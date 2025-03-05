@@ -1,0 +1,246 @@
+*dooing.txt*              A Minimalist Todo List Manager                *dooing*
+
+==============================================================================
+Table of Contents                                          *dooing-contents*
+
+1. Dooing                                                        |dooing-intro|
+  - Features                                                  |dooing-features|
+  - Requirements                                          |dooing-requirements|
+  - Installation                                          |dooing-installation|
+  - Configuration                                        |dooing-configuration|
+  - Usage                                                        |dooing-usage|
+  - Commands                                                  |dooing-commands|
+  - Keybindings                                            |dooing-keybindings|
+2. Advanced                                                    |dooing-advanced|
+  - Calendar                                                 |dooing-calendar|
+  - Priority System                                         |dooing-priorities|
+  - Import/Export                                             |dooing-import|
+3. Colors                                                      |dooing-colors|
+
+==============================================================================
+1. Dooing                                                        *dooing-intro*
+
+A minimalist todo list manager for Neovim, designed with simplicity and
+efficiency in mind. It provides a clean, distraction-free interface to manage
+your tasks directly within Neovim.
+
+FEATURES                                                      *dooing-features*
+
+- 📝 Manage todos in a clean floating window
+- 🏷️ Categorize tasks with #tags
+- ✅ Simple task management with clear visual feedback
+- 💾 Persistent storage of your todos
+- 🎨 Adapts to your Neovim colorscheme
+- 📅 Due dates with calendar integration
+- ⚡ Priority system with customizable weights
+- 🔍 Search and filter capabilities
+- 📤 Import/Export functionality
+- 🔄 Undo/Redo support for deleted todos
+
+REQUIREMENTS                                              *dooing-requirements*
+
+- Neovim >= 0.9.0
+- A patched font for icons (recommended)
+- Optional: nvim-web-devicons for file icons
+
+INSTALLATION                                              *dooing-installation*
+
+Using lazy.nvim: >lua
+    {
+        "atiladefreitas/dooing",
+        config = function()
+            require("dooing").setup({
+                -- your configuration here
+            })
+        end,
+    }
+<
+
+CONFIGURATION                                            *dooing-configuration*
+
+The plugin can be configured by passing a table to the setup function:
+>
+    require('dooing').setup({
+        window = {
+            width = 55,                -- Width of the todo window
+            height = 20,               -- Height of the todo window
+            border = "rounded",        -- Border style
+            position = "right",        -- Window position: "right", "left", "top", "bottom", "center",
+                                      -- "top-right", "top-left", "bottom-right", "bottom-left"
+            padding = {
+                top = 1,
+                bottom = 1,
+                left = 2,
+                right = 2,
+            },
+        },
+        quick_keys = true,
+        formatting = {
+            pending = {
+                icon = "○",
+                format = { "icon", "text", "due_date", "ect" },
+            },
+            done = {
+                icon = "✓",
+                format = { "icon", "text", "due_date", "ect" },
+            },
+        },
+        priorities = {
+            {
+                name = "important",
+                weight = 4,
+            },
+            {
+                name = "urgent",
+                weight = 2,
+            },
+        },
+        save_path = vim.fn.stdpath("data") .. "/dooing_todos.json",
+        calendar = {
+            language = "en",
+            icon = "",
+        },
+    })
+<
+
+USAGE                                                          *dooing-usage*
+
+Basic Operations:
+1. Open the todo window with `:Dooing`
+2. Add new todos with `i`
+3. Toggle completion with `x`
+4. Delete todos with `d`
+5. Add due dates with `H`
+6. Add priorities during creation
+7. Filter by tags with `t`
+
+COMMANDS                                                      *dooing-commands*
+
+                                                                    *:Dooing*
+Main command to interact with the plugin.
+
+Arguments:~
+    none            Opens/toggles the todo window
+    add [text]      Creates a new todo
+    list            Lists all todos in the command line
+    set             Modifies todo properties
+
+Examples: >vim
+    :Dooing
+    :Dooing add My new task #work
+    :Dooing add -p important,urgent My priority task
+    :Dooing list
+    :Dooing set 1 priorities important,urgent
+<
+
+KEYBINDINGS                                                *dooing-keybindings*
+
+Main Window~
+    <leader>td   Toggle todo window
+    i           Add new todo
+    x           Toggle todo status
+    d           Delete current todo
+    D           Delete all completed todos
+    q           Close window
+    H           Add due date
+    r           Remove due date
+    T           Add time estimation
+    R           Remove time estimation
+    ?           Toggle help window
+    t           Toggle tags window
+    c           Clear active tag filter
+    e           Edit todo
+    p           Edit priorities
+    u           Undo deletion
+    /           Search todos
+    I           Import todos
+    E           Export todos
+    <leader>D   Remove duplicates
+    <Space>     Toggle priority
+    <leader>p   Open todo scratchpad
+
+Tags Window~
+    e           Edit tag
+    d           Delete tag
+    <CR>        Filter by tag
+    q           Close window
+
+Calendar Window~
+    h           Previous day
+    l           Next day
+    k           Previous week
+    j           Next week
+    H           Previous month
+    L           Next month
+    <CR>        Select date
+    q           Close calendar
+
+==============================================================================
+2. Advanced                                                    *dooing-advanced*
+
+CALENDAR                                                     *dooing-calendar*
+
+The calendar feature supports multiple languages and provides a visual way to
+set due dates. Supported languages: en, pt, es, fr, de, it, jp
+
+Configure the calendar: >lua
+    calendar = {
+        language = "en",  -- Calendar language
+        icon = "",      -- Icon for due dates
+        keymaps = {
+            previous_day = "h",
+            next_day = "l",
+            previous_week = "k",
+            next_week = "j",
+            previous_month = "H",
+            next_month = "L",
+            select_day = "<CR>",
+            close_calendar = "q",
+        },
+    }
+<
+
+PRIORITY SYSTEM                                             *dooing-priorities*
+
+Configure priorities and their weights: >lua
+    priorities = {
+        {
+            name = "important",
+            weight = 4,
+        },
+        {
+            name = "urgent",
+            weight = 2,
+        },
+    },
+    priority_groups = {
+        high = {
+            members = { "important", "urgent" },
+            hl_group = "DiagnosticError",
+        },
+        medium = {
+            members = { "important" },
+            hl_group = "DiagnosticWarn",
+        },
+    }
+<
+
+IMPORT/EXPORT                                                 *dooing-import*
+
+Import and export todos using JSON format: >vim
+    :Dooing export ~/todos.json
+    :Dooing import ~/todos.json
+<
+
+==============================================================================
+3. Colors                                                      *dooing-colors*
+
+Highlight Groups~
+`DooingPending`       Pending todo items
+`DooingDone`          Completed todo items
+`DooingHelpText`      Help window text
+`DooingQuickTitle`    Quick keys title
+`DooingQuickKey`      Quick keys keybindings
+`DooingQuickDesc`     Quick keys descriptions
+
+ vim:tw=78:ts=8:ft=help:norl:
