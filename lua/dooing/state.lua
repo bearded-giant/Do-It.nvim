@@ -476,12 +476,22 @@ function M.delete_todo_with_confirmation(todo_index, win_id, calendar, callback)
 
 	-- Calculate window dimensions
 	local ui = vim.api.nvim_list_uis()[1]
-	local width = 60
+	local width = 120
 	local height = #lines
 	local row = math.floor((ui.height - height) / 2)
 	local col = math.floor((ui.width - width) / 2)
 
-	-- Create confirmation window
+	-- Get the delete confirmation key from config (default to "y" if not set) and set footer
+	local delete_key = config.options.keymaps.delete_confirmation or "Y"
+	-- local footer_text = " [" .. delete_key:upper() .. "]es - [N]o "
+	local footer_text
+	if delete_key:lower() == "y" then
+		footer_text = " [" .. delete_key:upper() .. "]es - [N]o "
+	else
+		footer_text = delete_key .. "-Yes - [N]o "
+	end
+
+	-- Create confirmation window with configurable footer
 	local confirm_win = vim.api.nvim_open_win(confirm_buf, true, {
 		relative = "editor",
 		row = row,
@@ -492,7 +502,7 @@ function M.delete_todo_with_confirmation(todo_index, win_id, calendar, callback)
 		border = "rounded",
 		title = " Delete incomplete todo? ",
 		title_pos = "center",
-		footer = " [Y]es - [N]o ",
+		footer = footer_text,
 		footer_pos = "center",
 		noautocmd = true,
 	})
@@ -588,8 +598,8 @@ function M.delete_todo_with_confirmation(todo_index, win_id, calendar, callback)
 		end
 	end
 
-	-- Handle responses
-	vim.keymap.set("n", "y", function()
+	-- Handle responses using the configurable key
+	vim.keymap.set("n", delete_key, function()
 		close_confirm()
 		M.delete_todo(todo_index)
 		if callback then
@@ -597,7 +607,7 @@ function M.delete_todo_with_confirmation(todo_index, win_id, calendar, callback)
 		end
 	end, opts)
 
-	vim.keymap.set("n", "Y", function()
+	vim.keymap.set("n", delete_key:upper(), function()
 		close_confirm()
 		M.delete_todo(todo_index)
 		if callback then
