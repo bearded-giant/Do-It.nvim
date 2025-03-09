@@ -1,36 +1,54 @@
 local M = {}
+
+-- Existing requires
 local config = require("dooing.config")
-local ui = require("dooing.ui")
 local state = require("dooing.state")
 
+-- New requires for refactored UI modules
+local ui = require("dooing.ui")
+local main_window = ui.main_window
+local todo_actions = ui.todo_actions
+
 function M.setup(opts)
+	-- Set up user config
 	config.setup(opts)
+	-- Load todos from state
 	state.load_todos()
 
+	-- Primary user command: :Dooing
 	vim.api.nvim_create_user_command("Dooing", function(opts)
 		local args = vim.split(opts.args, "%s+", { trimempty = true })
 		if #args == 0 then
-			ui.toggle_todo_window()
+			-- No args => toggle the main todo window
+			main_window.toggle_todo_window()
 			return
 		end
 
 		local command = args[1]
-		table.remove(args, 1) -- Remove command
+		table.remove(args, 1) -- Remove the command from the front
 
 		if command == "add" then
-			-- Parse priorities if -p or --priorities flag is present
+			--------------------------------------------------
+			-- Dooing add [arguments...]
+			--------------------------------------------------
+			-- Possible usage:
+			-- :Dooing add some text
+			-- :Dooing add -p priority1,priority2 "some text"
+			--
+			-- This block handles parsing out -p / --priorities and then
+			-- adds the todo to state
 			local priorities = nil
 			local todo_text = ""
 
 			local i = 1
 			while i <= #args do
 				if args[i] == "-p" or args[i] == "--priorities" then
+					-- If we see -p or --priorities, the next item in args
+					-- is a comma-separated list of priorities
 					if i + 1 <= #args then
-						-- Get and validate priorities
 						local priority_str = args[i + 1]
 						local priority_list = vim.split(priority_str, ",", { trimempty = true })
 
-						-- Validate each priority against config
 						local valid_priorities = {}
 						local invalid_priorities = {}
 						for _, p in ipairs(priority_list) do
@@ -47,14 +65,11 @@ function M.setup(opts)
 							end
 						end
 
-						-- Notify about invalid priorities
 						if #invalid_priorities > 0 then
 							vim.notify(
 								"Invalid priorities: " .. table.concat(invalid_priorities, ", "),
 								vim.log.levels.WARN,
-								{
-									title = "Dooing",
-								}
+								{ title = "Dooing" }
 							)
 						end
 
@@ -62,14 +77,17 @@ function M.setup(opts)
 							priorities = valid_priorities
 						end
 
-						i = i + 2 -- Skip priority flag and value
+						i = i + 2 -- Skip past the flag and its argument
 					else
-						vim.notify("Missing priority value after " .. args[i], vim.log.levels.ERROR, {
-							title = "Dooing",
-						})
+						vim.notify(
+							"Missing priority value after " .. args[i],
+							vim.log.levels.ERROR,
+							{ title = "Dooing" }
+						)
 						return
 					end
 				else
+					-- Everything else is part of the to-do text
 					todo_text = todo_text .. " " .. args[i]
 					i = i + 1
 				end
@@ -77,21 +95,24 @@ function M.setup(opts)
 
 			todo_text = vim.trim(todo_text)
 			if todo_text ~= "" then
+				-- Actually add the todo
 				state.add_todo(todo_text, priorities)
+
 				local msg = "Todo created: " .. todo_text
 				if priorities then
 					msg = msg .. " (priorities: " .. table.concat(priorities, ", ") .. ")"
 				end
-				vim.notify(msg, vim.log.levels.INFO, {
-					title = "Dooing",
-				})
+				vim.notify(msg, vim.log.levels.INFO, { title = "Dooing" })
 			end
 		elseif command == "list" then
-			-- Print all todos with their indices
+			--------------------------------------------------
+			-- Dooing list
+			--------------------------------------------------
+			-- Shows all todos, printed with `:messages`
 			for i, todo in ipairs(state.todos) do
 				local status = todo.done and "✓" or "○"
 
-				-- Build metadata string
+				-- Collect metadata
 				local metadata = {}
 				if todo.priorities and #todo.priorities > 0 then
 					table.insert(metadata, "priorities: " .. table.concat(todo.priorities, ", "))
@@ -106,11 +127,18 @@ function M.setup(opts)
 				local score = state.get_priority_score(todo)
 				table.insert(metadata, string.format("score: %.1f", score))
 
-				local metadata_text = #metadata > 0 and " (" .. table.concat(metadata, ", ") .. ")" or ""
+				local metadata_text = #metadata > 0 and (" (" .. table.concat(metadata, ", ") .. ")") or ""
 
 				vim.notify(string.format("%d. %s %s%s", i, status, todo.text, metadata_text), vim.log.levels.INFO)
 			end
 		elseif command == "set" then
+			--------------------------------------------------
+			-- Dooing set <index> <field> <value>
+			--------------------------------------------------
+			-- Example usage:
+			-- :Dooing set 3 priorities p1,p2
+			-- :Dooing set 2 ect 2h
+			--
 			if #args < 3 then
 				vim.notify("Usage: Dooing set <index> <field> <value>", vim.log.levels.ERROR)
 				return
@@ -126,14 +154,12 @@ function M.setup(opts)
 			local value = args[3]
 
 			if field == "priorities" then
-				-- Handle priority setting
+				-- If user typed "nil", it means clear priorities
 				if value == "nil" then
-					-- Clear priorities
 					state.todos[index].priorities = nil
 					state.save_todos()
 					vim.notify("Cleared priorities for todo " .. index, vim.log.levels.INFO)
 				else
-					-- Handle priority setting
 					local priority_list = vim.split(value, ",", { trimempty = true })
 					local valid_priorities = {}
 					local invalid_priorities = {}
@@ -166,8 +192,8 @@ function M.setup(opts)
 					end
 				end
 			elseif field == "ect" then
-				-- Handle estimated completion time setting
-				local hours, err = ui.parse_time_estimation(value)
+				-- Use the parse_time_estimation from the newly refactored todo_actions
+				local hours, err = todo_actions.parse_time_estimation(value)
 				if hours then
 					state.todos[index].estimated_hours = hours
 					state.save_todos()
@@ -179,7 +205,8 @@ function M.setup(opts)
 				vim.notify("Unknown field: " .. field, vim.log.levels.ERROR)
 			end
 		else
-			ui.toggle_todo_window()
+			-- If no recognized subcommand, just toggle the window
+			main_window.toggle_todo_window()
 		end
 	end, {
 		desc = "Toggle Todo List window or add new todo",
@@ -191,7 +218,7 @@ function M.setup(opts)
 			elseif args[1] == "set" and #args == 3 then
 				return { "priorities", "ect" }
 			elseif args[1] == "set" and (args[3] == "priorities") then
-				local priorities = { "nil" } -- Add nil as an option
+				local priorities = { "nil" } -- Let user type "nil" to clear
 				for _, p in ipairs(config.options.priorities) do
 					table.insert(priorities, p.name)
 				end
@@ -210,10 +237,10 @@ function M.setup(opts)
 		end,
 	})
 
-	-- Only set up keymap if it's enabled in config
+	-- Optional keymap for toggling the window
 	if config.options.keymaps.toggle_window then
 		vim.keymap.set("n", config.options.keymaps.toggle_window, function()
-			ui.toggle_todo_window()
+			main_window.toggle_todo_window()
 		end, { desc = "Toggle Todo List" })
 	end
 end
