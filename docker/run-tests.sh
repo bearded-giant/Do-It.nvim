@@ -1,13 +1,9 @@
 #!/bin/bash
 
-# Change to the docker directory
 cd "$(dirname "$0")"
-
-# Build the Docker image
 docker build -t dooing-plugin-test .
-
-# Run automated tests
-docker run --rm -v "$(pwd)/..:/plugin" dooing-plugin-test
+docker run --rm -v "$(pwd)/..:/plugin" dooing-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests', {pattern = '.*_spec.lua', recursive = true})" -c "qa!"
 
 # For interactive testing, uncomment:
 # docker run --rm -it -v "$(pwd)/..:/plugin" dooing-plugin-test nvim
+

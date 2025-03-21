@@ -2,12 +2,9 @@ local vim = vim
 
 local M = {}
 
--- Our main namespace for dooing highlights
 local ns_id = vim.api.nvim_create_namespace("dooing")
--- Cache for highlight groups
 local highlight_cache = {}
 
--- Set up base highlights
 function M.setup_highlights()
 	highlight_cache = {} -- Clear any old cache
 
@@ -21,12 +18,10 @@ function M.setup_highlights()
 	highlight_cache.help = "DooingHelpText"
 end
 
--- Return the highlight cache's namespace
 function M.get_namespace_id()
 	return ns_id
 end
 
--- Return a highlight group for a set of priorities
 function M.get_priority_highlight(priorities, config)
 	if not priorities or #priorities == 0 then
 		return highlight_cache.pending

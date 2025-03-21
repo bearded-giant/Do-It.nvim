@@ -2,7 +2,6 @@ local Cal = {}
 
 local config = require("dooing.config")
 
--- Month names in different languages
 Cal.MONTH_NAMES = {
 	en = {
 		"January",
@@ -104,13 +103,11 @@ Cal.MONTH_NAMES = {
 	},
 }
 
--- Helper function get calendar language to use on ui
 function Cal.get_language()
 	local calendar_opts = config.options.calendar or {}
 	return calendar_opts.language or "en"
 end
 
----Calculates the number of days in a given month and year
 local function get_days_in_month(month, year)
 	local days_in_month = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 	if month == 2 then
@@ -121,7 +118,6 @@ local function get_days_in_month(month, year)
 	return days_in_month[month]
 end
 
----Calculates the day of week for a given date
 local function get_day_of_week(year, month, day)
 	local t = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 }
 	if month < 3 then
@@ -130,7 +126,6 @@ local function get_day_of_week(year, month, day)
 	return (year + math.floor(year / 4) - math.floor(year / 100) + math.floor(year / 400) + t[month] + day) % 7
 end
 
----Sets up the calendar highlight groups
 local function setup_highlights()
 	vim.api.nvim_set_hl(0, "CalendarHeader", { link = "Title" })
 	vim.api.nvim_set_hl(0, "CalendarWeekday", { link = "Normal" })
@@ -182,7 +177,6 @@ function Cal.create(callback, opts)
 		title_pos = "center",
 	})
 
-	--- Gets the cursor position for a given day
 	local function get_cursor_position(day)
 		if not day then
 			return nil
@@ -202,7 +196,6 @@ function Cal.create(callback, opts)
 		return row, col
 	end
 
-	--- Gets the day from a given cursor position
 	local function get_day_from_position(row, col)
 		if row <= 2 then
 			return nil
@@ -220,7 +213,6 @@ function Cal.create(callback, opts)
 		return day
 	end
 
-	--- Renders the calendar
 	local function render()
 		local lines = {}
 
@@ -319,7 +311,6 @@ function Cal.create(callback, opts)
 		end
 	end
 
-	-- Navigates to a different day
 	local function navigate_day(direction)
 		local current_pos = vim.api.nvim_win_get_cursor(cal.win_id)
 		local current_day = get_day_from_position(current_pos[1], current_pos[2])
@@ -366,7 +357,6 @@ function Cal.create(callback, opts)
 		end
 	end
 
-	-- Set up keymaps
 	local keymaps = calendar_opts.keymaps
 	local keyopts = { buffer = cal.buf_id, nowait = true }
 

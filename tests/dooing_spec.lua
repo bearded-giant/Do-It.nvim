@@ -1,13 +1,9 @@
 local dooing = require("dooing")
 
 describe("dooing", function()
-	before_each(function()
-		-- Setup code that runs before each test
-	end)
+	before_each(function() end)
 
-	after_each(function()
-		-- Cleanup code that runs after each test
-	end)
+	after_each(function() end)
 
 	it("should properly initialize", function()
 		assert.truthy(dooing)
@@ -21,13 +17,11 @@ describe("dooing", function()
 		assert.truthy(dooing.ui)
 	end)
 
-	-- Test specific functionality
 	it("should load todos", function()
 		if dooing.state and dooing.state.todos and dooing.state.todos.get_todos then
 			local todos = dooing.state.todos.get_todos()
 			assert.truthy(todos)
 		else
-			-- Skip if the function doesn't exist
 			pending("get_todos function not found")
 		end
 	end)
