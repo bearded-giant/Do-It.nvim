@@ -28,8 +28,8 @@ tags_ops.setup(M, config)
 -- alias/convienence
 function M.load_todos()
 	-- load from disk, then update priority weights
-	M.update_priority_weights() -- from priorities.lua
 	M.load_from_disk() -- from storage.lua
+	M.update_priority_weights() -- from priorities.lua
 end
 
 -- alias for initial refactoring

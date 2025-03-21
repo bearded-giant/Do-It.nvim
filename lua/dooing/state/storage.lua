@@ -6,6 +6,12 @@ local Storage = {}
 
 function Storage.setup(M, config)
 	function M.save_to_disk()
+		-- Check if save_path is configured
+		if not config.options.save_path then
+			-- Use default save path if not set
+			config.options.save_path = vim.fn.stdpath("data") .. "/dooing_todos.json"
+		end
+		
 		local file = io.open(config.options.save_path, "w")
 		if file then
 			file:write(vim.fn.json_encode(M.todos))
@@ -14,6 +20,12 @@ function Storage.setup(M, config)
 	end
 
 	function M.load_from_disk()
+		-- Check if save_path is configured
+		if not config.options.save_path then
+			-- Use default save path if not set
+			config.options.save_path = vim.fn.stdpath("data") .. "/dooing_todos.json"
+		end
+		
 		local file = io.open(config.options.save_path, "r")
 		if file then
 			local content = file:read("*all")

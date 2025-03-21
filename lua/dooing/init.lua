@@ -9,6 +9,10 @@ local ui = require("dooing.ui")
 local main_window = ui.main_window
 local todo_actions = ui.todo_actions
 
+-- Expose modules for testing
+M.state = state
+M.ui = ui
+
 function M.setup(opts)
 	-- Set up user config
 	config.setup(opts)

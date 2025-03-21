@@ -11,8 +11,10 @@ function Priorities.setup(M, config)
 	-- Rebuild the cache from config
 	function M.update_priority_weights()
 		priority_weights = {}
-		for _, p in ipairs(config.options.priorities) do
-			priority_weights[p.name] = p.weight or 1
+		if config.options.priorities and type(config.options.priorities) == "table" then
+			for _, p in ipairs(config.options.priorities) do
+				priority_weights[p.name] = p.weight or 1
+			end
 		end
 	end
 
