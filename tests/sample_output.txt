@@ -1,0 +1,212 @@
+# Dooing Test Output Sample
+
+This file contains a sample of the test output from running `docker/run-tests.sh`, with explanations
+of the different sections and messages.
+
+```
+# Docker build output
+#0 building with "orbstack" instance using docker driver
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 439B done
+#1 DONE 0.0s
+...
+#11 naming to docker.io/library/dooing-plugin-test done
+#11 DONE 0.0s
+
+# Debug messages from init.lua - These are NOT test failures
+Testing file access with: /data/test_write.txt
+❌ Failed to write test file
+❌ Todos file not found or cannot be opened
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+
+# Test discovery information
+Starting...
+Scheduling: tests/ui/main_window_spec.lua
+Scheduling: tests/ui/search_window_spec.lua
+Scheduling: tests/state/storage_spec.lua
+Scheduling: tests/state/tags_spec.lua
+Scheduling: tests/state/todos_spec.lua
+Scheduling: tests/state/sorting_spec.lua
+Scheduling: tests/dooing_spec.lua
+
+# More debug messages - NOT test failures
+Testing file access with: /data/test_write.txt
+❌ Failed to write test file
+❌ Todos file not found or cannot be opened
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+
+# Test results for tags_spec.lua - All tests PASSED
+========================================	
+Testing: 	/plugin/tests/state/tags_spec.lua	
+[32mSuccess[0m	||	tags should get all unique tags	
+[32mSuccess[0m	||	tags should set tag filter	
+[32mSuccess[0m	||	tags should rename tags in all todos	
+[32mSuccess[0m	||	tags should delete tags from all todos	
+[32mSuccess[0m	||	tags should delete tag at the end of a line	
+	
+[32mSuccess: [0m	5	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# More debug messages - NOT test failures
+Testing file access with: /data/test_write.txt
+❌ Failed to write test file
+❌ Todos file not found or cannot be opened
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+
+# Test results for sorting_spec.lua - All tests PASSED
+========================================	
+Testing: 	/plugin/tests/state/sorting_spec.lua	
+[32mSuccess[0m	||	sorting should sort by completion status first	
+[32mSuccess[0m	||	sorting should sort by priority score second	
+[32mSuccess[0m	||	sorting should sort by due date third	
+[32mSuccess[0m	||	sorting should sort items with due dates before those without	
+[32mSuccess[0m	||	sorting should sort by creation time last	
+[32mSuccess[0m	||	sorting should handle complex sorting with all criteria	
+	
+[32mSuccess: [0m	6	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# More debug messages and test results for todos_spec.lua - All tests PASSED
+Testing file access with: /data/test_write.txt
+❌ Failed to write test file
+❌ Todos file not found or cannot be opened
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+
+========================================	
+Testing: 	/plugin/tests/state/todos_spec.lua	
+[32mSuccess[0m	||	todos should add a todo	
+[32mSuccess[0m	||	todos should parse categories from tags	
+[32mSuccess[0m	||	todos should toggle todo status correctly	
+[32mSuccess[0m	||	todos should delete a todo	
+[32mSuccess[0m	||	todos should delete completed todos	
+[32mSuccess[0m	||	todos should undo deleted todos	
+[32mSuccess[0m	||	todos should limit undo history size	
+[32mSuccess[0m	||	todos should remove duplicates	
+	
+[32mSuccess: [0m	8	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# Test results for dooing_spec.lua - 4 passes, 1 skipped (shown as "Pending")
+========================================	
+Testing: 	/plugin/tests/dooing_spec.lua	
+[32mSuccess[0m	||	dooing should properly initialize	
+[32mSuccess[0m	||	dooing should have state module	
+[32mSuccess[0m	||	dooing should have ui module	
+[33mPending[0m	||	dooing should load todos get_todos function not found	
+[32mSuccess[0m	||	dooing should load todos	
+	
+[32mSuccess: [0m	4	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# Test results for main_window_spec.lua - All tests PASSED
+========================================	
+Testing: 	/plugin/tests/ui/main_window_spec.lua	
+[32mSuccess[0m	||	main_window should format todo line correctly	
+[32mSuccess[0m	||	main_window should format completed todo line correctly	
+[32mSuccess[0m	||	main_window should format in-progress todo line correctly	
+[32mSuccess[0m	||	main_window should format todo with due date correctly	
+[32mSuccess[0m	||	main_window should toggle todo window	
+	
+[32mSuccess: [0m	5	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# Test results for search_window_spec.lua - All tests PASSED
+========================================	
+Testing: 	/plugin/tests/ui/search_window_spec.lua	
+[32mSuccess[0m	||	search_window should create search window	
+[32mSuccess[0m	||	search_window should search for todos	
+[32mSuccess[0m	||	search_window should handle empty search results	
+[32mSuccess[0m	||	search_window should close search window when main window closes	
+	
+[32mSuccess: [0m	4	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================	
+
+# Test results for storage_spec.lua - All tests PASSED
+========================================	
+Testing: 	/plugin/tests/state/storage_spec.lua	
+Saving todos to: /data/dooing_todos.json	
+Encoded 1 todos to JSON (length: 33)	
+✅ Successfully saved todos to /data/dooing_todos.json	
+✅ Verified file after save, size: 33 bytes	
+✅ Forced sync to disk	
+[32mSuccess[0m	||	storage should save todos to disk	
+Loading todos from: /data/dooing_todos.json	
+Read 37 bytes from todos file	
+✅ Successfully loaded 1 todos	
+[32mSuccess[0m	||	storage should load todos from disk	
+Saving todos to: /data/dooing_todos.json	
+Encoded 2 todos to JSON (length: 84)	
+✅ Successfully saved todos to /data/dooing_todos.json	
+✅ Verified file after save, size: 84 bytes	
+✅ Forced sync to disk	
+[32mSuccess[0m	||	storage should import todos from file	
+[32mSuccess[0m	||	storage should export todos to file	
+	
+[32mSuccess: [0m	4	
+[31mFailed : [0m	0	
+[31mErrors : [0m	0	
+========================================
+```
+
+## Summary of test results:
+
+- **tags_spec.lua**: 5 tests passed, 0 failed
+- **sorting_spec.lua**: 6 tests passed, 0 failed
+- **todos_spec.lua**: 8 tests passed, 0 failed
+- **dooing_spec.lua**: 4 tests passed, 0 failed, 1 pending
+- **main_window_spec.lua**: 5 tests passed, 0 failed
+- **search_window_spec.lua**: 4 tests passed, 0 failed
+- **storage_spec.lua**: 4 tests passed, 0 failed
+
+**Total: 36 tests passed, 0 failed, 1 pending**
+
+The "pending" test is not a failure - it means the test was skipped because a feature is not implemented yet.
+
+## Understanding the error-like messages
+
+The messages like these are NOT test failures:
+
+```
+Testing file access with: /data/test_write.txt
+❌ Failed to write test file
+❌ Todos file not found or cannot be opened
+Loading todos from: /data/dooing_todos.json
+❌ Could not open todos file for reading
+```
+
+These are debug output from init.lua in the Docker container that's trying to access files in /data directory. 
+The Docker container intentionally has limited file access to keep tests isolated.

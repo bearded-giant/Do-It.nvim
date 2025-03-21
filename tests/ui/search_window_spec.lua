@@ -15,6 +15,7 @@ describe("search_window", function()
         _G._original_vim_api_nvim_create_autocmd = vim.api.nvim_create_autocmd
         _G._original_vim_api_nvim_win_is_valid = vim.api.nvim_win_is_valid
         _G._original_vim_api_nvim_set_current_win = vim.api.nvim_set_current_win
+        _G._original_vim_api_nvim_win_close = vim.api.nvim_win_close
         
         vim.api.nvim_create_buf = function() return 1 end
         vim.api.nvim_open_win = function() return 1 end
@@ -26,6 +27,7 @@ describe("search_window", function()
         vim.api.nvim_create_autocmd = function() end
         vim.api.nvim_win_is_valid = function() return true end
         vim.api.nvim_set_current_win = function() end
+        vim.api.nvim_win_close = function() end
         
         -- Mock vim.api.nvim_list_uis
         vim.api.nvim_list_uis = function()
@@ -95,6 +97,7 @@ describe("search_window", function()
         vim.api.nvim_create_autocmd = _G._original_vim_api_nvim_create_autocmd
         vim.api.nvim_win_is_valid = _G._original_vim_api_nvim_win_is_valid
         vim.api.nvim_set_current_win = _G._original_vim_api_nvim_set_current_win
+        vim.api.nvim_win_close = _G._original_vim_api_nvim_win_close
         vim.ui.input = _G._original_vim_ui_input
     end)
     
@@ -175,21 +178,24 @@ describe("search_window", function()
             win_close_called = true 
         end
         
-        -- Mock the autocmd callback capture
-        local captured_callback
-        vim.api.nvim_create_autocmd = function(_, options)
-            captured_callback = options.callback
+        -- Create a callback capture function for the autocmd
+        local autocmd_callback
+        vim.api.nvim_create_autocmd = function(event, opts)
+            assert.are.equal("WinClosed", event)
+            autocmd_callback = opts.callback
+            return 1 -- Return a mock autocmd ID
         end
         
+        -- Call the function that creates the search window
         search_window.create_search_window(10)
         
-        -- Verify autocmd was created
-        assert.truthy(captured_callback)
+        -- Make sure the autocmd was created and callback captured
+        assert.truthy(autocmd_callback)
         
-        -- Trigger the autocmd callback
-        captured_callback()
+        -- Call the autocmd callback directly
+        autocmd_callback()
         
-        -- Verify window was closed
+        -- Verify that the win_close function was called
         assert.is_true(win_close_called)
     end)
 end)
