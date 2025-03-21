@@ -1,0 +1,19 @@
+name: Run Docker Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Docker Tests
+        run: ./docker/run-tests.sh
+        
+      - name: Handle failure
+        if: failure()
+        run: echo "Tests failed! Check the logs above for more details."
