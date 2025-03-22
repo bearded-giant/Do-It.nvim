@@ -89,6 +89,9 @@ M.defaults = {
 		export_todos = "E",
 		remove_duplicates = "<leader>D",
 		open_todo_scratchpad = "<leader>p",
+		reorder_todo = "r",
+		move_todo_up = "k",
+		move_todo_down = "j",
 	},
 	calendar = {
 		language = "en",

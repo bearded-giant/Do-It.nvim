@@ -7,6 +7,13 @@ local Todos = {}
 function Todos.setup(M, config)
 	-- Add a new todo
 	function M.add_todo(text, priority_names)
+		local max_order = 0
+		for _, todo in ipairs(M.todos) do
+			if todo.order_index and todo.order_index > max_order then
+				max_order = todo.order_index
+			end
+		end
+
 		table.insert(M.todos, {
 			text = text,
 			done = false,
@@ -16,6 +23,7 @@ function Todos.setup(M, config)
 			priorities = priority_names,
 			estimated_hours = nil,
 			notes = "",
+			order_index = max_order + 1,
 		})
 		M.save_to_disk()
 	end

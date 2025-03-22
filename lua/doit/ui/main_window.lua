@@ -502,6 +502,12 @@ local function create_window()
 		end)
 	end)
 
+	setup_keymap("reorder_todo", function()
+		todo_actions.reorder_todo(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
 	setup_keymap("open_todo_scratchpad", function()
 		scratchpad.open_todo_scratchpad(win_id)
 	end)

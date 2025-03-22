@@ -10,7 +10,16 @@ function Sorting.setup(M, config)
 				return not a.done
 			end
 
-			-- 2) Sort by priority score
+			-- 2) Sort by order_index if both have it
+			if a.order_index and b.order_index then
+				return a.order_index < b.order_index
+			elseif a.order_index then
+				return true
+			elseif b.order_index then
+				return false
+			end
+
+			-- 3) Sort by priority score
 			if config.options.priorities and #config.options.priorities > 0 then
 				local a_score = M.get_priority_score(a) -- from priorities.lua
 				local b_score = M.get_priority_score(b)
@@ -19,7 +28,7 @@ function Sorting.setup(M, config)
 				end
 			end
 
-			-- 3) Sort by due date
+			-- 4) Sort by due date
 			if a.due_at and b.due_at then
 				if a.due_at ~= b.due_at then
 					return a.due_at < b.due_at
@@ -30,7 +39,7 @@ function Sorting.setup(M, config)
 				return false
 			end
 
-			-- 4) Sort by creation time
+			-- 5) Sort by creation time
 			return a.created_at < b.created_at
 		end)
 	end
