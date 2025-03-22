@@ -2,23 +2,24 @@
 
 DoIt is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim. Perfect for users who want to keep track of their todos without leaving their editor.
 
-> This project is very much based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modification for customizations and tweaks to how I work, while maintaining the core functionality.
+> This project is very much based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modification for customization and tweaks to how I work, while maintaining the core functionality.
 
-![DoIt demo](https://github.com/user-attachments/assets/ffb921d6-6dd8-4a01-8aaa-f2440891b22e)
+{...pics and video coming soon...}
 
-## 🚀 Features
+## Features
 
-- 📝 Manage todos in a clean **floating window**
-- 🏷️ Categorize tasks with **#tags**
-- ✅ Simple task management with clear visual feedback
-- 💾 **Persistent storage** of your todos
-- 🎨 Adapts to your Neovim **colorscheme**
-- 🛠️ Compatible with **Lazy.nvim** for effortless installation
-- ⏰ **Relative timestamps** showing when todos were created
+- Manage todos in a simple and efficient way
+- Categorize tasks with #tags
+- Simple task management with clear visual feedback
+- Persistent storage of your todos
+- Adapts to your Neovim colorscheme
+- Compatible with **Lazy.nvim** for effortless installation
+- Relative timestamps showing when todos were created
+- Import/Export of todo json for backups, obsidian integration...whatever you want
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
@@ -32,39 +33,30 @@ return {
     "bryangrimes/doit",
     config = function()
         require("doit").setup({
-            -- your custom config here (optional)
+            -- optional configurations here...
         })
     end,
 }
 ```
 
-Run the following commands in Neovim to install DoIt:
-
-```vim
-:Lazy sync
-```
+`:Lazy sync` to install and sync the plugin, or relaunch Neovim.
 
 ### Default Configuration
 
-DoIt comes with sensible defaults that you can override:
+DoIt comes with sensible defaults that you can customize as you like.  Defaults:
 
 ```lua
 {
-    -- Core settings
-    save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
-
-    -- Timestamp settings
+    save_path = vim.fn.stdpath("data") .. "/doit_todos.json",  -- Data storage path
     timestamp = {
-        enabled = true,  -- Show relative timestamps (e.g., @5m ago, @2h ago)
+        enabled = true,         -- Show relative timestamps (e.g., @5m ago, @2h ago)
     },
-
-    -- Window settings
     window = {
-        width = 55,         -- Width of the floating window
-        height = 20,        -- Height of the floating window
-        border = 'rounded', -- Border style
-        position = 'center', -- Window position: 'right', 'left', 'top', 'bottom', 'center',
-                           -- 'top-right', 'top-left', 'bottom-right', 'bottom-left'
+        width = 55,             -- Width of the floating window
+        height = 20,            -- Height of the floating window
+        border = 'rounded',     -- Border style
+        position = 'center',    -- Window position: 'right', 'left', 'top', 'bottom', 'center',
+                                    -- 'top-right', 'top-left', 'bottom-right', 'bottom-left'
         padding = {
             top = 1,
             bottom = 1,
@@ -72,9 +64,7 @@ DoIt comes with sensible defaults that you can override:
             right = 2,
         },
     },
-
-    -- To-do formatting
-    formatting = {
+    formatting = {              -- To-do formatting
         pending = {
             icon = "○",
             format = { "icon", "notes_icon", "text", "due_date", "ect" },
@@ -88,18 +78,13 @@ DoIt comes with sensible defaults that you can override:
             format = { "icon", "notes_icon", "text", "due_date", "ect" },
         },
     },
-
-    quick_keys = true,      -- Quick keys window
-    
+    quick_keys = true, 
     notes = {
         icon = "📓",
     },
-
     scratchpad = {
         syntax_highlight = "markdown",
     },
-
-    -- Keymaps
     keymaps = {
         toggle_window = "<leader>td",
         new_todo = "i",
@@ -126,7 +111,6 @@ DoIt comes with sensible defaults that you can override:
         remove_duplicates = "<leader>D",
         open_todo_scratchpad = "<leader>p",
     },
-
     calendar = {
         language = "en",
         icon = "",
@@ -141,8 +125,6 @@ DoIt comes with sensible defaults that you can override:
             close_calendar = "q",
         },
     },
-
-    -- Priority settings
     priorities = {
         {
             name = "important",
@@ -176,7 +158,7 @@ DoIt comes with sensible defaults that you can override:
 
 ## Commands
 
-DoIt provides several commands for task management:
+DoIt provides several commands to get things done:
 
 - `:doit` - Opens the main window
 - `:doit add [text]` - Adds a new task
@@ -188,9 +170,7 @@ DoIt provides several commands for task management:
 
 ---
 
-## 🔑 Keybindings
-
-DoIt comes with intuitive keybindings:
+## Keybinds
 
 #### Main Window
 
@@ -243,60 +223,15 @@ DoIt comes with intuitive keybindings:
 
 ---
 
-## 📥 Backlog
+## Roadmap...Sort of
 
-Planned features and improvements for future versions of DoIt:
-
-#### Core Features
-
-- [x] Due Dates Support
-- [x] Priority Levels
-- [x] Todo Filtering by Tags
-- [x] Todo Search
-- [ ] Todo List Per Project
-
-#### UI Enhancements
-
-- [x] Tag Highlighting
-- [ ] Custom Todo Colors
+- [ ] Reorder Todos
+- [ ] Active Todo to Top
+- [ ] Named (and Multiple) Todo Lists
 - [ ] Todo Categories View
 
-#### Quality of Life
-
-- [ ] Multiple Todo Lists
-- [X] Import/Export Features
-
 ---
 
-## 📝 License
+## Acknowledgments
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-## 🔖 Versioning
-
-We use [Semantic Versioning](https://semver.org/) for versioning.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! If you'd like to improve DoIt, feel free to:
-
-- Submit an issue for bugs or feature requests
-- Create a pull request with your enhancements
-
----
-
-## 🌟 Acknowledgments
-
-DoIt is based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
-
-Additional thanks to all the developers who contribute to the Neovim ecosystem and plugins like [Lazy.nvim](https://github.com/folke/lazy.nvim).
-
----
-
-## 📬 Contact
-
-If you have any questions, feel free to open an issue on GitHub.
+DoIt is FOR SURE based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
