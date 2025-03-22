@@ -14,6 +14,17 @@ vim.api.nvim_create_user_command("ToDo", function()
 	require("doit").toggle_window()
 end, { desc = "Toggle doit window" })
 
+-- Ensure the toggle_window function exists
+vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+        if not require("doit").toggle_window then
+            require("doit").toggle_window = function()
+                require("doit").ui.main_window.toggle_todo_window()
+            end
+        end
+    end,
+})
+
 -- print("doit plugin initializing...")
 
 local function test_file_access()
@@ -38,7 +49,7 @@ local function test_file_access()
 		print("❌ Failed to write test file")
 	end
 
-	-- Check the todos file
+	-- Check/create the todos file
 	local todos_path = "/data/doit_todos.json"
 	local todos_file = io.open(todos_path, "r")
 	if todos_file then
@@ -55,7 +66,26 @@ local function test_file_access()
 			print("❌ Cannot write to todos file")
 		end
 	else
-		print("❌ Todos file not found or cannot be opened")
+		print("ℹ️ Todos file not found, creating it")
+		-- Create an empty todos file with an empty array
+		local create_file = io.open(todos_path, "w")
+		if create_file then
+			create_file:write("[]")
+			create_file:close()
+			print("✅ Created empty todos file")
+			
+			-- Verify it
+			local verify = io.open(todos_path, "r")
+			if verify then
+				local content = verify:read("*all")
+				verify:close()
+				print("✅ Verified todos file with content: " .. content)
+			else
+				print("❌ Could not verify todos file")
+			end
+		else
+			print("❌ Could not create todos file")
+		end
 	end
 end
 

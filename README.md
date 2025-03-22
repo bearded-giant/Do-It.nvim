@@ -1,5 +1,7 @@
 # DoIt
 
+[![Docker Tests](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml/badge.svg)](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml)
+
 DoIt is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim. Perfect for users who want to keep track of their todos without leaving their editor.
 
 > This project is very much based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modification for customization and tweaks to how I work, while maintaining the core functionality.

@@ -13,8 +13,8 @@ function M.setup(opts)
 	config.setup(opts)
 	state.load_todos()
 
-	-- Primary user command: :doit
-	vim.api.nvim_create_user_command("doit", function(opts)
+	-- Primary user command: :Doit (must start with uppercase)
+	vim.api.nvim_create_user_command("Doit", function(opts)
 		local args = vim.split(opts.args, "%s+", { trimempty = true })
 		if #args == 0 then
 			-- No args => toggle the main todo window
