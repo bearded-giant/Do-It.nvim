@@ -1,4 +1,4 @@
-# DoIt Plugin Development Guide
+# DoIt.nvim Plugin Development Guide
 
 This guide explains how to set up a development environment for the DoIt plugin. It assumes you're already familiar with the basics of Docker, Lua, and Neovim plugin development.
 
@@ -139,3 +139,4 @@ Contributions are welcome! Please ensure:
 2. All tests pass
 3. New features include tests
 4. Documentation is updated
+
