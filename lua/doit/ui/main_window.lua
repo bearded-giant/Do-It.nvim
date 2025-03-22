@@ -235,6 +235,17 @@ function M.format_todo_line(todo)
 	if not format then
 		format = { "icon", "text", "ect", "relative_time" } -- fallback
 	end
+	
+	-- Add visual indicator if this todo is being reordered
+	local is_reordering = false
+	if state.reordering_todo_index then
+		for i, t in ipairs(state.todos) do
+			if i == state.reordering_todo_index and t == todo then
+				is_reordering = true
+				break
+			end
+		end
+	end
 
 	local notes_icon = ""
 	if todo.notes and todo.notes ~= "" then
@@ -286,6 +297,10 @@ function M.format_todo_line(todo)
 
 	for _, part in ipairs(format) do
 		if part == "icon" then
+			if is_reordering then
+				table.insert(components, "> ")
+			end
+			
 			if todo.done then
 				table.insert(components, formatting.done.icon)
 			elseif todo.in_progress then
@@ -498,6 +513,12 @@ local function create_window()
 
 	setup_keymap("remove_time_estimation", function()
 		todo_actions.remove_time_estimation(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("reorder_todo", function()
+		todo_actions.reorder_todo(win_id, function()
 			M.render_todos()
 		end)
 	end)

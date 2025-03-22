@@ -46,6 +46,7 @@ FEATURES                                                      *doit-features*
 - Compatible with Lazy.nvim for effortless installation
 - Relative timestamps showing when todos were created
 - Import/Export of todo json for backups, obsidian integration...whatever you want
+- Todo reordering with customizable keybindings
 
 REQUIREMENTS                                              *doit-requirements*
 
@@ -239,6 +240,12 @@ Main Window~
     <leader>D   Remove duplicates
     <Space>     Toggle priority
     <leader>p   Open todo scratchpad
+    r           Enter reordering mode
+
+Reordering Mode~
+    k           Move todo up
+    j           Move todo down
+    r           Save and exit reordering mode
 
 Tags Window~
     e           Edit tag
@@ -334,7 +341,7 @@ Highlight Groups~
 ==============================================================================
 4. Roadmap                                                    *doit-roadmap*
 
-- Reorder Todos
+- ✓ Reorder Todos
 - Active Todo to Top
 - Named (and Multiple) Todo Lists
 - Todo Categories View

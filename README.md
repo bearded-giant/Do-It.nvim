@@ -118,6 +118,9 @@ DoIt comes with sensible defaults that you can customize as you like.  Defaults:
         export_todos = "E",
         remove_duplicates = "<leader>D",
         open_todo_scratchpad = "<leader>p",
+        reorder_todo = "r",
+        move_todo_up = "k",
+        move_todo_down = "j",
     },
     calendar = {
         language = "en",
@@ -206,6 +209,15 @@ DoIt provides several commands to get things done:
 | `<leader>D`  | Remove duplicates            |
 | `<Space>`    | Toggle priority              |
 | `<leader>p`  | Open todo scratchpad         |
+| `r`          | Enter reordering mode        |
+
+#### Reordering Mode
+
+| Key    | Action                        |
+|--------|------------------------------|
+| `k`    | Move todo up                  |
+| `j`    | Move todo down                |
+| `r`    | Save and exit reordering mode |
 
 #### Tags Window
 
@@ -233,7 +245,7 @@ DoIt provides several commands to get things done:
 
 ## Roadmap...Sort of
 
-- [ ] Reorder Todos
+- [x] Reorder Todos
 - [ ] Active Todo to Top
 - [ ] Named (and Multiple) Todo Lists
 - [ ] Todo Categories View

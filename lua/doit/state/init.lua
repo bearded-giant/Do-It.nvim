@@ -7,6 +7,7 @@ local M = {
 	active_filter = nil, -- optional active tag filter
 	deleted_todos = {}, -- history of deleted todos for undo
 	MAX_UNDO_HISTORY = 100,
+	reordering_todo_index = nil, -- currently reordering todo index
 }
 
 local storage = require("doit.state.storage")
