@@ -2,9 +2,15 @@
 
 [![Docker Tests](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml/badge.svg)](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml)
 
-DoIt is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim. Perfect for users who want to keep track of their todos without leaving their editor.
+DoIt is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim.
 
-> This project is very much based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modification for customization and tweaks to how I work, while maintaining the core functionality.
+DoIt is my personal way of how I want to track my tasks and todos. As a Principal Engineer, I have a lot of things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of todo list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
+
+I also wanted a sandbox to play with Lua and some docker ideas around containerized Neovim plugin development and testing.  Oh also I'm dabbling some with Claude Code in this repo, to see how AI can help me learn a new-ish language...so that's something.   Anyway, here we are.
+
+If you want to contribute or have any ideas, feel free to open an issue or make a PR. I don't know why you would, but hey, I'm not here to judge.  Cheers!
+
+> This project is 100% built on top of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modifications for customizations for how I work, while maintaining the core functionality.
 
 {...pics and video coming soon...}
 

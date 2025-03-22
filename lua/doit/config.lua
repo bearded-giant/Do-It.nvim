@@ -1,4 +1,3 @@
--- In config.lua, add PRIORITIES to the defaults
 local M = {}
 
 M.defaults = {
