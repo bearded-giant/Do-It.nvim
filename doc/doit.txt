@@ -16,38 +16,47 @@ Table of Contents                                          *doit-contents*
   - Priority System                                         |doit-priorities|
   - Import/Export                                             |doit-import|
 3. Colors                                                      |doit-colors|
+4. Roadmap                                                    |doit-roadmap|
 
 ==============================================================================
 1. doit                                                        *doit-intro*
 
-A minimalist todo list manager for Neovim, designed with simplicity and
+DoIt is a minimalist todo list manager for Neovim, designed with simplicity and
 efficiency in mind. It provides a clean, distraction-free interface to manage
 your tasks directly within Neovim.
 
+DoIt is my personal way of how I want to track my tasks and todos. As a 
+Principal Engineer, I have a lot of things to keep track of, and I wanted a 
+simple way to do that without leaving my editor. I've tried a lot of todo list 
+managers, and they all seem to be too much for me. I just want to keep track of 
+what I need to do, and that's it. I don't need a bunch of bells and whistles. 
+I just need to know what I need to do.
+
+DoIt is 100% built on top of Dooing by atiladefreitas. DoIt is a fork with 
+some heavy modifications for customizations for how I work, while maintaining 
+the core functionality.
+
 FEATURES                                                      *doit-features*
 
-- 📝 Manage todos in a clean floating window
-- 🏷️ Categorize tasks with #tags
-- ✅ Simple task management with clear visual feedback
-- 💾 Persistent storage of your todos
-- 🎨 Adapts to your Neovim colorscheme
-- 📅 Due dates with calendar integration
-- ⚡ Priority system with customizable weights
-- 🔍 Search and filter capabilities
-- 📤 Import/Export functionality
-- 🔄 Undo/Redo support for deleted todos
+- Manage todos in a simple and efficient way
+- Categorize tasks with #tags
+- Simple task management with clear visual feedback
+- Persistent storage of your todos
+- Adapts to your Neovim colorscheme
+- Compatible with Lazy.nvim for effortless installation
+- Relative timestamps showing when todos were created
+- Import/Export of todo json for backups, obsidian integration...whatever you want
 
 REQUIREMENTS                                              *doit-requirements*
 
-- Neovim >= 0.9.0
-- A patched font for icons (recommended)
-- Optional: nvim-web-devicons for file icons
+- Neovim >= 0.10.0
+- Lazy.nvim as your plugin manager
 
 INSTALLATION                                              *doit-installation*
 
-Using lazy.nvim: >lua
-    {
-        "atiladefreitas/doit",
+Using Lazy.nvim: >lua
+    return {
+        "bryangrimes/doit",
         config = function()
             require("doit").setup({
                 -- your configuration here
@@ -56,17 +65,24 @@ Using lazy.nvim: >lua
     }
 <
 
+Then run `:Lazy sync` to install and sync the plugin, or relaunch Neovim.
+
 CONFIGURATION                                            *doit-configuration*
 
-The plugin can be configured by passing a table to the setup function:
->
-    require('doit').setup({
+The plugin can be configured by passing a table to the setup function.
+Here are the default settings:
+>lua
+    {
+        save_path = vim.fn.stdpath("data") .. "/doit_todos.json",  -- Data storage path
+        timestamp = {
+            enabled = true,         -- Show relative timestamps (e.g., @5m ago, @2h ago)
+        },
         window = {
-            width = 55,                -- Width of the todo window
-            height = 20,               -- Height of the todo window
-            border = "rounded",        -- Border style
-            position = "right",        -- Window position: "right", "left", "top", "bottom", "center",
-                                      -- "top-right", "top-left", "bottom-right", "bottom-left"
+            width = 55,             -- Width of the floating window
+            height = 20,            -- Height of the floating window
+            border = 'rounded',     -- Border style
+            position = 'center',    -- Window position: 'right', 'left', 'top', 'bottom', 'center',
+                                    -- 'top-right', 'top-left', 'bottom-right', 'bottom-left'
             padding = {
                 top = 1,
                 bottom = 1,
@@ -74,15 +90,65 @@ The plugin can be configured by passing a table to the setup function:
                 right = 2,
             },
         },
-        quick_keys = true,
-        formatting = {
+        formatting = {              -- To-do formatting
             pending = {
                 icon = "○",
+                format = { "icon", "notes_icon", "text", "due_date", "ect" },
+            },
+            in_progress = {
+                icon = "◐",
                 format = { "icon", "text", "due_date", "ect" },
             },
             done = {
                 icon = "✓",
-                format = { "icon", "text", "due_date", "ect" },
+                format = { "icon", "notes_icon", "text", "due_date", "ect" },
+            },
+        },
+        quick_keys = true, 
+        notes = {
+            icon = "📓",
+        },
+        scratchpad = {
+            syntax_highlight = "markdown",
+        },
+        keymaps = {
+            toggle_window = "<leader>td",
+            new_todo = "i",
+            toggle_todo = "x",
+            delete_todo = "d",
+            delete_completed = "D",
+            close_window = "q",
+            undo_delete = "u",
+            add_due_date = "H",
+            remove_due_date = "r",
+            toggle_help = "?",
+            toggle_tags = "t",
+            toggle_priority = "<Space>",
+            clear_filter = "c",
+            edit_todo = "e",
+            edit_tag = "e",
+            edit_priorities = "p",
+            delete_tag = "d",
+            search_todos = "/",
+            add_time_estimation = "T",
+            remove_time_estimation = "R",
+            import_todos = "I",
+            export_todos = "E",
+            remove_duplicates = "<leader>D",
+            open_todo_scratchpad = "<leader>p",
+        },
+        calendar = {
+            language = "en",
+            icon = "",
+            keymaps = {
+                previous_day = "h",
+                next_day = "l",
+                previous_week = "k",
+                next_week = "j",
+                previous_month = "H",
+                next_month = "L",
+                select_day = "<CR>",
+                close_calendar = "q",
             },
         },
         priorities = {
@@ -95,18 +161,31 @@ The plugin can be configured by passing a table to the setup function:
                 weight = 2,
             },
         },
-        save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
-        calendar = {
-            language = "en",
-            icon = "",
+        priority_groups = {
+            high = {
+                members = { "important", "urgent" },
+                color = nil,
+                hl_group = "DiagnosticError",
+            },
+            medium = {
+                members = { "important" },
+                color = nil,
+                hl_group = "DiagnosticWarn",
+            },
+            low = {
+                members = { "urgent" },
+                color = nil,
+                hl_group = "DiagnosticInfo",
+            },
         },
-    })
+        hour_score_value = 1/8,
+    }
 <
 
 USAGE                                                          *doit-usage*
 
 Basic Operations:
-1. Open the todo window with `:doit`
+1. Open the todo window with `:Doit`
 2. Add new todos with `i`
 3. Toggle completion with `x`
 4. Delete todos with `d`
@@ -116,21 +195,23 @@ Basic Operations:
 
 COMMANDS                                                      *doit-commands*
 
-                                                                    *:doit*
+                                                                    *:Doit*
 Main command to interact with the plugin.
 
 Arguments:~
     none            Opens/toggles the todo window
     add [text]      Creates a new todo
+      -p, --priorities [list]   Comma-separated list of priorities
     list            Lists all todos in the command line
     set             Modifies todo properties
 
 Examples: >vim
-    :doit
-    :doit add My new task #work
-    :doit add -p important,urgent My priority task
-    :doit list
-    :doit set 1 priorities important,urgent
+    :Doit
+    :Doit add My new task #work
+    :Doit add -p important,urgent My priority task
+    :Doit list
+    :Doit set 1 priorities important,urgent
+    :Doit set 2 ect 2h
 <
 
 KEYBINDINGS                                                *doit-keybindings*
@@ -180,8 +261,8 @@ Calendar Window~
 
 CALENDAR                                                     *doit-calendar*
 
-The calendar feature supports multiple languages and provides a visual way to
-set due dates. Supported languages: en, pt, es, fr, de, it, jp
+The calendar feature provides a visual way to set due dates. 
+Supported languages: en, pt, es, fr, de, it, jp
 
 Configure the calendar: >lua
     calendar = {
@@ -216,11 +297,18 @@ Configure priorities and their weights: >lua
     priority_groups = {
         high = {
             members = { "important", "urgent" },
+            color = nil,
             hl_group = "DiagnosticError",
         },
         medium = {
             members = { "important" },
+            color = nil,
             hl_group = "DiagnosticWarn",
+        },
+        low = {
+            members = { "urgent" },
+            color = nil,
+            hl_group = "DiagnosticInfo",
         },
     }
 <
@@ -228,8 +316,8 @@ Configure priorities and their weights: >lua
 IMPORT/EXPORT                                                 *doit-import*
 
 Import and export todos using JSON format: >vim
-    :doit export ~/todos.json
-    :doit import ~/todos.json
+    :Doit export ~/todos.json
+    :Doit import ~/todos.json
 <
 
 ==============================================================================
@@ -243,4 +331,18 @@ Highlight Groups~
 `DoItQuickKey`      Quick keys keybindings
 `DoItQuickDesc`     Quick keys descriptions
 
- vim:tw=78:ts=8:ft=help:norl:
+==============================================================================
+4. Roadmap                                                    *doit-roadmap*
+
+- Reorder Todos
+- Active Todo to Top
+- Named (and Multiple) Todo Lists
+- Todo Categories View
+
+==============================================================================
+
+ACKNOWLEDGMENTS
+
+DoIt is FOR SURE based on Dooing by atiladefreitas. Special thanks to 
+him for creating the original plugin that inspired this fork.
+
