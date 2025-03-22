@@ -1,4 +1,4 @@
-# DoIt
+# DoIt.nvim
 
 [![Docker Tests](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml/badge.svg)](https://github.com/bryangrimes/doit/actions/workflows/run-tests.yml)
 
