@@ -1,4 +1,4 @@
--- Minimal init.lua for dooing plugin testing
+-- Minimal init.lua for doit plugin testing
 
 vim.opt.rtp:append("/plugin")
 
@@ -9,12 +9,12 @@ vim.opt.clipboard = "unnamedplus"
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- Set up Neovim commands for dooing....based on my personal preferences
+-- Set up Neovim commands for doit....based on my personal preferences
 vim.api.nvim_create_user_command("ToDo", function()
-	require("dooing").toggle_window()
-end, { desc = "Toggle Dooing window" })
+	require("doit").toggle_window()
+end, { desc = "Toggle doit window" })
 
--- print("Dooing plugin initializing...")
+-- print("doit plugin initializing...")
 
 local function test_file_access()
 	local test_path = "/data/test_write.txt"
@@ -39,7 +39,7 @@ local function test_file_access()
 	end
 
 	-- Check the todos file
-	local todos_path = "/data/dooing_todos.json"
+	local todos_path = "/data/doit_todos.json"
 	local todos_file = io.open(todos_path, "r")
 	if todos_file then
 		local content = todos_file:read("*all")
@@ -61,15 +61,15 @@ end
 
 test_file_access()
 
-local dooing_storage = require("dooing.state.storage")
-local original_setup = dooing_storage.setup
+local doit_storage = require("doit.state.storage")
+local original_setup = doit_storage.setup
 
-dooing_storage.setup = function(M, config)
+doit_storage.setup = function(M, config)
 	original_setup(M, config)
 
 	-- Replace save_to_disk with our own implementation
 	M.save_to_disk = function()
-		local save_path = "/data/dooing_todos.json"
+		local save_path = "/data/doit_todos.json"
 		print("Saving todos to: " .. save_path)
 
 		-- Ensure todos is initialized
@@ -121,7 +121,7 @@ dooing_storage.setup = function(M, config)
 	-- Also override load from disk to be more robust
 	M.load_from_disk = function()
 		-- Use fixed path directly since config might not be fully initialized yet
-		local save_path = "/data/dooing_todos.json"
+		local save_path = "/data/doit_todos.json"
 		print("Loading todos from: " .. save_path)
 
 		local file = io.open(save_path, "r")
@@ -150,8 +150,8 @@ dooing_storage.setup = function(M, config)
 	end
 end
 
-require("dooing").setup({
-	save_path = "/data/dooing_todos.json",
+require("doit").setup({
+	save_path = "/data/doit_todos.json",
 
 	timestamp = {
 		enabled = false,

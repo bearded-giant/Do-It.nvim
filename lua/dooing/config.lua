@@ -63,7 +63,7 @@ M.defaults = {
 		},
 	},
 	hour_score_value = 1 / 8,
-	save_path = vim.fn.stdpath("data") .. "/dooing_todos.json",
+	save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
 	keymaps = {
 		toggle_window = "<leader>td",
 		new_todo = "i",

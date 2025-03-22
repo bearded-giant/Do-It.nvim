@@ -1,11 +1,11 @@
 local vim = vim
-local config = require("dooing.config")
+local config = require("doit.config")
 
 local M = {}
 
 local help_win_id = nil
 local help_buf_id = nil
-local ns_id = vim.api.nvim_create_namespace("dooing_help")
+local ns_id = vim.api.nvim_create_namespace("doit_help")
 
 function M.create_help_window()
 	if help_win_id and vim.api.nvim_win_is_valid(help_win_id) then
@@ -83,7 +83,7 @@ function M.create_help_window()
 	vim.api.nvim_buf_set_option(help_buf_id, "buftype", "nofile")
 
 	for i = 0, #help_content - 1 do
-		vim.api.nvim_buf_add_highlight(help_buf_id, ns_id, "DooingHelpText", i, 0, -1)
+		vim.api.nvim_buf_add_highlight(help_buf_id, ns_id, "DoItHelpText", i, 0, -1)
 	end
 
 	vim.api.nvim_create_autocmd("BufLeave", {

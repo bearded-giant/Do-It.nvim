@@ -1,6 +1,6 @@
-local main_window = require("dooing.ui.main_window")
-local dooing_state = require("dooing.state")
-local config = require("dooing.config")
+local main_window = require("doit.ui.main_window")
+local doit_state = require("doit.state")
+local config = require("doit.config")
 
 describe("main_window", function()
 	before_each(function()
@@ -49,11 +49,11 @@ describe("main_window", function()
 		vim.api.nvim_buf_clear_namespace = function() end
 
 		-- test data
-		dooing_state.todos = {
+		doit_state.todos = {
 			{ text = "Test todo", done = false, created_at = os.time() },
 		}
 
-		dooing_state.sort_todos = function() end
+		doit_state.sort_todos = function() end
 
 		config.options = {
 			formatting = {
@@ -128,8 +128,8 @@ describe("main_window", function()
 	end)
 
 	it("should format todo with due date correctly", function()
-		_G._original_calendar = require("dooing.calendar")
-		package.loaded["dooing.calendar"] = {
+		_G._original_calendar = require("doit.calendar")
+		package.loaded["doit.calendar"] = {
 			MONTH_NAMES = {
 				en = {
 					"January",
@@ -166,7 +166,7 @@ describe("main_window", function()
 		assert.truthy(formatted:match("○ Todo with due date %[📅"))
 
 		-- Restore original
-		package.loaded["dooing.calendar"] = _G._original_calendar
+		package.loaded["doit.calendar"] = _G._original_calendar
 	end)
 
 	it("should toggle todo window", function()
@@ -183,4 +183,3 @@ describe("main_window", function()
 		main_window.render_todos = original_render
 	end)
 end)
-

@@ -1,15 +1,15 @@
 local vim = vim
 
-local config = require("dooing.config")
-local calendar = require("dooing.calendar")
-local highlights = require("dooing.ui.highlights")
-local todo_actions = require("dooing.ui.todo_actions")
-local help_window = require("dooing.ui.help_window")
-local tag_window = require("dooing.ui.tag_window")
-local search_window = require("dooing.ui.search_window")
-local scratchpad = require("dooing.ui.scratchpad")
+local config = require("doit.config")
+local calendar = require("doit.calendar")
+local highlights = require("doit.ui.highlights")
+local todo_actions = require("doit.ui.todo_actions")
+local help_window = require("doit.ui.help_window")
+local tag_window = require("doit.ui.tag_window")
+local search_window = require("doit.ui.search_window")
+local scratchpad = require("doit.ui.scratchpad")
 
-local state = require("dooing.state")
+local state = require("doit.state")
 state.load_todos()
 
 local M = {}
@@ -76,7 +76,7 @@ local function create_small_keys_window(main_win_pos)
 	})
 
 	-- Basic highlighting
-	local ns = vim.api.nvim_create_namespace("dooing_small_keys")
+	local ns = vim.api.nvim_create_namespace("doit_small_keys")
 	for i = 1, #lines do
 		-- you can highlight lines or columns here as needed
 		-- e.g. vim.api.nvim_buf_add_highlight(small_buf, ns, "String", i-1, 0, -1)
@@ -182,7 +182,7 @@ function M.render_todos()
 			local todo = state.todos[todo_index]
 			if todo then
 				if todo.done then
-					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DooingDone", line_nr, 0, -1)
+					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
 				else
 					local hl_group = highlights.get_priority_highlight(todo.priorities, config)
 					vim.api.nvim_buf_add_highlight(buf_id, ns_id, hl_group, line_nr, 0, -1)
@@ -208,7 +208,7 @@ function M.render_todos()
 						vim.api.nvim_buf_add_highlight(
 							buf_id,
 							ns_id,
-							"DooingTimestamp",
+							"DoItTimestamp",
 							line_nr,
 							start_idx - 1,
 							start_idx - 1 + #line:match(timestamp_pattern)

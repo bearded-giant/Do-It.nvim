@@ -1,6 +1,6 @@
 local Cal = {}
 
-local config = require("dooing.config")
+local config = require("doit.config")
 
 Cal.MONTH_NAMES = {
 	en = {

@@ -1,30 +1,30 @@
-*dooing.txt*              A Minimalist Todo List Manager                *dooing*
+*doit.txt*              A Minimalist Todo List Manager                *doit*
 
 ==============================================================================
-Table of Contents                                          *dooing-contents*
+Table of Contents                                          *doit-contents*
 
-1. Dooing                                                        |dooing-intro|
-  - Features                                                  |dooing-features|
-  - Requirements                                          |dooing-requirements|
-  - Installation                                          |dooing-installation|
-  - Configuration                                        |dooing-configuration|
-  - Usage                                                        |dooing-usage|
-  - Commands                                                  |dooing-commands|
-  - Keybindings                                            |dooing-keybindings|
-2. Advanced                                                    |dooing-advanced|
-  - Calendar                                                 |dooing-calendar|
-  - Priority System                                         |dooing-priorities|
-  - Import/Export                                             |dooing-import|
-3. Colors                                                      |dooing-colors|
+1. doit                                                        |doit-intro|
+  - Features                                                  |doit-features|
+  - Requirements                                          |doit-requirements|
+  - Installation                                          |doit-installation|
+  - Configuration                                        |doit-configuration|
+  - Usage                                                        |doit-usage|
+  - Commands                                                  |doit-commands|
+  - Keybindings                                            |doit-keybindings|
+2. Advanced                                                    |doit-advanced|
+  - Calendar                                                 |doit-calendar|
+  - Priority System                                         |doit-priorities|
+  - Import/Export                                             |doit-import|
+3. Colors                                                      |doit-colors|
 
 ==============================================================================
-1. Dooing                                                        *dooing-intro*
+1. doit                                                        *doit-intro*
 
 A minimalist todo list manager for Neovim, designed with simplicity and
 efficiency in mind. It provides a clean, distraction-free interface to manage
 your tasks directly within Neovim.
 
-FEATURES                                                      *dooing-features*
+FEATURES                                                      *doit-features*
 
 - 📝 Manage todos in a clean floating window
 - 🏷️ Categorize tasks with #tags
@@ -37,30 +37,30 @@ FEATURES                                                      *dooing-features*
 - 📤 Import/Export functionality
 - 🔄 Undo/Redo support for deleted todos
 
-REQUIREMENTS                                              *dooing-requirements*
+REQUIREMENTS                                              *doit-requirements*
 
 - Neovim >= 0.9.0
 - A patched font for icons (recommended)
 - Optional: nvim-web-devicons for file icons
 
-INSTALLATION                                              *dooing-installation*
+INSTALLATION                                              *doit-installation*
 
 Using lazy.nvim: >lua
     {
-        "atiladefreitas/dooing",
+        "atiladefreitas/doit",
         config = function()
-            require("dooing").setup({
+            require("doit").setup({
                 -- your configuration here
             })
         end,
     }
 <
 
-CONFIGURATION                                            *dooing-configuration*
+CONFIGURATION                                            *doit-configuration*
 
 The plugin can be configured by passing a table to the setup function:
 >
-    require('dooing').setup({
+    require('doit').setup({
         window = {
             width = 55,                -- Width of the todo window
             height = 20,               -- Height of the todo window
@@ -95,7 +95,7 @@ The plugin can be configured by passing a table to the setup function:
                 weight = 2,
             },
         },
-        save_path = vim.fn.stdpath("data") .. "/dooing_todos.json",
+        save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
         calendar = {
             language = "en",
             icon = "",
@@ -103,10 +103,10 @@ The plugin can be configured by passing a table to the setup function:
     })
 <
 
-USAGE                                                          *dooing-usage*
+USAGE                                                          *doit-usage*
 
 Basic Operations:
-1. Open the todo window with `:Dooing`
+1. Open the todo window with `:doit`
 2. Add new todos with `i`
 3. Toggle completion with `x`
 4. Delete todos with `d`
@@ -114,9 +114,9 @@ Basic Operations:
 6. Add priorities during creation
 7. Filter by tags with `t`
 
-COMMANDS                                                      *dooing-commands*
+COMMANDS                                                      *doit-commands*
 
-                                                                    *:Dooing*
+                                                                    *:doit*
 Main command to interact with the plugin.
 
 Arguments:~
@@ -126,14 +126,14 @@ Arguments:~
     set             Modifies todo properties
 
 Examples: >vim
-    :Dooing
-    :Dooing add My new task #work
-    :Dooing add -p important,urgent My priority task
-    :Dooing list
-    :Dooing set 1 priorities important,urgent
+    :doit
+    :doit add My new task #work
+    :doit add -p important,urgent My priority task
+    :doit list
+    :doit set 1 priorities important,urgent
 <
 
-KEYBINDINGS                                                *dooing-keybindings*
+KEYBINDINGS                                                *doit-keybindings*
 
 Main Window~
     <leader>td   Toggle todo window
@@ -176,9 +176,9 @@ Calendar Window~
     q           Close calendar
 
 ==============================================================================
-2. Advanced                                                    *dooing-advanced*
+2. Advanced                                                    *doit-advanced*
 
-CALENDAR                                                     *dooing-calendar*
+CALENDAR                                                     *doit-calendar*
 
 The calendar feature supports multiple languages and provides a visual way to
 set due dates. Supported languages: en, pt, es, fr, de, it, jp
@@ -200,7 +200,7 @@ Configure the calendar: >lua
     }
 <
 
-PRIORITY SYSTEM                                             *dooing-priorities*
+PRIORITY SYSTEM                                             *doit-priorities*
 
 Configure priorities and their weights: >lua
     priorities = {
@@ -225,22 +225,22 @@ Configure priorities and their weights: >lua
     }
 <
 
-IMPORT/EXPORT                                                 *dooing-import*
+IMPORT/EXPORT                                                 *doit-import*
 
 Import and export todos using JSON format: >vim
-    :Dooing export ~/todos.json
-    :Dooing import ~/todos.json
+    :doit export ~/todos.json
+    :doit import ~/todos.json
 <
 
 ==============================================================================
-3. Colors                                                      *dooing-colors*
+3. Colors                                                      *doit-colors*
 
 Highlight Groups~
-`DooingPending`       Pending todo items
-`DooingDone`          Completed todo items
-`DooingHelpText`      Help window text
-`DooingQuickTitle`    Quick keys title
-`DooingQuickKey`      Quick keys keybindings
-`DooingQuickDesc`     Quick keys descriptions
+`DoItPending`       Pending todo items
+`DoItDone`          Completed todo items
+`DoItHelpText`      Help window text
+`DoItQuickTitle`    Quick keys title
+`DoItQuickKey`      Quick keys keybindings
+`DoItQuickDesc`     Quick keys descriptions
 
  vim:tw=78:ts=8:ft=help:norl:

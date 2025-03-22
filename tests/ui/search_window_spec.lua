@@ -1,6 +1,6 @@
-local search_window = require("dooing.ui.search_window")
-local dooing_state = require("dooing.state")
-local config = require("dooing.config")
+local search_window = require("doit.ui.search_window")
+local doit_state = require("doit.state")
+local config = require("doit.config")
 
 describe("search_window", function()
 	before_each(function()
@@ -59,16 +59,16 @@ describe("search_window", function()
 		end
 
 		-- test data
-		dooing_state.todos = {
+		doit_state.todos = {
 			{ text = "Test todo", done = false, created_at = os.time() },
 			{ text = "Another todo", done = false, created_at = os.time() },
 			{ text = "Test with additional text", done = false, created_at = os.time() },
 		}
 
 		-- Mock search function
-		dooing_state.search_todos = function(query)
+		doit_state.search_todos = function(query)
 			local results = {}
-			for idx, todo in ipairs(dooing_state.todos) do
+			for idx, todo in ipairs(doit_state.todos) do
 				if todo.text:lower():find(query:lower()) then
 					table.insert(results, {
 						todo = todo,
@@ -156,7 +156,7 @@ describe("search_window", function()
 
 	it("should handle empty search results", function()
 		-- Make the search return no results
-		dooing_state.search_todos = function()
+		doit_state.search_todos = function()
 			return {}
 		end
 
@@ -187,4 +187,3 @@ describe("search_window", function()
 		pending("This test requires better mocking of autocmd behavior")
 	end)
 end)
-

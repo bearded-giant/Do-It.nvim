@@ -2,20 +2,20 @@ local vim = vim
 
 local M = {}
 
-local ns_id = vim.api.nvim_create_namespace("dooing")
+local ns_id = vim.api.nvim_create_namespace("doit")
 local highlight_cache = {}
 
 function M.setup_highlights()
 	highlight_cache = {} -- Clear any old cache
 
-	vim.api.nvim_set_hl(0, "DooingPending", { link = "Question", default = true })
-	vim.api.nvim_set_hl(0, "DooingDone", { link = "Comment", default = true })
-	vim.api.nvim_set_hl(0, "DooingHelpText", { link = "Directory", default = true })
-	vim.api.nvim_set_hl(0, "DooingTimestamp", { link = "Comment", default = true })
+	vim.api.nvim_set_hl(0, "DoItPending", { link = "Question", default = true })
+	vim.api.nvim_set_hl(0, "DoItDone", { link = "Comment", default = true })
+	vim.api.nvim_set_hl(0, "DoItHelpText", { link = "Directory", default = true })
+	vim.api.nvim_set_hl(0, "DoItTimestamp", { link = "Comment", default = true })
 
-	highlight_cache.pending = "DooingPending"
-	highlight_cache.done = "DooingDone"
-	highlight_cache.help = "DooingHelpText"
+	highlight_cache.pending = "DoItPending"
+	highlight_cache.done = "DoItDone"
+	highlight_cache.help = "DoItHelpText"
 end
 
 function M.get_namespace_id()
@@ -63,7 +63,7 @@ function M.get_priority_highlight(priorities, config)
 
 			local hl_group = highlight_cache.pending
 			if group.color and type(group.color) == "string" and group.color:match("^#%x%x%x%x%x%x$") then
-				local hl_name = "Dooing" .. group.color:gsub("#", "")
+				local hl_name = "doit" .. group.color:gsub("#", "")
 				vim.api.nvim_set_hl(0, hl_name, { fg = group.color })
 				hl_group = hl_name
 			elseif group.hl_group then

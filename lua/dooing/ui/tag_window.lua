@@ -1,9 +1,9 @@
 local vim = vim
 
-local state = require("dooing.state")
+local state = require("doit.state")
 state.load_todos()
 
-local config = require("dooing.config")
+local config = require("doit.config")
 
 local M = {}
 

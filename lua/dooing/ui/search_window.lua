@@ -1,13 +1,13 @@
 local vim = vim
 
-local state = require("dooing.state")
-local config = require("dooing.config")
+local state = require("doit.state")
+local config = require("doit.config")
 
 local M = {}
 
 local search_win_id = nil
 local search_buf_id = nil
-local ns_id = vim.api.nvim_create_namespace("dooing_search")
+local ns_id = vim.api.nvim_create_namespace("doit_search")
 
 local function handle_search_query(query, main_win_id)
 	if not query or query == "" then
@@ -49,7 +49,7 @@ local function handle_search_query(query, main_win_id)
 	for i, line in ipairs(lines) do
 		local line_nr = i - 1
 		if line:match("^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]") then
-			local hl_group = line:match(done_icon) and "DooingDone" or "DooingPending"
+			local hl_group = line:match(done_icon) and "DoItDone" or "DoItPending"
 			vim.api.nvim_buf_add_highlight(search_buf_id, ns_id, hl_group, line_nr, 0, -1)
 			for tag in line:gmatch("#(%w+)") do
 				local start_idx = line:find("#" .. tag) - 1

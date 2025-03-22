@@ -1,4 +1,4 @@
-# Dooing Test Output Sample
+# doit Test Output Sample
 
 This file contains a sample of the test output from running `docker/run-tests.sh`, with explanations
 of the different sections and messages.
@@ -10,20 +10,20 @@ of the different sections and messages.
 #1 transferring dockerfile: 439B done
 #1 DONE 0.0s
 ...
-#11 naming to docker.io/library/dooing-plugin-test done
+#11 naming to docker.io/library/doit-plugin-test done
 #11 DONE 0.0s
 
 # Debug messages from init.lua - These are NOT test failures
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 
 # Test discovery information
@@ -34,17 +34,17 @@ Scheduling: tests/state/storage_spec.lua
 Scheduling: tests/state/tags_spec.lua
 Scheduling: tests/state/todos_spec.lua
 Scheduling: tests/state/sorting_spec.lua
-Scheduling: tests/dooing_spec.lua
+Scheduling: tests/doit_spec.lua
 
 # More debug messages - NOT test failures
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 
 # Test results for tags_spec.lua - All tests PASSED
@@ -65,11 +65,11 @@ Testing: 	/plugin/tests/state/tags_spec.lua
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 
 # Test results for sorting_spec.lua - All tests PASSED
@@ -91,11 +91,11 @@ Testing: 	/plugin/tests/state/sorting_spec.lua
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 
 ========================================	
@@ -114,14 +114,14 @@ Testing: 	/plugin/tests/state/todos_spec.lua
 [31mErrors : [0m	0	
 ========================================	
 
-# Test results for dooing_spec.lua - 4 passes, 1 skipped (shown as "Pending")
+# Test results for doit_spec.lua - 4 passes, 1 skipped (shown as "Pending")
 ========================================	
-Testing: 	/plugin/tests/dooing_spec.lua	
-[32mSuccess[0m	||	dooing should properly initialize	
-[32mSuccess[0m	||	dooing should have state module	
-[32mSuccess[0m	||	dooing should have ui module	
-[33mPending[0m	||	dooing should load todos get_todos function not found	
-[32mSuccess[0m	||	dooing should load todos	
+Testing: 	/plugin/tests/doit_spec.lua	
+[32mSuccess[0m	||	doit should properly initialize	
+[32mSuccess[0m	||	doit should have state module	
+[32mSuccess[0m	||	doit should have ui module	
+[33mPending[0m	||	doit should load todos get_todos function not found	
+[32mSuccess[0m	||	doit should load todos	
 	
 [32mSuccess: [0m	4	
 [31mFailed : [0m	0	
@@ -158,19 +158,19 @@ Testing: 	/plugin/tests/ui/search_window_spec.lua
 # Test results for storage_spec.lua - All tests PASSED
 ========================================	
 Testing: 	/plugin/tests/state/storage_spec.lua	
-Saving todos to: /data/dooing_todos.json	
+Saving todos to: /data/doit_todos.json	
 Encoded 1 todos to JSON (length: 33)	
-✅ Successfully saved todos to /data/dooing_todos.json	
+✅ Successfully saved todos to /data/doit_todos.json	
 ✅ Verified file after save, size: 33 bytes	
 ✅ Forced sync to disk	
 [32mSuccess[0m	||	storage should save todos to disk	
-Loading todos from: /data/dooing_todos.json	
+Loading todos from: /data/doit_todos.json	
 Read 37 bytes from todos file	
 ✅ Successfully loaded 1 todos	
 [32mSuccess[0m	||	storage should load todos from disk	
-Saving todos to: /data/dooing_todos.json	
+Saving todos to: /data/doit_todos.json	
 Encoded 2 todos to JSON (length: 84)	
-✅ Successfully saved todos to /data/dooing_todos.json	
+✅ Successfully saved todos to /data/doit_todos.json	
 ✅ Verified file after save, size: 84 bytes	
 ✅ Forced sync to disk	
 [32mSuccess[0m	||	storage should import todos from file	
@@ -187,7 +187,7 @@ Encoded 2 todos to JSON (length: 84)
 - **tags_spec.lua**: 5 tests passed, 0 failed
 - **sorting_spec.lua**: 6 tests passed, 0 failed
 - **todos_spec.lua**: 8 tests passed, 0 failed
-- **dooing_spec.lua**: 4 tests passed, 0 failed, 1 pending
+- **doit_spec.lua**: 4 tests passed, 0 failed, 1 pending
 - **main_window_spec.lua**: 5 tests passed, 0 failed
 - **search_window_spec.lua**: 4 tests passed, 0 failed
 - **storage_spec.lua**: 4 tests passed, 0 failed
@@ -204,7 +204,7 @@ The messages like these are NOT test failures:
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 ```
 

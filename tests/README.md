@@ -1,4 +1,4 @@
-# Dooing Test Suite
+# doit Test Suite
 
 ## Understanding Test Output
 
@@ -10,7 +10,7 @@ When running the tests via `docker/run-tests.sh`, you may see warning messages i
 Testing file access with: /data/test_write.txt
 ❌ Failed to write test file
 ❌ Todos file not found or cannot be opened
-Loading todos from: /data/dooing_todos.json
+Loading todos from: /data/doit_todos.json
 ❌ Could not open todos file for reading
 ```
 
@@ -59,20 +59,20 @@ You can run specific tests by modifying the command in `docker/run-tests.sh`:
 
 ```bash
 # Run all tests
-docker run --rm -v "$(pwd)/..:/plugin" dooing-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests', {pattern = '.*_spec.lua', recursive = true})" -c "qa!"
+docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests', {pattern = '.*_spec.lua', recursive = true})" -c "qa!"
 
 # Run only state tests
-docker run --rm -v "$(pwd)/..:/plugin" dooing-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state', {pattern = '.*_spec.lua'})" -c "qa!"
+docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state', {pattern = '.*_spec.lua'})" -c "qa!"
 
 # Run a specific test file
-docker run --rm -v "$(pwd)/..:/plugin" dooing-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state/todos_spec.lua')" -c "qa!"
+docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state/todos_spec.lua')" -c "qa!"
 ```
 
 ## Test Structure
 
 The test suite is organized into the following structure:
 
-1. **Main tests** - `tests/dooing_spec.lua`: Basic plugin initialization tests
+1. **Main tests** - `tests/doit_spec.lua`: Basic plugin initialization tests
 
 2. **State tests**:
    - `tests/state/storage_spec.lua`: Tests for saving/loading todos

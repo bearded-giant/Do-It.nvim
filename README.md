@@ -1,10 +1,10 @@
-# Dooing
+# DoIt
 
-Dooing is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim. Perfect for users who want to keep track of their todos without leaving their editor.
+DoIt is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim. Perfect for users who want to keep track of their todos without leaving their editor.
 
-![dooing demo](https://github.com/user-attachments/assets/ffb921d6-6dd8-4a01-8aaa-f2440891b22e)
+> This project is very much based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). DoIt is a fork with some heavy modification for customizations and tweaks to how I work, while maintaining the core functionality.
 
-
+![DoIt demo](https://github.com/user-attachments/assets/ffb921d6-6dd8-4a01-8aaa-f2440891b22e)
 
 ## 🚀 Features
 
@@ -29,27 +29,29 @@ Dooing is a minimalist todo list manager for Neovim, designed with simplicity an
 
 ```lua
 return {
-    "atiladefreitas/dooing",
+    "bryangrimes/doit",
     config = function()
-        require("dooing").setup({
+        require("doit").setup({
             -- your custom config here (optional)
         })
     end,
 }
 ```
 
-Run the following commands in Neovim to install Dooing:
+Run the following commands in Neovim to install DoIt:
 
 ```vim
 :Lazy sync
 ```
 
 ### Default Configuration
-Dooing comes with sensible defaults that you can override:
+
+DoIt comes with sensible defaults that you can override:
+
 ```lua
 {
     -- Core settings
-    save_path = vim.fn.stdpath("data") .. "/dooing_todos.json",
+    save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
 
     -- Timestamp settings
     timestamp = {
@@ -174,13 +176,13 @@ Dooing comes with sensible defaults that you can override:
 
 ## Commands
 
-Dooing provides several commands for task management:
+DoIt provides several commands for task management:
 
-- `:Dooing` - Opens the main window
-- `:Dooing add [text]` - Adds a new task
+- `:doit` - Opens the main window
+- `:doit add [text]` - Adds a new task
   - `-p, --priorities [list]` - Comma-separated list of priorities (e.g. "important,urgent")
-- `:Dooing list` - Lists all todos with their indices and metadata
-- `:Dooing set [index] [field] [value]` - Modifies todo properties
+- `:doit list` - Lists all todos with their indices and metadata
+- `:doit set [index] [field] [value]` - Modifies todo properties
   - `priorities` - Set/update priorities (use "nil" to clear)
   - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
 
@@ -188,9 +190,10 @@ Dooing provides several commands for task management:
 
 ## 🔑 Keybindings
 
-Dooing comes with intuitive keybindings:
+DoIt comes with intuitive keybindings:
 
 #### Main Window
+
 | Key           | Action                        |
 |--------------|------------------------------|
 | `<leader>td` | Toggle todo window           |
@@ -217,6 +220,7 @@ Dooing comes with intuitive keybindings:
 | `<leader>p`  | Open todo scratchpad         |
 
 #### Tags Window
+
 | Key    | Action        |
 |--------|--------------|
 | `e`    | Edit tag     |
@@ -225,6 +229,7 @@ Dooing comes with intuitive keybindings:
 | `q`    | Close window |
 
 #### Calendar Window
+
 | Key    | Action              |
 |--------|-------------------|
 | `h`    | Previous day       |
@@ -240,7 +245,7 @@ Dooing comes with intuitive keybindings:
 
 ## 📥 Backlog
 
-Planned features and improvements for future versions of Dooing:
+Planned features and improvements for future versions of DoIt:
 
 #### Core Features
 
@@ -271,13 +276,13 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 🔖 Versioning
 
-We use [Semantic Versioning](https://semver.org/) for versioning. For the available versions, see the [tags on this repository](https://github.com/atiladefreitas/dooing/tags).
+We use [Semantic Versioning](https://semver.org/) for versioning.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! If you'd like to improve Dooing, feel free to:
+Contributions are welcome! If you'd like to improve DoIt, feel free to:
 
 - Submit an issue for bugs or feature requests
 - Create a pull request with your enhancements
@@ -286,21 +291,12 @@ Contributions are welcome! If you'd like to improve Dooing, feel free to:
 
 ## 🌟 Acknowledgments
 
-Dooing was built with the Neovim community in mind. Special thanks to all the developers who contribute to the Neovim ecosystem and plugins like [Lazy.nvim](https://github.com/folke/lazy.nvim).
+DoIt is based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
 
----
-
-## All my plugins
-| Repository | Description | Stars |
-|------------|-------------|-------|
-| [LazyClip](https://github.com/atiladefreitas/lazyclip) | A Simple Clipboard Manager | ![Stars](https://img.shields.io/github/stars/atiladefreitas/lazyclip?style=social) |
-| [Dooing](https://github.com/atiladefreitas/dooing) | A Minimalist Todo List Manager | ![Stars](https://img.shields.io/github/stars/atiladefreitas/dooing?style=social) |
-| [TinyUnit](https://github.com/atiladefreitas/tinyunit) | A Practical CSS Unit Converter | ![Stars](https://img.shields.io/github/stars/atiladefreitas/tinyunit?style=social) |
+Additional thanks to all the developers who contribute to the Neovim ecosystem and plugins like [Lazy.nvim](https://github.com/folke/lazy.nvim).
 
 ---
 
 ## 📬 Contact
 
-If you have any questions, feel free to reach out:
-- [LinkedIn](https://linkedin.com/in/atilafreitas)
-- Email: [contact@atiladefreitas.com](mailto:contact@atiladefreitas.com)
+If you have any questions, feel free to open an issue on GitHub.

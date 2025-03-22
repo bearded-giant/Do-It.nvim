@@ -1,8 +1,8 @@
 local M = {}
 
-local config = require("dooing.config")
-local state = require("dooing.state")
-local ui = require("dooing.ui")
+local config = require("doit.config")
+local state = require("doit.state")
+local ui = require("doit.ui")
 local main_window = ui.main_window
 local todo_actions = ui.todo_actions
 
@@ -13,8 +13,8 @@ function M.setup(opts)
 	config.setup(opts)
 	state.load_todos()
 
-	-- Primary user command: :Dooing
-	vim.api.nvim_create_user_command("Dooing", function(opts)
+	-- Primary user command: :doit
+	vim.api.nvim_create_user_command("doit", function(opts)
 		local args = vim.split(opts.args, "%s+", { trimempty = true })
 		if #args == 0 then
 			-- No args => toggle the main todo window
@@ -27,11 +27,11 @@ function M.setup(opts)
 
 		if command == "add" then
 			--------------------------------------------------
-			-- Dooing add [arguments...]
+			-- doit add [arguments...]
 			--------------------------------------------------
 			-- Possible usage:
-			-- :Dooing add some text
-			-- :Dooing add -p priority1,priority2 "some text"
+			-- :doit add some text
+			-- :doit add -p priority1,priority2 "some text"
 			--
 			-- This block handles parsing out -p / --priorities and then
 			-- adds the todo to state
@@ -67,7 +67,7 @@ function M.setup(opts)
 							vim.notify(
 								"Invalid priorities: " .. table.concat(invalid_priorities, ", "),
 								vim.log.levels.WARN,
-								{ title = "Dooing" }
+								{ title = "doit" }
 							)
 						end
 
@@ -77,11 +77,7 @@ function M.setup(opts)
 
 						i = i + 2 -- Skip past the flag and its argument
 					else
-						vim.notify(
-							"Missing priority value after " .. args[i],
-							vim.log.levels.ERROR,
-							{ title = "Dooing" }
-						)
+						vim.notify("Missing priority value after " .. args[i], vim.log.levels.ERROR, { title = "doit" })
 						return
 					end
 				else
@@ -100,11 +96,11 @@ function M.setup(opts)
 				if priorities then
 					msg = msg .. " (priorities: " .. table.concat(priorities, ", ") .. ")"
 				end
-				vim.notify(msg, vim.log.levels.INFO, { title = "Dooing" })
+				vim.notify(msg, vim.log.levels.INFO, { title = "doit" })
 			end
 		elseif command == "list" then
 			--------------------------------------------------
-			-- Dooing list
+			-- doit list
 			--------------------------------------------------
 			-- Shows all todos, printed with `:messages`
 			for i, todo in ipairs(state.todos) do
@@ -131,14 +127,14 @@ function M.setup(opts)
 			end
 		elseif command == "set" then
 			--------------------------------------------------
-			-- Dooing set <index> <field> <value>
+			-- doit set <index> <field> <value>
 			--------------------------------------------------
 			-- Example usage:
-			-- :Dooing set 3 priorities p1,p2
-			-- :Dooing set 2 ect 2h
+			-- :doit set 3 priorities p1,p2
+			-- :doit set 2 ect 2h
 			--
 			if #args < 3 then
-				vim.notify("Usage: Dooing set <index> <field> <value>", vim.log.levels.ERROR)
+				vim.notify("Usage: doit set <index> <field> <value>", vim.log.levels.ERROR)
 				return
 			end
 

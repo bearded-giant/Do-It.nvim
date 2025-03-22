@@ -1,7 +1,7 @@
 local vim = vim
 
-local config = require("dooing.config")
-local state = require("dooing.state")
+local config = require("doit.config")
+local state = require("doit.state")
 
 local M = {}
 

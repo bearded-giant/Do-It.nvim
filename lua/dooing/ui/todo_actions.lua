@@ -1,8 +1,8 @@
 local vim = vim
 
-local state = require("dooing.state")
-local config = require("dooing.config")
-local calendar = require("dooing.calendar")
+local state = require("doit.state")
+local config = require("doit.config")
+local calendar = require("doit.calendar")
 
 local M = {}
 

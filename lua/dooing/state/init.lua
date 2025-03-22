@@ -1,5 +1,5 @@
 -- local vim = vim
-local config = require("dooing.config")
+local config = require("doit.config")
 
 -- hold the actual todo list, plus any other shared fields
 local M = {
@@ -9,13 +9,13 @@ local M = {
 	MAX_UNDO_HISTORY = 100,
 }
 
-local storage = require("dooing.state.storage")
-local todos_ops = require("dooing.state.todos")
-local priorities = require("dooing.state.priorities")
-local due_dates = require("dooing.state.due_dates")
-local search_ops = require("dooing.state.search")
-local sorting_ops = require("dooing.state.sorting")
-local tags_ops = require("dooing.state.tags")
+local storage = require("doit.state.storage")
+local todos_ops = require("doit.state.todos")
+local priorities = require("doit.state.priorities")
+local due_dates = require("doit.state.due_dates")
+local search_ops = require("doit.state.search")
+local sorting_ops = require("doit.state.sorting")
+local tags_ops = require("doit.state.tags")
 
 storage.setup(M, config)
 todos_ops.setup(M, config)

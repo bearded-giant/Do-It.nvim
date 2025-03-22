@@ -203,13 +203,13 @@ function Todos.setup(M, config)
 		-- Local helper for highlight
 		local function get_priority_highlights(todo)
 			if todo.done then
-				return "DooingDone"
+				return "DoItDone"
 			elseif todo.in_progress then
-				return "DooingInProgress"
+				return "DoItInProgress"
 			end
 
 			if not config.options.priorities or #config.options.priorities == 0 then
-				return "DooingPending"
+				return "DoItPending"
 			end
 
 			if todo.priorities and #todo.priorities > 0 and config.options.priority_groups then
@@ -238,15 +238,15 @@ function Todos.setup(M, config)
 						end
 					end
 					if all_members_match then
-						return group.hl_group or "DooingPending"
+						return group.hl_group or "DoItPending"
 					end
 				end
 			end
 
-			return "DooingPending"
+			return "DoItPending"
 		end
 
-		local ns = vim.api.nvim_create_namespace("dooing_confirm")
+		local ns = vim.api.nvim_create_namespace("doit_confirm")
 		vim.api.nvim_buf_add_highlight(confirm_buf, ns, "WarningMsg", 0, 0, -1)
 		vim.api.nvim_buf_add_highlight(confirm_buf, ns, get_priority_highlights(current_todo), 2, 0, #line)
 

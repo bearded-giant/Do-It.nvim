@@ -1,25 +1,25 @@
-local dooing = require("dooing")
+local doit = require("doit")
 
-describe("dooing", function()
+describe("doit", function()
 	before_each(function() end)
 
 	after_each(function() end)
 
 	it("should properly initialize", function()
-		assert.truthy(dooing)
+		assert.truthy(doit)
 	end)
 
 	it("should have state module", function()
-		assert.truthy(dooing.state)
+		assert.truthy(doit.state)
 	end)
 
 	it("should have ui module", function()
-		assert.truthy(dooing.ui)
+		assert.truthy(doit.ui)
 	end)
 
 	it("should load todos", function()
-		if dooing.state and dooing.state.todos and dooing.state.todos.get_todos then
-			local todos = dooing.state.todos.get_todos()
+		if doit.state and doit.state.todos and doit.state.todos.get_todos then
+			local todos = doit.state.todos.get_todos()
 			assert.truthy(todos)
 		else
 			pending("get_todos function not found")
