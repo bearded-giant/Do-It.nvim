@@ -99,6 +99,7 @@ DoIt comes with sensible defaults that you can customize as you like.  Defaults:
         toggle_todo = "x",
         delete_todo = "d",
         delete_completed = "D",
+        delete_confirmation = "<Y>",
         close_window = "q",
         undo_delete = "u",
         add_due_date = "H",

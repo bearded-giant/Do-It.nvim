@@ -69,6 +69,7 @@ M.defaults = {
 		toggle_todo = "x",
 		delete_todo = "d",
 		delete_completed = "D",
+		delete_confirmation = "<Y>",
 		close_window = "q",
 		undo_delete = "u",
 		add_due_date = "H",
