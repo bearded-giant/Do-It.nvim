@@ -4,7 +4,6 @@ local config = require("dooing.config")
 
 describe("main_window", function()
     before_each(function()
-        -- Mock vim APIs
         _G._original_vim_api_nvim_create_buf = vim.api.nvim_create_buf
         _G._original_vim_api_nvim_open_win = vim.api.nvim_open_win
         _G._original_vim_api_nvim_buf_set_lines = vim.api.nvim_buf_set_lines
@@ -85,7 +84,6 @@ describe("main_window", function()
     end)
     
     after_each(function()
-        -- Restore original functions
         vim.api.nvim_create_buf = _G._original_vim_api_nvim_create_buf
         vim.api.nvim_open_win = _G._original_vim_api_nvim_open_win
         vim.api.nvim_buf_set_lines = _G._original_vim_api_nvim_buf_set_lines
