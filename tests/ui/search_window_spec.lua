@@ -126,13 +126,11 @@ describe("search_window", function()
 
 		search_window.create_search_window(10) -- 10 is a mock window ID
 
-		-- Verify functions were called
 		assert.is_true(create_buf_called)
 		assert.is_true(open_win_called)
 	end)
 
 	it("should search for todos", function()
-		-- Track buf_set_lines call
 		local captured_lines
 		vim.api.nvim_buf_set_lines = function(_, _, _, _, lines)
 			captured_lines = lines
@@ -140,7 +138,6 @@ describe("search_window", function()
 
 		search_window.create_search_window(10) -- 10 is a mock window ID
 
-		-- Verify search results were processed
 		assert.truthy(captured_lines)
 		assert.is_true(#captured_lines >= 3) -- Title, empty line, and at least one result
 

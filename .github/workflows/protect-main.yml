@@ -1,0 +1,22 @@
+name: Protect Main Branch
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Docker Tests
+        run: ./docker/run-tests.sh
+        
+      - name: Validate test results
+        if: failure()
+        run: |
+          echo "⚠️ Tests failed! Cannot push to main branch."
+          echo "Please fix the failing tests before pushing to main."
+          exit 1
