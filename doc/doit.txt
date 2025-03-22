@@ -21,18 +21,18 @@ Table of Contents                                          *doit-contents*
 ==============================================================================
 1. doit                                                        *doit-intro*
 
-DoIt is a minimalist todo list manager for Neovim, designed with simplicity and
+Do-It.nvim is a minimalist todo list manager for Neovim, designed with simplicity and
 efficiency in mind. It provides a clean, distraction-free interface to manage
 your tasks directly within Neovim.
 
-DoIt is my personal way of how I want to track my tasks and todos. As a 
+Do-It.nvim is my personal way of how I want to track my tasks and todos. As a 
 Principal Engineer, I have a lot of things to keep track of, and I wanted a 
 simple way to do that without leaving my editor. I've tried a lot of todo list 
 managers, and they all seem to be too much for me. I just want to keep track of 
 what I need to do, and that's it. I don't need a bunch of bells and whistles. 
 I just need to know what I need to do.
 
-DoIt is 100% built on top of Dooing by atiladefreitas. DoIt is a fork with 
+Do-It.nvim is 100% built on top of Dooing by atiladefreitas. Do-It.nvim is a fork with 
 some heavy modifications for customizations for how I work, while maintaining 
 the core functionality.
 
@@ -351,6 +351,6 @@ Highlight Groups~
 
 ACKNOWLEDGMENTS
 
-DoIt is FOR SURE based on Dooing by atiladefreitas. Special thanks to 
+Do-It.nvim is FOR SURE based on Dooing by atiladefreitas. Special thanks to 
 him for creating the original plugin that inspired this fork.
 
