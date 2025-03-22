@@ -16,13 +16,13 @@ end, { desc = "Toggle doit window" })
 
 -- Ensure the toggle_window function exists
 vim.api.nvim_create_autocmd("VimEnter", {
-    callback = function()
-        if not require("doit").toggle_window then
-            require("doit").toggle_window = function()
-                require("doit").ui.main_window.toggle_todo_window()
-            end
-        end
-    end,
+	callback = function()
+		if not require("doit").toggle_window then
+			require("doit").toggle_window = function()
+				require("doit").ui.main_window.toggle_todo_window()
+			end
+		end
+	end,
 })
 
 -- print("doit plugin initializing...")
@@ -30,18 +30,18 @@ vim.api.nvim_create_autocmd("VimEnter", {
 local function test_file_access()
 	local test_path = "/data/test_write.txt"
 
-	print("Testing file access with: " .. test_path)
+	-- print("Testing file access with: " .. test_path)
 	local write_test = io.open(test_path, "w")
 	if write_test then
 		write_test:write("Test write at " .. os.date())
 		write_test:close()
-		print("✅ Successfully wrote test file")
+		-- print("✅ Successfully wrote test file")
 
 		local read_test = io.open(test_path, "r")
 		if read_test then
 			local content = read_test:read("*all")
 			read_test:close()
-			print("✅ Successfully read test file: " .. content)
+			-- print("✅ Successfully read test file: " .. content)
 		else
 			print("❌ Failed to read test file")
 		end
@@ -55,31 +55,31 @@ local function test_file_access()
 	if todos_file then
 		local content = todos_file:read("*all")
 		todos_file:close()
-		print("✅ Todos file exists with content length: " .. #content)
+		-- print("✅ Todos file exists with content length: " .. #content)
 
 		-- Try to append to it
 		local append_test = io.open(todos_path, "a")
 		if append_test then
 			append_test:close()
-			print("✅ Can write to todos file")
+			-- print("✅ Can write to todos file")
 		else
 			print("❌ Cannot write to todos file")
 		end
 	else
-		print("ℹ️ Todos file not found, creating it")
+		-- print("ℹ️ Todos file not found, creating it")
 		-- Create an empty todos file with an empty array
 		local create_file = io.open(todos_path, "w")
 		if create_file then
 			create_file:write("[]")
 			create_file:close()
-			print("✅ Created empty todos file")
-			
+			-- print("✅ Created empty todos file")
+
 			-- Verify it
 			local verify = io.open(todos_path, "r")
 			if verify then
 				local content = verify:read("*all")
 				verify:close()
-				print("✅ Verified todos file with content: " .. content)
+				-- print("✅ Verified todos file with content: " .. content)
 			else
 				print("❌ Could not verify todos file")
 			end
@@ -100,7 +100,7 @@ doit_storage.setup = function(M, config)
 	-- Replace save_to_disk with our own implementation
 	M.save_to_disk = function()
 		local save_path = "/data/doit_todos.json"
-		print("Saving todos to: " .. save_path)
+		-- print("Saving todos to: " .. save_path)
 
 		-- Ensure todos is initialized
 		if not M.todos then
@@ -129,21 +129,21 @@ doit_storage.setup = function(M, config)
 			return false
 		end
 
-		print("✅ Successfully saved todos to " .. save_path)
+		-- print("✅ Successfully saved todos to " .. save_path)
 
 		-- Verify the file
 		local verify_file = io.open(save_path, "r")
 		if verify_file then
 			local content = verify_file:read("*all")
 			verify_file:close()
-			print("✅ Verified file after save, size: " .. #content .. " bytes")
+			-- print("✅ Verified file after save, size: " .. #content .. " bytes")
 		else
 			print("❌ Could not verify file after save")
 		end
 
 		-- Force sync to disk
 		os.execute("sync")
-		print("✅ Forced sync to disk")
+		-- print("✅ Forced sync to disk")
 
 		return true
 	end
@@ -152,7 +152,7 @@ doit_storage.setup = function(M, config)
 	M.load_from_disk = function()
 		-- Use fixed path directly since config might not be fully initialized yet
 		local save_path = "/data/doit_todos.json"
-		print("Loading todos from: " .. save_path)
+		-- print("Loading todos from: " .. save_path)
 
 		local file = io.open(save_path, "r")
 		if not file then
@@ -163,18 +163,18 @@ doit_storage.setup = function(M, config)
 		local content = file:read("*all")
 		file:close()
 
-		print("Read " .. #content .. " bytes from todos file")
+		-- print("Read " .. #content .. " bytes from todos file")
 
 		if content and content ~= "" then
 			local ok, result = pcall(vim.fn.json_decode, content)
 			if ok and result then
 				M.todos = result
-				print("✅ Successfully loaded " .. #M.todos .. " todos")
+				-- print("✅ Successfully loaded " .. #M.todos .. " todos")
 			else
 				print("❌ Error parsing JSON: " .. (result or "unknown error"))
 			end
 		else
-			print("⚠️ Todos file is empty")
+			-- print("⚠️ Todos file is empty")
 			M.todos = {}
 		end
 	end

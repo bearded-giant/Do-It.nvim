@@ -1,3 +1,4 @@
+-- tests/ui/reordering_spec.lua
 local vim = vim
 
 local state = require("doit.state")
@@ -534,46 +535,76 @@ function M.reorder_todo(win_id, on_render)
 	if todo_index < 1 or todo_index > #state.todos then
 		return
 	end
+	
+	-- Get the buf_id first so we can use it throughout
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+	
+	-- Make sure buffer is modifiable
+	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
+
+	-- Determine the actual index in todos array if using filter
+	local real_index
+	if state.active_filter then
+		local visible_count = 0
+		for i, todo in ipairs(state.todos) do
+			if todo.text:match("#" .. state.active_filter) then
+				visible_count = visible_count + 1
+				if visible_count == todo_index then
+					real_index = i
+					break
+				end
+			end
+		end
+	else
+		real_index = todo_index
+	end
+
+	-- Set the reordering todo index for visual indicator
+	state.reordering_todo_index = real_index
 
 	-- Highlight the current line
-	local buf_id = vim.api.nvim_win_get_buf(win_id)
 	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
 	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 	vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", line_num - 1, 0, -1)
 
 	-- Create a notification
 	vim.notify(
-		"Reordering mode: Press j/k to move todo up/down, press r to save and exit",
+		"Reordering mode: Press Up/Down arrows to move todo, press r to save and exit",
 		vim.log.levels.INFO
 	)
 
-	-- Temporarily save the current keymaps
-	local old_j_keymap = vim.fn.maparg("j", "n", false, true)
-	local old_k_keymap = vim.fn.maparg("k", "n", false, true)
+	-- Store any existing keymaps we need to restore
 	local old_r_keymap = vim.fn.maparg("r", "n", false, true)
 
 	-- Define the function to exit reordering mode and restore keymaps
 	local function exit_reorder_mode()
+		-- Make sure buffer is modifiable
+		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
+		
 		-- Clear highlights
 		vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
+		
+		-- Clear reordering indicator
+		state.reordering_todo_index = nil
 
-		-- Restore original key mappings if they existed
-		if old_j_keymap and not vim.tbl_isempty(old_j_keymap) then
-			vim.keymap.set("n", "j", old_j_keymap.rhs, { buffer = buf_id, noremap = old_j_keymap.noremap, silent = old_j_keymap.silent })
-		else
-			vim.keymap.del("n", "j", { buffer = buf_id })
+		-- Safely remove keymaps with pcall to prevent errors if mapping doesn't exist
+		local function safe_del_keymap(key)
+			pcall(function() 
+				vim.keymap.del("n", key, { buffer = buf_id }) 
+			end)
 		end
 
-		if old_k_keymap and not vim.tbl_isempty(old_k_keymap) then
-			vim.keymap.set("n", "k", old_k_keymap.rhs, { buffer = buf_id, noremap = old_k_keymap.noremap, silent = old_k_keymap.silent })
-		else
-			vim.keymap.del("n", "k", { buffer = buf_id })
-		end
+		-- Delete the mappings
+		safe_del_keymap("<Down>")
+		safe_del_keymap("<Up>")
+		safe_del_keymap("r")
+		safe_del_keymap("<Esc>")
 
+		-- Restore original r keymap if it existed
 		if old_r_keymap and not vim.tbl_isempty(old_r_keymap) then
-			vim.keymap.set("n", "r", old_r_keymap.rhs, { buffer = buf_id, noremap = old_r_keymap.noremap, silent = old_r_keymap.silent })
-		else
-			vim.keymap.del("n", "r", { buffer = buf_id })
+			pcall(function() 
+				vim.keymap.set("n", "r", old_r_keymap.rhs, { buffer = buf_id, noremap = old_r_keymap.noremap, silent = old_r_keymap.silent })
+			end)
 		end
 
 		-- Notify user that reorder mode is exited
@@ -590,18 +621,11 @@ function M.reorder_todo(win_id, on_render)
 	end
 
 	-- Move the todo down in the list
-	vim.keymap.set("n", config.options.keymaps.move_todo_down, function()
+	vim.keymap.set("n", "<Down>", function()
+		-- Make sure buffer is modifiable
+		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
+		
 		local current_index = line_num - (state.active_filter and 3 or 1)
-
-		-- Determine if we're working with filtered or unfiltered todos
-		local valid_todos = state.active_filter 
-			and vim.tbl_filter(function(t) return t.text:match("#" .. state.active_filter) end, state.todos)
-			or state.todos
-
-		if current_index >= #valid_todos then
-			-- Already at the bottom
-			return
-		end
 
 		-- Get the real index in state.todos
 		local real_index
@@ -620,76 +644,77 @@ function M.reorder_todo(win_id, on_render)
 			real_index = current_index
 		end
 
-		-- Find the next todo in state.todos (might need to skip some if filtering)
-		local next_index
-		if state.active_filter then
-			local found_current = false
-			for i, todo in ipairs(state.todos) do
-				if i == real_index then
-					found_current = true
-				elseif found_current and todo.text:match("#" .. state.active_filter) then
-					next_index = i
-					break
-				end
-			end
-		else
-			next_index = real_index + 1
+		-- Skip if at bottom
+		if not real_index or real_index >= #state.todos then
+			return
 		end
 
-		if real_index and next_index then
-			-- Swap order indices
-			local tmp_order = state.todos[real_index].order_index
-			state.todos[real_index].order_index = state.todos[next_index].order_index
-			state.todos[next_index].order_index = tmp_order
+		-- Find the next todo in state.todos
+		local next_index = real_index + 1
+		
+		-- Skip if filtered and next one doesn't match filter
+		if state.active_filter and not state.todos[next_index].text:match("#" .. state.active_filter) then
+			return
+		end
 
-			-- Resort based on new order indices
-			state.sort_todos()
-			
-			-- Move the cursor and highlight
-			if on_render then
-				on_render()
-			end
-			
-			-- Update cursor position to follow the moved todo
-			local new_line_num
-			if state.active_filter then
-				-- Find the new position of the todo in the filtered view
-				local visible_count = 0
-				for i, todo in ipairs(state.todos) do
-					if todo.text:match("#" .. state.active_filter) then
-						visible_count = visible_count + 1
-						if i == next_index then
-							new_line_num = visible_count + (state.active_filter and 3 or 1)
-							break
-						end
+		-- Swap order indices
+		local tmp_order = state.todos[real_index].order_index
+		state.todos[real_index].order_index = state.todos[next_index].order_index
+		state.todos[next_index].order_index = tmp_order
+
+		-- Resort based on new order indices
+		state.sort_todos()
+				
+		-- Update reordering indicator to the new position
+		state.reordering_todo_index = next_index
+		
+		-- Render the updates
+		if on_render then
+			on_render()
+		end
+				
+		-- Update cursor position to follow the moved todo
+		if state.active_filter then
+			-- Recalculate the cursor position when filtered
+			local new_line_num = 0
+			local visible_count = 0
+			for i, todo in ipairs(state.todos) do
+				if todo.text:match("#" .. state.active_filter) then
+					visible_count = visible_count + 1
+					if i == next_index then
+						new_line_num = visible_count + (state.active_filter and 3 or 1)
+						break
 					end
 				end
-			else
-				-- In unfiltered view, the new position is simply the next_index
-				new_line_num = next_index + 1
 			end
 			
-			if new_line_num then
+			if new_line_num > 0 then
 				vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
 				line_num = new_line_num
 				vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 			end
+		else
+			-- Unfiltered view is simpler
+			local new_line_num = next_index + 1
+			vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+			line_num = new_line_num
+			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 		end
 	end, { buffer = buf_id, nowait = true })
 
 	-- Move the todo up in the list
-	vim.keymap.set("n", config.options.keymaps.move_todo_up, function()
+	vim.keymap.set("n", "<Up>", function()
+		-- Make sure buffer is modifiable
+		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
+		
 		local current_index = line_num - (state.active_filter and 3 or 1)
+
+		-- Skip if at top
 		if current_index <= 1 then
-			-- Already at the top
 			return
 		end
-
-		-- Determine if we're working with filtered or unfiltered todos
-		local valid_todos = state.active_filter 
-			and vim.tbl_filter(function(t) return t.text:match("#" .. state.active_filter) end, state.todos)
-			or state.todos
 
 		-- Get the real index in state.todos
 		local real_index
@@ -708,63 +733,78 @@ function M.reorder_todo(win_id, on_render)
 			real_index = current_index
 		end
 
-		-- Find the previous todo in state.todos (might need to skip some if filtering)
-		local prev_index
-		if state.active_filter then
+		if not real_index or real_index <= 1 then
+			return
+		end
+
+		-- Find the previous todo in state.todos
+		local prev_index = real_index - 1
+		
+		-- Skip if filtered and prev one doesn't match filter
+		if state.active_filter and not state.todos[prev_index].text:match("#" .. state.active_filter) then
+			-- Keep going back until we find one that matches the filter
+			local found = false
 			for i = real_index - 1, 1, -1 do
 				if state.todos[i].text:match("#" .. state.active_filter) then
 					prev_index = i
+					found = true
 					break
 				end
 			end
-		else
-			prev_index = real_index - 1
+			if not found then
+				return
+			end
 		end
 
-		if real_index and prev_index then
-			-- Swap order indices
-			local tmp_order = state.todos[real_index].order_index
-			state.todos[real_index].order_index = state.todos[prev_index].order_index
-			state.todos[prev_index].order_index = tmp_order
+		-- Swap order indices
+		local tmp_order = state.todos[real_index].order_index
+		state.todos[real_index].order_index = state.todos[prev_index].order_index
+		state.todos[prev_index].order_index = tmp_order
 
-			-- Resort based on new order indices
-			state.sort_todos()
-			
-			-- Move the cursor and highlight
-			if on_render then
-				on_render()
-			end
-			
-			-- Update cursor position to follow the moved todo
-			local new_line_num
-			if state.active_filter then
-				-- Find the new position of the todo in the filtered view
-				local visible_count = 0
-				for i, todo in ipairs(state.todos) do
-					if todo.text:match("#" .. state.active_filter) then
-						visible_count = visible_count + 1
-						if i == prev_index then
-							new_line_num = visible_count + (state.active_filter and 3 or 1)
-							break
-						end
+		-- Resort based on new order indices
+		state.sort_todos()
+		
+		-- Update reordering indicator to the new position
+		state.reordering_todo_index = prev_index
+				
+		-- Render the updates
+		if on_render then
+			on_render()
+		end
+				
+		-- Update cursor position to follow the moved todo
+		if state.active_filter then
+			-- Recalculate the cursor position when filtered
+			local new_line_num = 0
+			local visible_count = 0
+			for i, todo in ipairs(state.todos) do
+				if todo.text:match("#" .. state.active_filter) then
+					visible_count = visible_count + 1
+					if i == prev_index then
+						new_line_num = visible_count + (state.active_filter and 3 or 1)
+						break
 					end
 				end
-			else
-				-- In unfiltered view, the new position is simply the prev_index
-				new_line_num = prev_index + 1
 			end
 			
-			if new_line_num then
+			if new_line_num > 0 then
 				vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
 				line_num = new_line_num
 				vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 			end
+		else
+			-- Unfiltered view is simpler
+			local new_line_num = prev_index + 1
+			vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+			line_num = new_line_num
+			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 		end
 	end, { buffer = buf_id, nowait = true })
 
 	-- Exit reordering mode
-	vim.keymap.set("n", config.options.keymaps.reorder_todo, function()
+	vim.keymap.set("n", "r", function()
 		-- Update all order_index values before exiting
 		update_order_indices()
 		exit_reorder_mode()
