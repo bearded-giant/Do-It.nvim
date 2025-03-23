@@ -2,9 +2,9 @@
 
 [![Tests](https://github.com/bearded-giant/do-it.nvim/actions/workflows/run-tests.yml/badge.svg)](https://github.com/bearded-giant/do-it.nvim/actions/workflows/run-tests.yml)
 
-Do-It.nvim is a minimalist todo list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim.
+Do-It.nvim is a minimalist to-do list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim.
 
-Do-It.nvim is my personal way of how I want to track my tasks and todos. As a Principal Engineer, I have a lot of things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of todo list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
+Do-It.nvim is my personal way of how I want to track my tasks and to-dos. As a Principal Engineer, I have a lot of things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of to-do list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
 
 I also wanted a sandbox to play with Lua and some docker ideas around containerized Neovim plugin development and testing.  Oh also I'm dabbling some with Claude Code in this repo, to see how AI can help me learn a new-ish language...so that's something.   Anyway, here we are.
 
@@ -16,14 +16,15 @@ If you want to contribute or have any ideas, feel free to open an issue or make 
 
 ## Features
 
-- Manage todos in a simple and efficient way
+- Manage to-dos in a simple and efficient way
 - Categorize tasks with #tags
 - Simple task management with clear visual feedback
-- Persistent storage of your todos
+- Persistent storage of your to-dos
 - Adapts to your Neovim colorscheme
 - Compatible with **Lazy.nvim** for effortless installation
-- Relative timestamps showing when todos were created
-- Import/Export of todo json for backups, obsidian integration...whatever you want
+- Relative timestamps showing when to-dos were created
+- Import/Export of to-do json for backups, obsidian integration...whatever you want
+- To-do reordering with customizable keybindings
 
 ---
 
@@ -173,10 +174,10 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
 Do-It.nvim provides several commands to get things done:
 
 - `:doit` - Opens the main window
-- `:doit add [text]` - Adds a new task
+- `:doit add [text]` - Adds a new to-do
   - `-p, --priorities [list]` - Comma-separated list of priorities (e.g. "important,urgent")
-- `:doit list` - Lists all todos with their indices and metadata
-- `:doit set [index] [field] [value]` - Modifies todo properties
+- `:doit list` - Lists all to-dos with their indices and metadata
+- `:doit set [index] [field] [value]` - Modifies to-do properties
   - `priorities` - Set/update priorities (use "nil" to clear)
   - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
 
@@ -188,11 +189,11 @@ Do-It.nvim provides several commands to get things done:
 
 | Key           | Action                        |
 |--------------|------------------------------|
-| `<leader>td` | Toggle todo window           |
-| `i`          | Add new todo                 |
-| `x`          | Toggle todo status           |
-| `d`          | Delete current todo          |
-| `D`          | Delete all completed todos   |
+| `<leader>td` | Toggle to-do window           |
+| `i`          | Add new to-do                 |
+| `x`          | Toggle to-do status           |
+| `d`          | Delete current to-do          |
+| `D`          | Delete all completed to-dos   |
 | `q`          | Close window                 |
 | `H`          | Add due date                 |
 | `r`          | Remove due date              |
@@ -201,23 +202,23 @@ Do-It.nvim provides several commands to get things done:
 | `?`          | Toggle help window           |
 | `t`          | Toggle tags window           |
 | `c`          | Clear active tag filter      |
-| `e`          | Edit todo                    |
+| `e`          | Edit to-do                    |
 | `p`          | Edit priorities              |
 | `u`          | Undo delete                  |
-| `/`          | Search todos                 |
-| `I`          | Import todos                 |
-| `E`          | Export todos                 |
+| `/`          | Search to-dos                 |
+| `I`          | Import to-dos                 |
+| `E`          | Export to-dos                 |
 | `<leader>D`  | Remove duplicates            |
 | `<Space>`    | Toggle priority              |
-| `<leader>p`  | Open todo scratchpad         |
+| `<leader>p`  | Open to-do scratchpad         |
 | `r`          | Enter reordering mode        |
 
-#### Reordering Mode
+#### Reordering to-dos
 
 | Key    | Action                        |
 |--------|------------------------------|
-| `k`    | Move todo up                  |
-| `j`    | Move todo down                |
+| `k`    | Move to-do up                  |
+| `j`    | Move to-do down                |
 | `r`    | Save and exit reordering mode |
 
 #### Tags Window
@@ -246,10 +247,10 @@ Do-It.nvim provides several commands to get things done:
 
 ## Roadmap...Sort of
 
-- [x] Reorder Todos
-- [ ] Active Todo to Top
-- [ ] Named (and Multiple) Todo Lists
-- [ ] Todo Categories View
+- [x] Reorder To-dos
+- [ ] Active To-do to Top
+- [ ] Named (and Multiple) To-do Lists
+- [ ] To-do Categories View
 
 ---
 
