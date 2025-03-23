@@ -7,11 +7,22 @@ local help_win_id = nil
 local help_buf_id = nil
 local ns_id = vim.api.nvim_create_namespace("doit_help")
 
-function M.create_help_window()
-	if help_win_id and vim.api.nvim_win_is_valid(help_win_id) then
+function M.is_help_window_open()
+	return help_win_id ~= nil and vim.api.nvim_win_is_valid(help_win_id)
+end
+
+function M.close_help_window()
+	if M.is_help_window_open() then
 		vim.api.nvim_win_close(help_win_id, true)
 		help_win_id = nil
 		help_buf_id = nil
+		return true
+	end
+	return false
+end
+
+function M.create_help_window()
+	if M.close_help_window() then
 		return
 	end
 
@@ -41,7 +52,7 @@ function M.create_help_window()
 		string.format(" %-12s - Add new to-do", keys.new_todo),
 		string.format(" %-12s - Toggle to-do status", keys.toggle_todo),
 		string.format(" %-12s - Delete current to-do", keys.delete_todo),
-		string.format(" %-12s - Delete all completed todos", keys.delete_completed),
+		string.format(" %-12s - Delete all completed to-dos", keys.delete_completed),
 		string.format(" %-12s - Close window", keys.close_window),
 		string.format(" %-12s - Add due date to to-do", keys.add_due_date),
 		string.format(" %-12s - Remove to-do due date", keys.remove_due_date),
@@ -53,17 +64,17 @@ function M.create_help_window()
 		string.format(" %-12s - Edit to-do item", keys.edit_todo),
 		string.format(" %-12s - Edit to-do priorities", keys.edit_priorities),
 		string.format(" %-12s - Undo deletion", keys.undo_delete),
-		string.format(" %-12s - Search todos", keys.search_todos),
-		string.format(" %-12s - Import todos", keys.import_todos),
-		string.format(" %-12s - Export todos", keys.export_todos),
+		string.format(" %-12s - Search to-dos", keys.search_todos),
+		string.format(" %-12s - Import to-dos", keys.import_todos),
+		string.format(" %-12s - Export to-dos", keys.export_todos),
 		string.format(" %-12s - Remove duplicates", keys.remove_duplicates),
-		string.format(" %-12s - Open todo scratchpad", keys.open_todo_scratchpad),
+		string.format(" %-12s - Open to-do scratchpad", keys.open_todo_scratchpad),
 		string.format(" %-12s - Toggle priority", keys.toggle_priority),
 		string.format(" %-12s - Enter reordering mode", keys.reorder_todo),
 		"",
-		" Reordering mode:",
-		string.format(" %-12s - Move todo up", keys.move_todo_up),
-		string.format(" %-12s - Move todo down", keys.move_todo_down),
+		" Reordering to-dos:",
+		string.format(" %-12s - Move to-do up", keys.move_todo_up),
+		string.format(" %-12s - Move to-do down", keys.move_todo_down),
 		string.format(" %-12s - Save and exit reordering mode", keys.reorder_todo),
 		"",
 		" Tags window:",
@@ -104,16 +115,19 @@ function M.create_help_window()
 		end,
 	})
 
-	local function close_help()
-		if help_win_id and vim.api.nvim_win_is_valid(help_win_id) then
-			vim.api.nvim_win_close(help_win_id, true)
-			help_win_id = nil
-			help_buf_id = nil
-		end
-	end
-
-	vim.keymap.set("n", config.options.keymaps.close_window, close_help, { buffer = help_buf_id, nowait = true })
-	vim.keymap.set("n", config.options.keymaps.toggle_help, close_help, { buffer = help_buf_id, nowait = true })
+	vim.keymap.set(
+		"n",
+		config.options.keymaps.close_window,
+		M.close_help_window,
+		{ buffer = help_buf_id, nowait = true }
+	)
+	vim.keymap.set(
+		"n",
+		config.options.keymaps.toggle_help,
+		M.close_help_window,
+		{ buffer = help_buf_id, nowait = true }
+	)
 end
 
 return M
+

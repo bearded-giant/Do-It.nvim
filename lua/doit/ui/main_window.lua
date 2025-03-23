@@ -235,7 +235,7 @@ function M.format_todo_line(todo)
 	if not format then
 		format = { "icon", "text", "ect", "relative_time" } -- fallback
 	end
-	
+
 	-- Add visual indicator if this todo is being reordered
 	local is_reordering = false
 	if state.reordering_todo_index then
@@ -300,7 +300,7 @@ function M.format_todo_line(todo)
 			if is_reordering then
 				table.insert(components, "> ")
 			end
-			
+
 			if todo.done then
 				table.insert(components, formatting.done.icon)
 			elseif todo.in_progress then
@@ -558,14 +558,15 @@ function M.toggle_todo_window()
 end
 
 function M.close_window()
-	-- Attempt to close the help window
+	-- sequence the closing to ensure that stray modals don't remain.
+	help_window.close_help_window()
 
-	-- help_window.create_help_window() -- This toggles, so call it if open
+	if tag_window.close_tag_window then
+		tag_window.close_tag_window()
+	end
 
-	-- Do a direct close if help_win is valid
-	-- Instead of calling 'create_help_window()' again, you can do:
-	if help_win_id and vim.api.nvim_win_is_valid(help_win_id) then
-		vim.api.nvim_win_close(help_win_id, true)
+	if search_window.close_search_window then
+		search_window.close_search_window()
 	end
 
 	if win_id and vim.api.nvim_win_is_valid(win_id) then

@@ -69,7 +69,7 @@ function Todos.setup(M, config)
 		end
 	end
 
-	-- Delete completed todos
+	-- Delete ALL completed todos
 	function M.delete_completed()
 		local remaining = {}
 		local removed_count = 0
