@@ -223,7 +223,7 @@ Main Window~
     i           Add new to-do
     x           Toggle to-do status
     d           Delete current to-do
-    D           Delete all completed to-dos
+    D           Delete all completed
     q           Close window
     H           Add due date
     r           Remove due date
@@ -240,13 +240,13 @@ Main Window~
     E           Export to-dos
     <leader>D   Remove duplicates
     <Space>     Toggle priority
-    <leader>p   Open to-do scratchpad
+    <leader>p   Open scratchpad
     r           Enter reordering mode
 
 Reordering to-dos~
     k           Move to-do up
     j           Move to-do down
-    r           Save and exit reordering mode
+    r           Save and exit reordering
 
 Tags Window~
     e           Edit tag
@@ -332,8 +332,8 @@ Import and export todos using JSON format: >vim
 3. Colors                                                      *doit-colors*
 
 Highlight Groups~
-`DoItPending`       Pending to-do items
-`DoItDone`          Completed to-do items
+`DoItPending`       Pending to-dos
+`DoItDone`          Completed to-dos
 `DoItHelpText`      Help window text
 `DoItQuickTitle`    Quick keys title
 `DoItQuickKey`      Quick keys keybindings
