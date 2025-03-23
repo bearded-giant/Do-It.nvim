@@ -39,7 +39,7 @@ If you want to contribute or have any ideas, feel free to open an issue or make 
 
 ```lua
 return {
-    "bryangrimes/doit",
+    "bearded-giant/do-it.nvim",
     config = function()
         require("doit").setup({
             -- optional configurations here...

@@ -57,7 +57,7 @@ INSTALLATION                                              *doit-installation*
 
 Using Lazy.nvim: >lua
     return {
-        "bryangrimes/doit",
+        "bearded-giant/do-it.nvim",
         config = function()
             require("doit").setup({
                 -- your configuration here
