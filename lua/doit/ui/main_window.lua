@@ -29,9 +29,9 @@ local function create_small_keys_window(main_win_pos)
 
 	local lines_1 = {
 		"",
-		string.format("  %-6s - New todo", keys.new_todo),
-		string.format("  %-6s - Toggle todo", keys.toggle_todo),
-		string.format("  %-6s - Delete todo", keys.delete_todo),
+		string.format("  %-6s - New", keys.new_todo),
+		string.format("  %-6s - Toggle status", keys.toggle_todo),
+		string.format("  %-6s - Delete", keys.delete_todo),
 		string.format("  %-6s - Undo delete", keys.undo_delete),
 		string.format("  %-6s - Add due date", keys.add_due_date),
 		"",

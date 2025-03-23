@@ -191,27 +191,27 @@ Do-It.nvim provides several commands to get things done:
 |--------------|------------------------------|
 | `<leader>td` | Toggle to-do window           |
 | `i`          | Add new to-do                 |
-| `x`          | Toggle to-do status           |
+| `x`          | Toggle status                 |
 | `d`          | Delete current to-do          |
-| `D`          | Delete all completed to-dos   |
-| `q`          | Close window                 |
-| `H`          | Add due date                 |
-| `r`          | Remove due date              |
-| `T`          | Add time estimation          |
-| `R`          | Remove time estimation       |
-| `?`          | Toggle help window           |
-| `t`          | Toggle tags window           |
-| `c`          | Clear active tag filter      |
+| `D`          | Delete all completed          |
+| `q`          | Close window                  |
+| `H`          | Add due date                  |
+| `r`          | Remove due date               |
+| `T`          | Add time estimation           |
+| `R`          | Remove time estimation        |
+| `?`          | Toggle help window            |
+| `t`          | Toggle tags window            |
+| `c`          | Clear active tag filter       |
 | `e`          | Edit to-do                    |
-| `p`          | Edit priorities              |
-| `u`          | Undo delete                  |
+| `p`          | Edit priorities               |
+| `u`          | Undo delete                   |
 | `/`          | Search to-dos                 |
 | `I`          | Import to-dos                 |
 | `E`          | Export to-dos                 |
-| `<leader>D`  | Remove duplicates            |
-| `<Space>`    | Toggle priority              |
-| `<leader>p`  | Open to-do scratchpad         |
-| `r`          | Enter reordering mode        |
+| `<leader>D`  | Remove duplicates             |
+| `<Space>`    | Toggle priority               |
+| `<leader>p`  | Open scratchpad               |
+| `r`          | Enter reordering mode         |
 
 #### Reordering to-dos
 
@@ -219,7 +219,7 @@ Do-It.nvim provides several commands to get things done:
 |--------|------------------------------|
 | `k`    | Move to-do up                  |
 | `j`    | Move to-do down                |
-| `r`    | Save and exit reordering mode |
+| `r`    | Save and exit reordering |
 
 #### Tags Window
 
