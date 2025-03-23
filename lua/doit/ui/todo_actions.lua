@@ -521,11 +521,23 @@ function M.remove_due_date(win_id, on_render)
 	end
 end
 
+-- Track reordering mode state
+local reordering_mode_active = false
+
 -- Reorder todo items
 function M.reorder_todo(win_id, on_render)
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
+	
+	-- Prevent entering reordering mode if already active
+	if reordering_mode_active then
+		vim.notify("Already in reordering mode", vim.log.levels.WARNING)
+		return
+	end
+	
+	-- Set reordering mode flag
+	reordering_mode_active = true
 
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
@@ -533,6 +545,7 @@ function M.reorder_todo(win_id, on_render)
 	-- Get the current todo index
 	local todo_index = line_num - (state.active_filter and 3 or 1)
 	if todo_index < 1 or todo_index > #state.todos then
+		reordering_mode_active = false
 		return
 	end
 	
@@ -607,6 +620,9 @@ function M.reorder_todo(win_id, on_render)
 			end)
 		end
 
+		-- Reset reordering mode flag
+		reordering_mode_active = false
+		
 		-- Notify user that reorder mode is exited
 		vim.notify("Reordering mode exited and saved", vim.log.levels.INFO)
 	end
