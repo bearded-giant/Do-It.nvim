@@ -9,7 +9,28 @@ local search_win_id = nil
 local search_buf_id = nil
 local ns_id = vim.api.nvim_create_namespace("doit_search")
 
+function M.is_search_window_open()
+	return search_win_id ~= nil and vim.api.nvim_win_is_valid(search_win_id)
+end
+
+function M.close_search_window()
+	if M.is_search_window_open() then
+		vim.api.nvim_win_close(search_win_id, true)
+		search_win_id = nil
+		search_buf_id = nil
+		return true
+	end
+	return false
+end
+
 local function handle_search_query(query, main_win_id)
+	if not search_buf_id or not vim.api.nvim_buf_is_valid(search_buf_id) then
+		return
+	end
+
+	vim.api.nvim_buf_set_option(search_buf_id, "modifiable", true)
+	vim.api.nvim_buf_clear_namespace(search_buf_id, ns_id, 0, -1)
+
 	if not query or query == "" then
 		if search_win_id and vim.api.nvim_win_is_valid(search_win_id) then
 			vim.api.nvim_win_close(search_win_id, true)
@@ -22,14 +43,15 @@ local function handle_search_query(query, main_win_id)
 		return
 	end
 
+	local results = state.search_todos(query)
+	local lines = {
+		"  Search Results for: " .. query,
+		"",
+	}
+
 	local done_icon = config.options.formatting.done.icon
 	local pending_icon = config.options.formatting.pending.icon
-	local in_progress_icon = config.options.formatting.in_progress.icon
 
-	local results = state.search_todos(query)
-
-	vim.api.nvim_buf_set_option(search_buf_id, "modifiable", true)
-	local lines = { "Search Results for: " .. query, "" }
 	local valid_lines = {}
 	if #results > 0 then
 		for _, result in ipairs(results) do
@@ -43,14 +65,15 @@ local function handle_search_query(query, main_win_id)
 	end
 
 	vim.api.nvim_buf_set_lines(search_buf_id, 0, -1, false, lines)
-	vim.api.nvim_buf_set_option(search_buf_id, "modifiable", false)
 
-	-- Highlight
+	-- apply highlight
 	for i, line in ipairs(lines) do
 		local line_nr = i - 1
-		if line:match("^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]") then
+		if line:match("^%s+[" .. done_icon .. pending_icon .. "]") then
 			local hl_group = line:match(done_icon) and "DoItDone" or "DoItPending"
 			vim.api.nvim_buf_add_highlight(search_buf_id, ns_id, hl_group, line_nr, 0, -1)
+
+			-- tag highlight
 			for tag in line:gmatch("#(%w+)") do
 				local start_idx = line:find("#" .. tag) - 1
 				vim.api.nvim_buf_add_highlight(search_buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
@@ -60,12 +83,16 @@ local function handle_search_query(query, main_win_id)
 		end
 	end
 
-	vim.keymap.set("n", "q", function()
-		if search_win_id and vim.api.nvim_win_is_valid(search_win_id) then
-			vim.api.nvim_win_close(search_win_id, true)
-		end
-		search_win_id = nil
-		search_buf_id = nil
+	vim.api.nvim_buf_set_option(search_buf_id, "modifiable", false)
+
+	-- confirm config and keymaps exist
+	local close_key = "q"
+	if config and config.options and config.options.keymaps and config.options.keymaps.close_window then
+		close_key = config.options.keymaps.close_window
+	end
+
+	vim.keymap.set("n", close_key, function()
+		M.close_search_window()
 		if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
 			vim.api.nvim_set_current_win(main_win_id)
 		end
@@ -148,3 +175,4 @@ function M.create_search_window(main_win_id)
 end
 
 return M
+

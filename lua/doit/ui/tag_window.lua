@@ -10,6 +10,20 @@ local M = {}
 local tag_win_id = nil
 local tag_buf_id = nil
 
+function M.is_tag_window_open()
+	return tag_win_id ~= nil and vim.api.nvim_win_is_valid(tag_win_id)
+end
+
+function M.close_tag_window()
+	if M.is_tag_window_open() then
+		vim.api.nvim_win_close(tag_win_id, true)
+		tag_win_id = nil
+		tag_buf_id = nil
+		return true
+	end
+	return false
+end
+
 function M.create_tag_window(main_win_id)
 	if tag_win_id and vim.api.nvim_win_is_valid(tag_win_id) then
 		vim.api.nvim_win_close(tag_win_id, true)
@@ -52,11 +66,9 @@ function M.create_tag_window(main_win_id)
 		local cursor = vim.api.nvim_win_get_cursor(tag_win_id)
 		local tag = vim.api.nvim_buf_get_lines(tag_buf_id, cursor[1] - 1, cursor[1], false)[1]
 		if tag ~= "No tags found" then
-			state.set_filter(tag)
-			vim.api.nvim_win_close(tag_win_id, true)
-			tag_win_id = nil
-			tag_buf_id = nil
-			if main_win_id then
+			state.set_tag_filter(tag)
+			M.close_tag_window()
+			if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
 				vim.api.nvim_set_current_win(main_win_id)
 			end
 		end
@@ -92,16 +104,13 @@ function M.create_tag_window(main_win_id)
 		end
 	end, { buffer = tag_buf_id })
 
-	vim.keymap.set("n", "q", function()
-		if vim.api.nvim_win_is_valid(tag_win_id) then
-			vim.api.nvim_win_close(tag_win_id, true)
-		end
-		tag_win_id = nil
-		tag_buf_id = nil
-		if main_win_id then
+	vim.keymap.set("n", config.options.keymaps.close_window, function()
+		M.close_tag_window()
+		if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
 			vim.api.nvim_set_current_win(main_win_id)
 		end
-	end, { buffer = tag_buf_id })
+	end, { buffer = tag_buf_id, nowait = true })
 end
 
 return M
+
