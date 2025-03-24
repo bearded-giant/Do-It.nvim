@@ -1,4 +1,3 @@
--- tests/ui/reordering_spec.lua
 local vim = vim
 
 local state = require("doit.state")
@@ -49,8 +48,6 @@ end
 -- Todo Actions
 --------------------------------------------------
 
--- Create a new to-do. Because we no longer call "render_todos()" directly here,
--- we allow the caller to do so after the new to-do is created (to avoid circular requires).
 function M.new_todo(on_render)
 	vim.ui.input({ prompt = "New to-do: " }, function(input)
 		if input then
@@ -240,7 +237,6 @@ function M.delete_todo(win_id, on_render)
 			end
 		end
 
-		-- The original code calls state.delete_todo_with_confirmation
 		state.delete_todo_with_confirmation(todo_index, win_id, calendar, function()
 			if on_render then
 				on_render()
@@ -264,7 +260,6 @@ function M.remove_duplicates(on_render)
 	end
 end
 
--- Edits an existing todo
 function M.edit_todo(win_id, on_render)
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local todo_index = cursor[1] - 1
@@ -302,7 +297,6 @@ function M.edit_todo(win_id, on_render)
 	end
 end
 
--- Edits the priorities of an existing todo
 function M.edit_priorities(win_id, on_render)
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local todo_index = cursor[1] - 1
@@ -442,7 +436,6 @@ function M.edit_priorities(win_id, on_render)
 	end
 end
 
--- Add time estimation
 function M.add_time_estimation(win_id, on_render)
 	local current_line = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = current_line - (state.active_filter and 3 or 1)
@@ -467,7 +460,6 @@ function M.add_time_estimation(win_id, on_render)
 	end)
 end
 
--- Remove time estimation
 function M.remove_time_estimation(win_id, on_render)
 	local current_line = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = current_line - (state.active_filter and 3 or 1)
@@ -484,7 +476,6 @@ function M.remove_time_estimation(win_id, on_render)
 	end
 end
 
--- Add a due date
 function M.add_due_date(win_id, on_render)
 	local current_line = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = current_line - (state.active_filter and 3 or 1)
@@ -504,7 +495,6 @@ function M.add_due_date(win_id, on_render)
 	end, { language = "en" })
 end
 
--- Remove a due date
 function M.remove_due_date(win_id, on_render)
 	local current_line = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = current_line - (state.active_filter and 3 or 1)
@@ -521,7 +511,6 @@ function M.remove_due_date(win_id, on_render)
 	end
 end
 
--- Reorder todo items
 function M.reorder_todo(win_id, on_render)
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
@@ -529,16 +518,16 @@ function M.reorder_todo(win_id, on_render)
 
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
-	
+
 	-- Get the current todo index
 	local todo_index = line_num - (state.active_filter and 3 or 1)
 	if todo_index < 1 or todo_index > #state.todos then
 		return
 	end
-	
+
 	-- Get the buf_id first so we can use it throughout
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-	
+
 	-- Make sure buffer is modifiable
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
@@ -567,43 +556,58 @@ function M.reorder_todo(win_id, on_render)
 	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 	vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", line_num - 1, 0, -1)
 
+	-- Get the configured reorder key (default: r)
+	local reorder_key = config.options.keymaps and config.options.keymaps.reorder_todo or "r"
+
 	-- Create a notification
 	vim.notify(
-		"Reordering mode: Press Up/Down arrows to move todo, press r to save and exit",
+		"Reordering mode: Press Up/Down arrows to move todo, press " .. reorder_key .. " to save and exit",
 		vim.log.levels.INFO
 	)
 
 	-- Store any existing keymaps we need to restore
-	local old_r_keymap = vim.fn.maparg("r", "n", false, true)
+	local old_r_keymap = vim.fn.maparg(reorder_key, "n", false, true)
 
 	-- Define the function to exit reordering mode and restore keymaps
 	local function exit_reorder_mode()
 		-- Make sure buffer is modifiable
 		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-		
+
 		-- Clear highlights
 		vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
-		
+
 		-- Clear reordering indicator
 		state.reordering_todo_index = nil
 
 		-- Safely remove keymaps with pcall to prevent errors if mapping doesn't exist
 		local function safe_del_keymap(key)
-			pcall(function() 
-				vim.keymap.del("n", key, { buffer = buf_id }) 
+			pcall(function()
+				vim.keymap.del("n", key, { buffer = buf_id })
 			end)
 		end
 
 		-- Delete the mappings
 		safe_del_keymap("<Down>")
 		safe_del_keymap("<Up>")
-		safe_del_keymap("r")
+		safe_del_keymap(reorder_key)
 		safe_del_keymap("<Esc>")
 
-		-- Restore original r keymap if it existed
+		-- Restore original reorder_key keymap if it existed
 		if old_r_keymap and not vim.tbl_isempty(old_r_keymap) then
-			pcall(function() 
-				vim.keymap.set("n", "r", old_r_keymap.rhs, { buffer = buf_id, noremap = old_r_keymap.noremap, silent = old_r_keymap.silent })
+			pcall(function()
+				vim.keymap.set(
+					"n",
+					reorder_key,
+					old_r_keymap.rhs,
+					{ buffer = buf_id, noremap = old_r_keymap.noremap, silent = old_r_keymap.silent }
+				)
+			end)
+		elseif config.options.keymaps and config.options.keymaps.reorder_todo then
+			-- Restore the reorder functionality using the configured key
+			pcall(function()
+				vim.keymap.set("n", reorder_key, function()
+					M.reorder_todo(win_id, on_render)
+				end, { buffer = buf_id, nowait = true })
 			end)
 		end
 
@@ -624,7 +628,7 @@ function M.reorder_todo(win_id, on_render)
 	vim.keymap.set("n", "<Down>", function()
 		-- Make sure buffer is modifiable
 		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-		
+
 		local current_index = line_num - (state.active_filter and 3 or 1)
 
 		-- Get the real index in state.todos
@@ -651,7 +655,7 @@ function M.reorder_todo(win_id, on_render)
 
 		-- Find the next todo in state.todos
 		local next_index = real_index + 1
-		
+
 		-- Skip if filtered and next one doesn't match filter
 		if state.active_filter and not state.todos[next_index].text:match("#" .. state.active_filter) then
 			return
@@ -664,15 +668,15 @@ function M.reorder_todo(win_id, on_render)
 
 		-- Resort based on new order indices
 		state.sort_todos()
-				
+
 		-- Update reordering indicator to the new position
 		state.reordering_todo_index = next_index
-		
+
 		-- Render the updates
 		if on_render then
 			on_render()
 		end
-				
+
 		-- Update cursor position to follow the moved todo
 		if state.active_filter then
 			-- Recalculate the cursor position when filtered
@@ -687,9 +691,9 @@ function M.reorder_todo(win_id, on_render)
 					end
 				end
 			end
-			
+
 			if new_line_num > 0 then
-				vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+				vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
 				line_num = new_line_num
 				vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
@@ -697,7 +701,7 @@ function M.reorder_todo(win_id, on_render)
 		else
 			-- Unfiltered view is simpler
 			local new_line_num = next_index + 1
-			vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+			vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
 			line_num = new_line_num
 			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
@@ -706,9 +710,8 @@ function M.reorder_todo(win_id, on_render)
 
 	-- Move the todo up in the list
 	vim.keymap.set("n", "<Up>", function()
-		-- Make sure buffer is modifiable
 		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-		
+
 		local current_index = line_num - (state.active_filter and 3 or 1)
 
 		-- Skip if at top
@@ -739,10 +742,9 @@ function M.reorder_todo(win_id, on_render)
 
 		-- Find the previous todo in state.todos
 		local prev_index = real_index - 1
-		
+
 		-- Skip if filtered and prev one doesn't match filter
 		if state.active_filter and not state.todos[prev_index].text:match("#" .. state.active_filter) then
-			-- Keep going back until we find one that matches the filter
 			local found = false
 			for i = real_index - 1, 1, -1 do
 				if state.todos[i].text:match("#" .. state.active_filter) then
@@ -756,23 +758,21 @@ function M.reorder_todo(win_id, on_render)
 			end
 		end
 
-		-- Swap order indices
+		-- Swap!
 		local tmp_order = state.todos[real_index].order_index
 		state.todos[real_index].order_index = state.todos[prev_index].order_index
 		state.todos[prev_index].order_index = tmp_order
 
-		-- Resort based on new order indices
 		state.sort_todos()
-		
-		-- Update reordering indicator to the new position
+
+		-- Reordering indicator to the new position
 		state.reordering_todo_index = prev_index
-				
-		-- Render the updates
+
 		if on_render then
 			on_render()
 		end
-				
-		-- Update cursor position to follow the moved todo
+
+		-- update cursor position to follow the moved todo
 		if state.active_filter then
 			-- Recalculate the cursor position when filtered
 			local new_line_num = 0
@@ -786,9 +786,9 @@ function M.reorder_todo(win_id, on_render)
 					end
 				end
 			end
-			
+
 			if new_line_num > 0 then
-				vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+				vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
 				line_num = new_line_num
 				vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
@@ -796,16 +796,16 @@ function M.reorder_todo(win_id, on_render)
 		else
 			-- Unfiltered view is simpler
 			local new_line_num = prev_index + 1
-			vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+			vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
 			line_num = new_line_num
 			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 		end
 	end, { buffer = buf_id, nowait = true })
 
-	-- Exit reordering mode
-	vim.keymap.set("n", "r", function()
-		-- Update all order_index values before exiting
+	-- Exit reordering
+	local reorder_key = config.options.keymaps and config.options.keymaps.reorder_todo or "r"
+	vim.keymap.set("n", reorder_key, function()
 		update_order_indices()
 		exit_reorder_mode()
 		if on_render then
