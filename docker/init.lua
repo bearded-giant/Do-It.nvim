@@ -9,6 +9,272 @@ vim.opt.clipboard = "unnamedplus"
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
+-- Setup DAP
+local dap = require("dap")
+
+-- Configure one-small-step-for-vimkind for Lua debugging
+dap.adapters.nlua = function(callback, config)
+    callback({ type = "server", host = "0.0.0.0", port = 8086 })
+end
+
+-- Path mapping configuration - maps the container paths to host paths
+-- This is crucial for breakpoints to work correctly
+dap.configurations.lua = {
+    {
+        type = "nlua",
+        request = "attach",
+        name = "Attach to running Neovim instance",
+        host = "0.0.0.0",
+        port = 8086,
+        pathMappings = {
+            ["/plugin"] = "/host-plugin", -- Maps container path to host path
+        },
+    }
+}
+
+-- DAP UI will be configured after plugins are fully loaded
+vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+        -- Only set up DAP UI after all plugins are loaded
+        local has_dapui, dapui = pcall(require, "dapui")
+        if has_dapui then
+            -- Configure DAP-UI to use floating windows that can overlay modal windows
+            dapui.setup({
+                icons = { expanded = "▾", collapsed = "▸", current_frame = "▸" },
+                mappings = {
+                    -- Ensure these mappings don't conflict with the plugin
+                    expand = { "<CR>", "<2-LeftMouse>" },
+                    open = "o",
+                    remove = "d",
+                    edit = "e",
+                    repl = "r",
+                    toggle = "t",
+                },
+                -- Use floating windows for everything to avoid UI conflicts
+                layouts = {
+                    {
+                        elements = {
+                            { id = "scopes", size = 0.25 },
+                            "breakpoints",
+                            "stacks",
+                            "watches",
+                        },
+                        size = 40,
+                        position = "left",
+                    },
+                    {
+                        elements = {
+                            "repl",
+                            "console",
+                        },
+                        size = 0.25,
+                        position = "bottom",
+                    },
+                },
+                floating = {
+                    max_height = 0.9,
+                    max_width = 0.9,
+                    border = "rounded",
+                    mappings = {
+                        close = { "q", "<Esc>" },
+                    },
+                },
+                windows = { indent = 1 },
+                render = {
+                    max_type_length = nil,
+                },
+            })
+
+            -- Create global functions for debugging that can be called from any context
+            _G.debug_toggle_ui = function()
+                dapui.toggle()
+            end
+
+            _G.debug_eval = function(expr)
+                dapui.eval(expr)
+            end
+            
+            _G.debug_float_element = function(element)
+                dapui.float_element(element)
+            end
+
+            -- Function to show variable scopes in a floating window
+            _G.debug_show_scopes = function()
+                dapui.float_element("scopes", { enter = true })
+            end
+
+            -- Emergency force close function
+            _G.force_close_dapui = function()
+                dapui.close()
+            end
+
+            -- Override DAP continue to make it also show scopes in a floating window
+            local dap_continue = require("dap").continue
+            require("dap").continue = function()
+                dap_continue()
+                -- Show scopes after a small delay to let the breakpoint hit
+                vim.defer_fn(function()
+                    _G.debug_show_scopes()
+                end, 100)
+            end
+
+            -- Make DAP UI auto-open on breakpoint hit rather than session start
+            dap.listeners.after.event_initialized["dapui_config"] = function()
+                -- Don't open UI automatically on start to avoid fighting with plugin UI
+                -- dapui.open()
+            end
+            
+            -- Hook into stopped event to show debug info
+            dap.listeners.after.event_stopped["dapui_config"] = function()
+                -- Move plugin window when breakpoint hits
+                vim.defer_fn(function()
+                    local status, doit_ui = pcall(require, "doit.ui.main_window")
+                    if status and doit_ui.is_window_open and doit_ui.is_window_open() then
+                        -- Make space for debugging by moving the plugin window
+                        doit_ui.resize_for_debug()
+                    end
+                    
+                    -- Show scopes in floating window when hitting a breakpoint
+                    _G.debug_show_scopes()
+                end, 100)
+            end
+            
+            dap.listeners.before.event_terminated["dapui_config"] = function()
+                dapui.close()
+            end
+            
+            dap.listeners.before.event_exited["dapui_config"] = function()
+                dapui.close()
+            end
+        else
+            vim.notify("DAP UI not available", vim.log.levels.WARN)
+        end
+    end,
+})
+
+-- Define a debugging keymaps group
+vim.api.nvim_create_user_command("DebugStart", function()
+    require('osv').launch({ host = '0.0.0.0', port = 8086 })
+    vim.notify("Debug adapter started on port 8086", vim.log.levels.INFO)
+end, { desc = "Start OSV Debug Adapter" })
+
+-- Create user commands for debugging that work even in modal windows
+vim.api.nvim_create_user_command("DebugStart", function()
+    require('osv').launch({ host = '0.0.0.0', port = 8086 })
+    vim.notify("Debug adapter started on port 8086", vim.log.levels.INFO)
+end, { desc = "Start OSV Debug Adapter" })
+
+-- Emergency command to restore window after debug
+vim.api.nvim_create_user_command("DebugRestoreWindow", function()
+    local status, doit_ui = pcall(require, "doit.ui.main_window")
+    if status and doit_ui.restore_window then
+        doit_ui.restore_window()
+        vim.notify("Window position restored", vim.log.levels.INFO)
+    end
+end, { desc = "Restore doit window position after debugging" })
+
+-- Emergency escape command that closes plugin windows and debugger
+vim.api.nvim_create_user_command("DebugEmergencyExit", function()
+    -- First try to close the plugin window
+    local status, doit_ui = pcall(require, "doit.ui")
+    if status and doit_ui.main_window and doit_ui.main_window.close_window then
+        doit_ui.main_window.close_window()
+    end
+    
+    -- Then close all DAP UI windows
+    if _G.force_close_dapui then
+        _G.force_close_dapui()
+    end
+    
+    -- Restore the cursor to a better buffer
+    vim.cmd("edit!")
+    vim.notify("Emergency exit complete - all windows closed", vim.log.levels.INFO)
+end, { desc = "Emergency exit from plugin and debug windows" })
+
+vim.api.nvim_create_user_command("DebugContinue", function()
+    require('dap').continue()
+end, { desc = "DAP: Continue execution" })
+
+vim.api.nvim_create_user_command("DebugToggleBreakpoint", function()
+    require('dap').toggle_breakpoint()
+end, { desc = "DAP: Toggle breakpoint" })
+
+vim.api.nvim_create_user_command("DebugStepOver", function()
+    require('dap').step_over()
+end, { desc = "DAP: Step over" })
+
+vim.api.nvim_create_user_command("DebugStepInto", function()
+    require('dap').step_into()
+end, { desc = "DAP: Step into" })
+
+vim.api.nvim_create_user_command("DebugStepOut", function()
+    require('dap').step_out()
+end, { desc = "DAP: Step out" })
+
+vim.api.nvim_create_user_command("DebugShowScopes", function()
+    _G.debug_show_scopes()
+end, { desc = "DAP: Show variable scopes" })
+
+vim.api.nvim_create_user_command("DebugToggleUI", function()
+    _G.debug_toggle_ui()
+end, { desc = "DAP: Toggle UI" })
+
+vim.api.nvim_create_user_command("DebugEval", function(opts)
+    _G.debug_eval(opts.args)
+end, { desc = "DAP: Evaluate expression", nargs = 1 })
+
+vim.api.nvim_create_user_command("DebugShowElement", function(opts)
+    _G.debug_float_element(opts.args)
+end, { desc = "DAP: Show UI element", nargs = 1, complete = function()
+    return { "scopes", "stacks", "breakpoints", "watches", "repl", "console" }
+end })
+
+vim.api.nvim_create_user_command("DebugCloseAll", function()
+    _G.force_close_dapui()
+end, { desc = "DAP: Force close all UI elements" })
+
+-- Standard keymaps that work in normal buffers
+vim.api.nvim_set_keymap(
+    "n",
+    "<leader>ds",
+    ":DebugStart<CR>",
+    { noremap = true, silent = true, desc = "Start Debug Adapter" }
+)
+
+vim.api.nvim_set_keymap("n", "<leader>db", ":DebugToggleBreakpoint<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Toggle breakpoint" })
+vim.api.nvim_set_keymap("n", "<leader>dc", ":DebugContinue<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Continue" })
+vim.api.nvim_set_keymap("n", "<leader>dso", ":DebugStepOver<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Step over" })
+vim.api.nvim_set_keymap("n", "<leader>dsi", ":DebugStepInto<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Step into" })
+vim.api.nvim_set_keymap("n", "<leader>dx", ":DebugStepOut<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Step out" })
+vim.api.nvim_set_keymap("n", "<leader>dv", ":DebugShowScopes<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Show variables" })
+vim.api.nvim_set_keymap("n", "<leader>du", ":DebugToggleUI<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Toggle UI" })
+
+-- IMPORTANT: Emergency exit sequence that will work even when UI is stuck
+vim.api.nvim_set_keymap("n", "<leader>dX", ":DebugEmergencyExit<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Emergency exit (plugin + debugger)" })
+    
+-- Add command to restore window position
+vim.api.nvim_set_keymap("n", "<leader>dr", ":DebugRestoreWindow<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Restore plugin window position" })
+
+-- Create terminal-mode mappings for common debug operations
+-- These allow controlling debugger even from insert mode
+vim.api.nvim_set_keymap("t", "<C-b>", "<C-\\><C-n>:DebugToggleBreakpoint<CR>a", 
+    { noremap = true, silent = true, desc = "DAP: Toggle breakpoint" })
+vim.api.nvim_set_keymap("t", "<C-c>", "<C-\\><C-n>:DebugContinue<CR>a", 
+    { noremap = true, silent = true, desc = "DAP: Continue" })
+vim.api.nvim_set_keymap("t", "<C-v>", "<C-\\><C-n>:DebugShowScopes<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Show variables" })
+vim.api.nvim_set_keymap("t", "<C-x>", "<C-\\><C-n>:DebugCloseAll<CR>", 
+    { noremap = true, silent = true, desc = "DAP: Close UI" })
+
 -- Set up Neovim commands for doit....based on my personal preferences
 vim.api.nvim_create_user_command("ToDo", function()
 	require("doit").toggle_window()

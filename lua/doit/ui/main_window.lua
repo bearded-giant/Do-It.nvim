@@ -576,4 +576,109 @@ function M.close_window()
 	end
 end
 
+-- Debug integration functions
+function M.is_window_open()
+	return win_id ~= nil and vim.api.nvim_win_is_valid(win_id)
+end
+
+-- This function can be called from outside to temporarily move the todo window
+-- to make space for debugging information
+function M.resize_for_debug()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	-- Get window dimensions
+	local ui = vim.api.nvim_list_uis()[1]
+	local width = math.floor(ui.width * 0.4) -- Make window smaller to leave space for debug
+	local height = config.options.window.height
+	
+	-- Move window to the left side
+	local new_col = 2
+	local config_pos = vim.api.nvim_win_get_config(win_id)
+	local current_row
+	
+	-- Handle different Neovim version formats for window config
+	if type(config_pos.row) == "number" then
+		-- Newer Neovim versions
+		current_row = config_pos.row
+	elseif type(config_pos.row) == "table" then
+		-- Older Neovim versions with [false] indexing
+		current_row = config_pos.row[false]
+	else
+		-- Fallback
+		current_row = 2
+	end
+	
+	-- Update window position
+	vim.api.nvim_win_set_config(win_id, {
+		relative = "editor",
+		row = current_row,
+		col = new_col,
+		width = width,
+		height = height,
+	})
+
+	-- Re-render with new sizing
+	M.render_todos()
+	
+	-- Add instruction note
+	vim.notify("Window resized for debugging. Press <leader>dr to restore.", vim.log.levels.INFO)
+end
+
+-- Restore original window position
+function M.restore_window()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local ui = vim.api.nvim_list_uis()[1]
+	local width = config.options.window.width
+	local height = config.options.window.height
+	local position = config.options.window.position or "right"
+	local padding = 2
+
+	local col, row
+	if position == "right" then
+		col = ui.width - width - padding
+		row = math.floor((ui.height - height) / 2)
+	elseif position == "left" then
+		col = padding
+		row = math.floor((ui.height - height) / 2)
+	elseif position == "top" then
+		col = math.floor((ui.width - width) / 2)
+		row = padding
+	elseif position == "bottom" then
+		col = math.floor((ui.width - width) / 2)
+		row = ui.height - height - padding
+	elseif position == "top-right" then
+		col = ui.width - width - padding
+		row = padding
+	elseif position == "top-left" then
+		col = padding
+		row = padding
+	elseif position == "bottom-right" then
+		col = ui.width - width - padding
+		row = ui.height - height - padding
+	elseif position == "bottom-left" then
+		col = padding
+		row = ui.height - height - padding
+	else
+		col = math.floor((ui.width - width) / 2)
+		row = math.floor((ui.height - height) / 2)
+	end
+
+	-- Update window position
+	vim.api.nvim_win_set_config(win_id, {
+		relative = "editor",
+		row = row,
+		col = col,
+		width = width,
+		height = height,
+	})
+
+	-- Re-render with original sizing
+	M.render_todos()
+end
+
 return M
