@@ -6,9 +6,7 @@ local Storage = {}
 
 function Storage.setup(M, config)
 	function M.save_to_disk()
-		-- Check if save_path is configured
 		if not config.options.save_path then
-			-- Use default save path if not set
 			config.options.save_path = vim.fn.stdpath("data") .. "/doit_todos.json"
 		end
 
@@ -20,9 +18,7 @@ function Storage.setup(M, config)
 	end
 
 	function M.load_from_disk()
-		-- Check if save_path is configured
 		if not config.options.save_path then
-			-- Use default save path if not set
 			config.options.save_path = vim.fn.stdpath("data") .. "/doit_todos.json"
 		end
 
@@ -32,8 +28,7 @@ function Storage.setup(M, config)
 			file:close()
 			if content and content ~= "" then
 				M.todos = vim.fn.json_decode(content)
-				
-				-- Migration: ensure all todos have an order_index
+
 				local needs_migration = false
 				for i, todo in ipairs(M.todos) do
 					if not todo.order_index then
@@ -41,8 +36,7 @@ function Storage.setup(M, config)
 						needs_migration = true
 					end
 				end
-				
-				-- Save immediately if we had to add order indices
+
 				if needs_migration then
 					M.save_to_disk()
 				end

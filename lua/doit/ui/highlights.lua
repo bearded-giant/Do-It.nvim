@@ -27,7 +27,7 @@ function M.get_priority_highlight(priorities, config)
 		return highlight_cache.pending
 	end
 
-	-- Sort config priority groups by size, descending
+	-- Sort groups by size, descending
 	local sorted_groups = {}
 	for name, group in pairs(config.options.priority_groups or {}) do
 		table.insert(sorted_groups, { name = name, group = group })

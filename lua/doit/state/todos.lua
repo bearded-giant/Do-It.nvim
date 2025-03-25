@@ -5,7 +5,6 @@ local vim = vim
 local Todos = {}
 
 function Todos.setup(M, config)
-	-- Add a new todo
 	function M.add_todo(text, priority_names)
 		local max_order = 0
 		for _, todo in ipairs(M.todos) do
@@ -28,7 +27,6 @@ function Todos.setup(M, config)
 		M.save_to_disk()
 	end
 
-	-- Toggle a todo's status
 	function M.toggle_todo(index)
 		local todo = M.todos[index]
 		if not todo then
@@ -47,7 +45,6 @@ function Todos.setup(M, config)
 		M.save_to_disk()
 	end
 
-	-- Store a deleted todo in a small "undo" history
 	local function store_deleted_todo(todo, index)
 		table.insert(M.deleted_todos, 1, {
 			todo = vim.deepcopy(todo),
@@ -59,7 +56,6 @@ function Todos.setup(M, config)
 		end
 	end
 
-	-- Delete a todo
 	function M.delete_todo(index)
 		if M.todos[index] then
 			local todo = M.todos[index]
@@ -69,7 +65,6 @@ function Todos.setup(M, config)
 		end
 	end
 
-	-- Delete ALL completed todos
 	function M.delete_completed()
 		local remaining = {}
 		local removed_count = 0
@@ -85,7 +80,6 @@ function Todos.setup(M, config)
 		M.save_to_disk()
 	end
 
-	-- Undo the most recently deleted todo
 	function M.undo_delete()
 		if #M.deleted_todos == 0 then
 			vim.notify("No more todos to restore", vim.log.levels.INFO)
@@ -126,7 +120,6 @@ function Todos.setup(M, config)
 		return tostring(removed)
 	end
 
-	-- Confirmation-based deletion (used in UI)
 	function M.delete_todo_with_confirmation(todo_index, win_id, calendar, callback)
 		local current_todo = M.todos[todo_index]
 		if not current_todo then
@@ -134,7 +127,7 @@ function Todos.setup(M, config)
 		end
 
 		if current_todo.done then
-			-- If completed, no confirmation needed
+			-- If completed no confirmation needed
 			M.delete_todo(todo_index)
 			if callback then
 				callback()
@@ -142,7 +135,7 @@ function Todos.setup(M, config)
 			return
 		end
 
-		-- Otherwise, build a small confirmation window
+		-- Else build a small confirmation window
 		local confirm_buf = vim.api.nvim_create_buf(false, true)
 		local safe_text = current_todo.text:gsub("\n", " ")
 		local line = "   ○ " .. safe_text
@@ -208,7 +201,6 @@ function Todos.setup(M, config)
 		vim.api.nvim_win_set_option(confirm_win, "signcolumn", "no")
 		vim.api.nvim_win_set_option(confirm_win, "mousemoveevent", false)
 
-		-- Local helper for highlight
 		local function get_priority_highlights(todo)
 			if todo.done then
 				return "DoItDone"

@@ -5,10 +5,8 @@ local vim = vim
 local Priorities = {}
 
 function Priorities.setup(M, config)
-	-- Priority weights cache
 	local priority_weights = {}
 
-	-- Rebuild the cache from config
 	function M.update_priority_weights()
 		priority_weights = {}
 		if config.options.priorities and type(config.options.priorities) == "table" then
@@ -18,7 +16,6 @@ function Priorities.setup(M, config)
 		end
 	end
 
-	-- Get priority score for a single todo
 	function M.get_priority_score(todo)
 		if todo.done then
 			return 0
@@ -35,7 +32,7 @@ function Priorities.setup(M, config)
 			end
 		end
 
-		-- Estimated completion time multiplier
+		-- Est time completion multiplier
 		local ect_multiplier = 1
 		if todo.estimated_hours and todo.estimated_hours > 0 then
 			local factor = config.options.hour_score_value

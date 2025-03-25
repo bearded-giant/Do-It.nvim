@@ -458,8 +458,7 @@ function M.reorder_todo(win_id, on_render)
 	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 	vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", line_num - 1, 0, -1)
 
-	-- Get the configured reorder key (default: r)
-	local reorder_key = config.options.keymaps and config.options.keymaps.reorder_todo or "r"
+	local reorder_key = config.options.keymaps.reorder_todo
 
 	vim.notify(
 		"Reordering mode: Press Up/Down arrows to move todo, press " .. reorder_key .. " to save and exit",
@@ -551,43 +550,52 @@ function M.reorder_todo(win_id, on_render)
 			return
 		end
 
+		-- Find next/previous todo within filter
 		local target_index
 		if direction == "down" then
-			target_index = real_index + 1
+			for i = real_index + 1, #state.todos do
+				if not state.active_filter or state.todos[i].text:match("#" .. state.active_filter) then
+					target_index = i
+					break
+				end
+			end
 
-			-- Skip if filtered and next one doesn't match filter
-			if state.active_filter and not state.todos[target_index].text:match("#" .. state.active_filter) then
-				return
+			if not target_index then
+				return -- No visible todo to swap with
 			end
 		else -- up
-			target_index = real_index - 1
+			for i = real_index - 1, 1, -1 do
+				if not state.active_filter or state.todos[i].text:match("#" .. state.active_filter) then
+					target_index = i
+					break
+				end
+			end
 
-			-- Skip if filtered and previous one doesn't match filter
-			if state.active_filter and not state.todos[target_index].text:match("#" .. state.active_filter) then
-				local found = false
-				for i = real_index - 1, 1, -1 do
-					if state.todos[i].text:match("#" .. state.active_filter) then
-						target_index = i
-						found = true
-						break
-					end
-				end
-				if not found then
-					return
-				end
+			if not target_index then
+				return -- No visible todo to swap with
 			end
 		end
 
-		-- Swap
-		local tmp_order = state.todos[real_index].order_index
-		state.todos[real_index].order_index = state.todos[target_index].order_index
-		state.todos[target_index].order_index = tmp_order
+		-- Swap order indices for reordering
+		local current_order = state.todos[real_index].order_index
+		local target_order = state.todos[target_index].order_index
 
-		-- Resort
+		-- Swap the order indices
+		state.todos[real_index].order_index = target_order
+		state.todos[target_index].order_index = current_order
+
 		state.sort_todos()
 
-		-- Update
-		state.reordering_todo_index = target_index
+		-- Find the new position of our todo after sorting
+		local new_position
+		for i, todo in ipairs(state.todos) do
+			if todo == state.todos[target_index] then
+				new_position = i
+				break
+			end
+		end
+
+		state.reordering_todo_index = new_position or target_index
 
 		if on_render then
 			on_render()
@@ -602,7 +610,7 @@ function M.reorder_todo(win_id, on_render)
 			for i, todo in ipairs(state.todos) do
 				if todo.text:match("#" .. state.active_filter) then
 					visible_count = visible_count + 1
-					if i == target_index then
+					if i == state.reordering_todo_index then
 						new_line_num = visible_count + (state.active_filter and 3 or 1)
 						break
 					end
@@ -610,7 +618,7 @@ function M.reorder_todo(win_id, on_render)
 			end
 		else
 			-- Unfiltered view is simpler
-			new_line_num = target_index + 1
+			new_line_num = state.reordering_todo_index + 1
 		end
 
 		if new_line_num > 0 then

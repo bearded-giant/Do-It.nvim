@@ -85,7 +85,6 @@ local function create_small_keys_window(main_win_pos)
 	return small_win
 end
 
--- Prompts for export file path
 local function prompt_export()
 	local default_path = vim.fn.expand("~/todos.json")
 
@@ -109,7 +108,6 @@ local function prompt_export()
 	end)
 end
 
--- Prompts for import file path
 local function prompt_import(on_render)
 	local default_path = vim.fn.expand("~/todos.json")
 
@@ -136,7 +134,6 @@ local function prompt_import(on_render)
 	end)
 end
 
--- Render the to-dos into the current buffer
 function M.render_todos()
 	if not buf_id or not vim.api.nvim_buf_is_valid(buf_id) then
 		return
@@ -146,10 +143,8 @@ function M.render_todos()
 	local ns_id = highlights.get_namespace_id()
 	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 
-	-- Sort todos
 	state.sort_todos()
 
-	-- Gather lines
 	local lines = { "" }
 	if state.active_filter then
 		table.insert(lines, "")
@@ -158,7 +153,6 @@ function M.render_todos()
 
 	for _, todo in ipairs(state.todos) do
 		if not state.active_filter or todo.text:match("#" .. state.active_filter) then
-			-- We'll call a local helper to format each line
 			table.insert(lines, "  " .. M.format_todo_line(todo))
 		end
 	end
@@ -224,7 +218,6 @@ function M.render_todos()
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", false)
 end
 
--- Format a single todo line based on config
 function M.format_todo_line(todo)
 	local formatting = config.options.formatting
 	if not formatting or not formatting.pending or not formatting.done then
@@ -236,7 +229,7 @@ function M.format_todo_line(todo)
 		format = { "icon", "text", "ect", "relative_time" } -- fallback
 	end
 
-	-- Add visual indicator if this todo is being reordered
+	-- Visual indicator if this todo is being reordered
 	local is_reordering = false
 	if state.reordering_todo_index then
 		for i, t in ipairs(state.todos) do
@@ -430,7 +423,6 @@ local function create_window()
 		end
 	end
 
-	-- Link each key to the appropriate action
 	setup_keymap("new_todo", function()
 		todo_actions.new_todo(function()
 			M.render_todos()
@@ -472,7 +464,6 @@ local function create_window()
 
 	setup_keymap("toggle_tags", function()
 		tag_window.create_tag_window(win_id)
-		-- re-render after user picks a tag from the tag window
 		M.render_todos()
 	end)
 

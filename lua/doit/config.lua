@@ -1,6 +1,7 @@
 local M = {}
 
 M.defaults = {
+	development_mode = false,
 	window = {
 		width = 55,
 		height = 20,
