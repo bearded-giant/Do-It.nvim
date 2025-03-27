@@ -3,7 +3,6 @@
 local Tags = {}
 
 function Tags.setup(M, config)
-	-- Gather all unique tags from todos
 	function M.get_all_tags()
 		local tags = {}
 		local seen = {}
@@ -19,12 +18,10 @@ function Tags.setup(M, config)
 		return tags
 	end
 
-	-- Set the active filter
 	function M.set_filter(tag)
 		M.active_filter = tag
 	end
 
-	-- Rename a tag in all todos
 	function M.rename_tag(old_tag, new_tag)
 		for _, todo in ipairs(M.todos) do
 			todo.text = todo.text:gsub("#" .. old_tag, "#" .. new_tag)
@@ -32,7 +29,6 @@ function Tags.setup(M, config)
 		M.save_to_disk()
 	end
 
-	-- Delete a tag from all todos
 	function M.delete_tag(tag)
 		for _, todo in ipairs(M.todos) do
 			-- Replace the tag if present

@@ -5,7 +5,6 @@ local vim = vim
 local DueDates = {}
 
 function DueDates.setup(M, config)
-	-- Helper to parse a date in MM/DD/YYYY
 	local function parse_date(date_str)
 		local month, day, year = date_str:match("^(%d%d?)/(%d%d?)/(%d%d%d%d)$")
 		if not (month and day and year) then
@@ -52,7 +51,6 @@ function DueDates.setup(M, config)
 		})
 	end
 
-	-- Add a due date
 	function M.add_due_date(index, date_str)
 		local todo = M.todos[index]
 		if not todo then
@@ -69,7 +67,6 @@ function DueDates.setup(M, config)
 		end
 	end
 
-	-- Remove a due date
 	function M.remove_due_date(index)
 		local todo = M.todos[index]
 		if not todo then
@@ -80,7 +77,6 @@ function DueDates.setup(M, config)
 		return true
 	end
 
-	-- (Optional) add_time_estimation and remove_time_estimation
 	function M.add_time_estimation(index, hours)
 		local todo = M.todos[index]
 		if not todo then

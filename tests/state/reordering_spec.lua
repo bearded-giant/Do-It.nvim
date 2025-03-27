@@ -295,6 +295,66 @@ describe("todo reordering", function()
     assert.equals("Todo 1", state.todos[2].text)
   end)
   
+  -- Test moving a todo multiple positions
+  it("should move a todo multiple positions with multiple actions", function()
+    -- Set up test todos with specific order
+    state.todos = {
+      { text = "Todo 1", order_index = 1 },
+      { text = "Todo 2", order_index = 2 },
+      { text = "Todo 3", order_index = 3 },
+      { text = "Todo 4", order_index = 4 },
+    }
+    
+    -- Setup a simplified sort function
+    local real_sort = state.sort_todos
+    state.sort_todos = function()
+      table.sort(state.todos, function(a, b)
+        return a.order_index < b.order_index
+      end)
+    end
+    
+    -- Start with Todo 1
+    local current_index = 1
+    local current_todo_text = state.todos[current_index].text
+    
+    -- First move: Swap Todo 1 with Todo 2
+    local tmp_order = state.todos[current_index].order_index
+    state.todos[current_index].order_index = state.todos[current_index + 1].order_index
+    state.todos[current_index + 1].order_index = tmp_order
+    state.sort_todos()
+    
+    -- Find the new position of the todo we're tracking
+    for i, todo in ipairs(state.todos) do
+      if todo.text == current_todo_text then
+        current_index = i
+        break
+      end
+    end
+    
+    -- Second move: Swap with the next todo (now Todo 3)
+    tmp_order = state.todos[current_index].order_index
+    state.todos[current_index].order_index = state.todos[current_index + 1].order_index
+    state.todos[current_index + 1].order_index = tmp_order
+    state.sort_todos()
+    
+    -- Verify the todo has moved to position 3
+    for i, todo in ipairs(state.todos) do
+      if todo.text == current_todo_text then
+        current_index = i
+        break
+      end
+    end
+    
+    -- Restore original sort function
+    state.sort_todos = real_sort
+    
+    -- Verify that Todo 1 has moved from position 1 to position 3
+    assert.equals(3, current_index)
+    assert.equals("Todo 1", state.todos[3].text)
+    assert.equals("Todo 2", state.todos[1].text)
+    assert.equals("Todo 3", state.todos[2].text)
+  end)
+  
   -- Test attempting to move beyond the list boundaries (first item up)
   it("should handle trying to move the first todo up", function()
     -- Store the original state

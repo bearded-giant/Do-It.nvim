@@ -9,50 +9,10 @@ local todo_actions = ui.todo_actions
 M.state = state
 M.ui = ui
 
--- Reload all doit modules
-function M.reload()
-	-- Unload all doit modules
-	for k in pairs(package.loaded) do
-		if k:match("^doit") then
-			package.loaded[k] = nil
-		end
-	end
-	
-	-- Reload main module
-	require("doit")
-	
-	-- Notify user
-	vim.notify("DoIt plugin reloaded", vim.log.levels.INFO)
-	
-	return M
-end
-
--- Toggle auto-reload for development
-function M.toggle_auto_reload()
-	if M._auto_reload_group then
-		-- Disable auto-reload
-		vim.api.nvim_del_augroup_by_id(M._auto_reload_group)
-		M._auto_reload_group = nil
-		vim.notify("DoIt auto-reload disabled", vim.log.levels.INFO)
-	else
-		-- Enable auto-reload
-		M._auto_reload_group = vim.api.nvim_create_augroup("DoitAutoReload", { clear = true })
-		vim.api.nvim_create_autocmd("BufWritePost", {
-			group = M._auto_reload_group,
-			pattern = { "/plugin/lua/doit/**/*.lua", vim.fn.stdpath("config") .. "/lua/doit/**/*.lua" },
-			callback = function()
-				M.reload()
-			end,
-			desc = "Auto-reload DoIt plugin when its files change",
-		})
-		vim.notify("DoIt auto-reload enabled", vim.log.levels.INFO)
-	end
-end
-
 function M.setup(opts)
 	config.setup(opts)
 	state.load_todos()
-	
+
 	-- Primary user commands
 	-- :Doit - Main command
 	vim.api.nvim_create_user_command("Doit", function(opts)
@@ -272,16 +232,9 @@ function M.setup(opts)
 		end,
 	})
 
-	-- Optional keymap for toggling the window
-	-- Development commands
-	vim.api.nvim_create_user_command("DoitReload", function()
-		M.reload()
-	end, { desc = "Reload DoIt plugin" })
-	
-	vim.api.nvim_create_user_command("DoitAutoReload", function()
-		M.toggle_auto_reload()
-	end, { desc = "Toggle auto-reload for DoIt plugin" })
-	
+	-- Set up development tools if enabled
+	require("doit.development").setup()
+
 	if config.options.keymaps.toggle_window then
 		vim.keymap.set("n", config.options.keymaps.toggle_window, function()
 			main_window.toggle_todo_window()
@@ -290,3 +243,4 @@ function M.setup(opts)
 end
 
 return M
+
