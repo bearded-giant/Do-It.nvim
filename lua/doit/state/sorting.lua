@@ -26,22 +26,22 @@ function Sorting.setup(M, config)
 				end
 			end
 
-			-- 2) Sort by order_index if both have it
+			-- 2) Sort by priority score for non-done items
+			if not a.done and not b.done and config.options.priorities and #config.options.priorities > 0 then
+				local a_score = M.get_priority_score(a) -- from priorities.lua
+				local b_score = M.get_priority_score(b)
+				if a_score ~= b_score then
+					return a_score > b_score
+				end
+			end
+
+			-- 3) Sort by order_index if both have it (for manual ordering)
 			if a.order_index and b.order_index then
 				return a.order_index < b.order_index
 			elseif a.order_index then
 				return true
 			elseif b.order_index then
 				return false
-			end
-
-			-- 3) Sort by priority score
-			if config.options.priorities and #config.options.priorities > 0 then
-				local a_score = M.get_priority_score(a) -- from priorities.lua
-				local b_score = M.get_priority_score(b)
-				if a_score ~= b_score then
-					return a_score > b_score
-				end
 			end
 
 			-- 4) Sort by due date

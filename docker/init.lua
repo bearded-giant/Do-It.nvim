@@ -269,27 +269,27 @@ require("doit").setup({
 
 	priorities = {
 		{
-			name = "important",
-			weight = 4,
+			name = "urgent",
+			weight = 8,
 		},
 		{
-			name = "urgent",
-			weight = 2,
+			name = "important",
+			weight = 4,
 		},
 	},
 	priority_groups = {
 		high = {
-			members = { "important", "urgent" },
+			members = { "urgent", "important" },
 			color = nil,
 			hl_group = "DiagnosticError",
 		},
 		medium = {
-			members = { "important" },
+			members = { "urgent" },
 			color = nil,
 			hl_group = "DiagnosticWarn",
 		},
 		low = {
-			members = { "urgent" },
+			members = { "important" },
 			color = nil,
 			hl_group = "DiagnosticInfo",
 		},
