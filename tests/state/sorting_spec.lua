@@ -28,6 +28,30 @@ describe("sorting", function()
 		assert.are.equal("Done todo", doit_state.todos[2].text)
 	end)
 
+	it("should prioritize in-progress todos at the top", function()
+		doit_state.todos = {
+			{ text = "Pending todo", done = false, in_progress = false, created_at = os.time() },
+			{ text = "In-progress todo", done = false, in_progress = true, created_at = os.time() },
+		}
+
+		doit_state.sort_todos()
+
+		assert.are.equal("In-progress todo", doit_state.todos[1].text)
+		assert.are.equal("Pending todo", doit_state.todos[2].text)
+	end)
+
+	it("should sort in-progress todos by priority", function()
+		doit_state.todos = {
+			{ text = "In-progress low priority", done = false, in_progress = true, created_at = os.time(), priorities = { "p3" } },
+			{ text = "In-progress high priority", done = false, in_progress = true, created_at = os.time(), priorities = { "p1", "p2" } },
+		}
+
+		doit_state.sort_todos()
+
+		assert.are.equal("In-progress high priority", doit_state.todos[1].text)
+		assert.are.equal("In-progress low priority", doit_state.todos[2].text)
+	end)
+
 	it("should sort by priority score second", function()
 		doit_state.todos = {
 			{ text = "Low priority", done = false, created_at = os.time(), priorities = { "p3" } },
@@ -101,11 +125,11 @@ describe("sorting", function()
 				due_at = tomorrow,
 			},
 			{
-				text = "Pending, low priority, due tomorrow",
+				text = "In-progress, low priority",
 				done = false,
+				in_progress = true,
 				created_at = yesterday,
 				priorities = { "p3" },
-				due_at = tomorrow,
 			},
 			{
 				text = "Pending, high priority, no due date",
@@ -118,10 +142,9 @@ describe("sorting", function()
 
 		doit_state.sort_todos()
 
-		assert.is_false(doit_state.todos[1].done)
+		assert.are.equal("In-progress, low priority", doit_state.todos[1].text)
 		assert.is_false(doit_state.todos[2].done)
 		assert.is_false(doit_state.todos[3].done)
-
 		assert.is_true(doit_state.todos[4].done)
 		assert.is_true(doit_state.todos[5].done)
 	end)

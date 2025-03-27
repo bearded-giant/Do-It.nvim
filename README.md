@@ -25,6 +25,7 @@ If you want to contribute or have any ideas, feel free to open an issue or make 
 - Relative timestamps showing when to-dos were created
 - Import/Export of to-do json for backups, obsidian integration...whatever you want
 - To-do reordering with customizable keybindings
+- In-progress (active) to-dos automatically float to the top of the list and sort by priority
 
 ---
 
@@ -248,7 +249,7 @@ Do-It.nvim provides several commands to get things done:
 ## Roadmap...Sort of
 
 - [x] Reorder To-dos
-- [ ] Active To-do to Top
+- [x] Active To-do to Top
 - [ ] Named (and Multiple) To-do Lists
 - [ ] To-do Categories View
 
