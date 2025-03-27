@@ -1,5 +1,4 @@
 -- Minimal init.lua for doit plugin testing
-
 vim.opt.rtp:append("/plugin")
 
 vim.opt.termguicolors = true
