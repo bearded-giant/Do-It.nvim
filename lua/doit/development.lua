@@ -62,7 +62,7 @@ function M.toggle_auto_reload()
 			callback = function()
 				M.reload()
 			end,
-			desc = "Auto-reload Do-It.nvim plugin when its files change",
+			desc = "Auto-reload Do-It.nvim plugin on change",
 		})
 		vim.notify("Do-It.nvim auto-reload enabled", vim.log.levels.INFO)
 	end
@@ -125,4 +125,3 @@ function M.check_dap_status()
 end
 
 return M
-

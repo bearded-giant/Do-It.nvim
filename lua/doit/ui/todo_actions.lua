@@ -460,11 +460,6 @@ function M.reorder_todo(win_id, on_render)
 
 	local reorder_key = config.options.keymaps.reorder_todo
 
-	vim.notify(
-		"Reordering mode: Press Up/Down arrows to move todo, press " .. reorder_key .. " to save and exit",
-		vim.log.levels.INFO
-	)
-
 	local old_r_keymap = vim.fn.maparg(reorder_key, "n", false, true)
 
 	local function exit_reorder_mode()
@@ -502,7 +497,9 @@ function M.reorder_todo(win_id, on_render)
 			end)
 		end
 
-		vim.notify("Reordering mode exited and saved", vim.log.levels.INFO)
+		if config.options.development_mode then
+			vim.notify("Reordering mode exited and saved", vim.log.levels.INFO)
+		end
 	end
 
 	local function update_order_indices()
@@ -550,6 +547,9 @@ function M.reorder_todo(win_id, on_render)
 			return
 		end
 
+		-- Store the current todo for tracking
+		local current_todo = state.todos[real_index]
+
 		-- Find next/previous todo within filter
 		local target_index
 		if direction == "down" then
@@ -589,13 +589,17 @@ function M.reorder_todo(win_id, on_render)
 		-- Find the new position of our todo after sorting
 		local new_position
 		for i, todo in ipairs(state.todos) do
-			if todo == state.todos[target_index] then
+			if todo == current_todo then
 				new_position = i
 				break
 			end
 		end
 
-		state.reordering_todo_index = new_position or target_index
+		if not new_position then
+			return -- Something went wrong, couldn't find the todo
+		end
+
+		state.reordering_todo_index = new_position
 
 		if on_render then
 			on_render()
@@ -610,7 +614,7 @@ function M.reorder_todo(win_id, on_render)
 			for i, todo in ipairs(state.todos) do
 				if todo.text:match("#" .. state.active_filter) then
 					visible_count = visible_count + 1
-					if i == state.reordering_todo_index then
+					if i == new_position then
 						new_line_num = visible_count + (state.active_filter and 3 or 1)
 						break
 					end
@@ -618,23 +622,22 @@ function M.reorder_todo(win_id, on_render)
 			end
 		else
 			-- Unfiltered view is simpler
-			new_line_num = state.reordering_todo_index + 1
+			new_line_num = new_position + 1
 		end
 
 		if new_line_num > 0 then
 			vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
-			line_num = new_line_num
 			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
 		end
 	end
 
 	vim.keymap.set("n", "<Down>", function()
-		move_todo(buf_id, win_id, line_num, ns_id, "down", on_render)
+		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "down", on_render)
 	end, { buffer = buf_id, nowait = true })
 
 	vim.keymap.set("n", "<Up>", function()
-		move_todo(buf_id, win_id, line_num, ns_id, "up", on_render)
+		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "up", on_render)
 	end, { buffer = buf_id, nowait = true })
 
 	local reorder_key = config.options.keymaps and config.options.keymaps.reorder_todo or "r"

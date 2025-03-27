@@ -88,4 +88,77 @@ describe("todo reordering UI", function()
     assert.equals(2, state.todos[2].order_index)
     assert.equals(3, state.todos[3].order_index)
   end)
+  
+  it("should track the moved todo correctly through multiple moves", function()
+    -- Set up state
+    state.todos = {
+      { text = "Todo 1", order_index = 1 },
+      { text = "Todo 2", order_index = 2 },
+      { text = "Todo 3", order_index = 3 },
+      { text = "Todo 4", order_index = 4 },
+    }
+    
+    -- Mock win_get_cursor to return cursor at line 2 (Todo 1)
+    vim.api.nvim_win_get_cursor = function() return {2, 0} end
+    
+    -- Create a test context for move_todo function
+    local buf_id = 1
+    local win_id = 1
+    local ns_id = 1
+    local rendered = false
+    local on_render = function() rendered = true end
+    
+    -- First call - simulate moving Todo 1 down
+    local todo_being_moved = state.todos[1]
+    
+    -- Find and call the move_todo function - we'll simulate it here
+    local current_index = 1 -- First todo (line 2, accounting for header)
+    local target_index = 2 -- Moving down to second todo
+    
+    -- Swap order indices
+    local tmp = state.todos[current_index].order_index
+    state.todos[current_index].order_index = state.todos[target_index].order_index
+    state.todos[target_index].order_index = tmp
+    
+    -- Sort todos
+    state.sort_todos()
+    
+    -- Verify Todo 1 is now at position 2
+    assert.equals("Todo 1", state.todos[2].text)
+    assert.equals("Todo 2", state.todos[1].text)
+    
+    -- Second call - simulate moving the same todo (Todo 1) down again
+    current_index = 2 -- Todo 1 is now at position 2
+    target_index = 3 -- Moving down to position 3
+    
+    -- Swap order indices again
+    tmp = state.todos[current_index].order_index
+    state.todos[current_index].order_index = state.todos[target_index].order_index
+    state.todos[target_index].order_index = tmp
+    
+    -- Sort todos
+    state.sort_todos()
+    
+    -- Verify Todo 1 is now at position 3
+    assert.equals("Todo 1", state.todos[3].text)
+    assert.equals("Todo 3", state.todos[2].text)
+    assert.equals("Todo 2", state.todos[1].text)
+    
+    -- Third call - simulate moving the same todo (Todo 1) up
+    current_index = 3 -- Todo 1 is now at position 3
+    target_index = 2 -- Moving up to position 2
+    
+    -- Swap order indices again
+    tmp = state.todos[current_index].order_index
+    state.todos[current_index].order_index = state.todos[target_index].order_index
+    state.todos[target_index].order_index = tmp
+    
+    -- Sort todos
+    state.sort_todos()
+    
+    -- Verify Todo 1 is now at position 2
+    assert.equals("Todo 1", state.todos[2].text)
+    assert.equals("Todo 3", state.todos[3].text)
+    assert.equals("Todo 2", state.todos[1].text)
+  end)
 end)
