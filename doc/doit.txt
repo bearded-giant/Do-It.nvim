@@ -47,6 +47,7 @@ FEATURES                                                      *doit-features*
 - Relative timestamps showing when to-dos were created
 - Import/Export of to-do json for backups, obsidian integration...whatever you want
 - To-do reordering with customizable keybindings
+- In-progress (active) to-dos automatically float to the top of the list and sort by priority
 
 REQUIREMENTS                                              *doit-requirements*
 
@@ -321,6 +322,11 @@ Configure priorities and their weights: >lua
     }
 <
 
+Sorting by Priority~
+1. In-progress (active) todos are always displayed at the top
+2. When multiple in-progress todos exist, they're sorted by priority (urgent+important, then important, then urgent)
+3. All other todos follow the standard sorting (priority, due date, creation time)
+
 IMPORT/EXPORT                                                 *doit-import*
 
 Import and export todos using JSON format: >vim
@@ -343,7 +349,7 @@ Highlight Groups~
 4. Roadmap                                                    *doit-roadmap*
 
 - ✓ Reorder To-dos
-- Active To-do to Top
+- ✓ Active To-do to Top
 - Named (and Multiple) To-do Lists
 - To-do Categories View
 

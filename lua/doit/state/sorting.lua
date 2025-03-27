@@ -1,4 +1,4 @@
--- Sort the todo list by done-ness, priority score, due date, etc.
+-- Sort the todo list by done-ness, in-progress status, priority score, due date, etc.
 
 local Sorting = {}
 
@@ -8,6 +8,22 @@ function Sorting.setup(M, config)
 			-- 1) Sort by completion
 			if a.done ~= b.done then
 				return not a.done
+			end
+			
+			-- If both are not done, prioritize in_progress items to the top
+			if not a.done and not b.done then
+				if a.in_progress ~= b.in_progress then
+					return a.in_progress
+				end
+				
+				-- If both are in_progress, sort by priority score
+				if a.in_progress and b.in_progress and config.options.priorities and #config.options.priorities > 0 then
+					local a_score = M.get_priority_score(a) -- from priorities.lua
+					local b_score = M.get_priority_score(b)
+					if a_score ~= b_score then
+						return a_score > b_score
+					end
+				end
 			end
 
 			-- 2) Sort by order_index if both have it
