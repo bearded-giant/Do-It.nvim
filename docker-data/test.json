@@ -1,1 +1,26 @@
-success
+[
+  {
+    "text": "Urgent only todo",
+    "priorities": ["urgent"],
+    "order_index": 1,
+    "created_at": 1685037654
+  },
+  {
+    "text": "Important only todo", 
+    "priorities": ["important"],
+    "order_index": 2,
+    "created_at": 1685037654
+  },
+  {
+    "text": "Urgent and important todo",
+    "priorities": ["urgent", "important"],
+    "order_index": 3,
+    "created_at": 1685037654
+  },
+  {
+    "text": "No priority todo",
+    "priorities": [],
+    "order_index": 4,
+    "created_at": 1685037654
+  }
+]
