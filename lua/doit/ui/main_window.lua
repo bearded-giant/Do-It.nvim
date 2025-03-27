@@ -560,6 +560,11 @@ function M.close_window()
 		search_window.close_search_window()
 	end
 
+	-- Reset reordering state when closing the window
+	if state.reordering_todo_index ~= nil then
+		state.reordering_todo_index = nil
+	end
+
 	if win_id and vim.api.nvim_win_is_valid(win_id) then
 		vim.api.nvim_win_close(win_id, true)
 		win_id = nil

@@ -480,22 +480,12 @@ function M.reorder_todo(win_id, on_render)
 		safe_del_keymap(reorder_key)
 		safe_del_keymap("<Esc>")
 
-		if old_r_keymap and not vim.tbl_isempty(old_r_keymap) then
-			pcall(function()
-				vim.keymap.set(
-					"n",
-					reorder_key,
-					old_r_keymap.rhs,
-					{ buffer = buf_id, noremap = old_r_keymap.noremap, silent = old_r_keymap.silent }
-				)
-			end)
-		elseif config.options.keymaps and config.options.keymaps.reorder_todo then
-			pcall(function()
-				vim.keymap.set("n", reorder_key, function()
-					M.reorder_todo(win_id, on_render)
-				end, { buffer = buf_id, nowait = true })
-			end)
-		end
+		-- Always restore the reorder keybinding to ensure it can be re-entered
+		pcall(function()
+			vim.keymap.set("n", reorder_key, function()
+				M.reorder_todo(win_id, on_render)
+			end, { buffer = buf_id, nowait = true })
+		end)
 
 		if config.options.development_mode then
 			vim.notify("Reordering mode exited and saved", vim.log.levels.INFO)
