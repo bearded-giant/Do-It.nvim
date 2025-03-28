@@ -1,7 +1,7 @@
 -- Minimal init.lua for doit plugin testing
 vim.opt.rtp:append("/plugin")
 
-vim.opt.termguicolors = true
+vim.opt.termguicolors = tru
 vim.opt.mouse = "a"
 vim.opt.clipboard = "unnamedplus"
 
@@ -9,10 +9,10 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
 -- Set up oil.nvim
-require('oil').setup({
-    keymaps = {
-        ["<Esc>"] = "actions.close",
-    },
+require("oil").setup({
+	keymaps = {
+		["<Esc>"] = "actions.close",
+	},
 })
 vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Open parent directory" })
 
@@ -276,6 +276,7 @@ require("doit").setup({
 	},
 
 	priorities = {
+		{ name = "critical", weight = 16 },
 		{
 			name = "urgent",
 			weight = 8,
@@ -286,6 +287,11 @@ require("doit").setup({
 		},
 	},
 	priority_groups = {
+		critical = {
+			members = { "critical", "urgent", "important" },
+			color = nil,
+			hl_group = "DiagnosticError",
+		},
 		high = {
 			members = { "urgent", "important" },
 			color = nil,
