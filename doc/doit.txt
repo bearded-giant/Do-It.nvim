@@ -204,16 +204,16 @@ Main command to interact with the plugin.
 Arguments:~
     none            Opens/toggles the to-do window
     add [text]      Creates a new to-do
-      -p, --priorities [list]   Comma-separated list of priorities
+      -p, --priority [name]     Name of the priority to assign
     list            Lists all to-dos in the command line
     set             Modifies to-do properties
 
 Examples: >vim
     :Doit
     :Doit add My new task #work
-    :Doit add -p important,urgent My priority task
+    :Doit add -p important My priority task
     :Doit list
-    :Doit set 1 priorities important,urgent
+    :Doit set 1 priorities important
     :Doit set 2 ect 2h
 <
 
@@ -294,18 +294,23 @@ PRIORITY SYSTEM                                             *doit-priorities*
 
 Configure priorities and their weights: >lua
     priorities = {
+        { name = "critical", weight = 16 },
+        {
+            name = "urgent",
+            weight = 8,
+        },
         {
             name = "important",
             weight = 4,
         },
-        {
-            name = "urgent",
-            weight = 2,
-        },
     },
     priority_groups = {
+        critical = {
+            members = { "critical" },
+            color = "#FF0000",
+        },
         high = {
-            members = { "important", "urgent" },
+            members = { "urgent" },
             color = nil,
             hl_group = "DiagnosticError",
         },
@@ -314,18 +319,15 @@ Configure priorities and their weights: >lua
             color = nil,
             hl_group = "DiagnosticWarn",
         },
-        low = {
-            members = { "urgent" },
-            color = nil,
-            hl_group = "DiagnosticInfo",
-        },
     }
 <
 
 Sorting by Priority~
 1. In-progress (active) todos are always displayed at the top
-2. When multiple in-progress todos exist, they're sorted by priority (urgent+important, then important, then urgent)
+2. When multiple in-progress todos exist, they're sorted by priority (critical, then urgent, then important)
 3. All other todos follow the standard sorting (priority, due date, creation time)
+
+Note: Each todo can have only one priority assigned.
 
 IMPORT/EXPORT                                                 *doit-import*
 

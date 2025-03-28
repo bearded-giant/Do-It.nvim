@@ -30,9 +30,31 @@ function Storage.setup(M, config)
 				M.todos = vim.fn.json_decode(content)
 
 				local needs_migration = false
+				
+				-- Migration: Add order_index if missing
 				for i, todo in ipairs(M.todos) do
 					if not todo.order_index then
 						todo.order_index = i
+						needs_migration = true
+					end
+				end
+				
+				-- Migration: Convert priorities from array to string
+				for _, todo in ipairs(M.todos) do
+					if todo.priorities and type(todo.priorities) == "table" then
+						local highest_priority = nil
+						local highest_weight = 0
+						
+						for _, prio_name in ipairs(todo.priorities) do
+							for _, p in ipairs(config.options.priorities or {}) do
+								if p.name == prio_name and (p.weight or 0) > highest_weight then
+									highest_weight = p.weight or 0
+									highest_priority = prio_name
+								end
+							end
+						end
+						
+						todo.priorities = highest_priority
 						needs_migration = true
 					end
 				end

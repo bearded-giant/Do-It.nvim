@@ -5,7 +5,7 @@ local vim = vim
 local Todos = {}
 
 function Todos.setup(M, config)
-	function M.add_todo(text, priority_names)
+	function M.add_todo(text, priority_name)
 		local max_order = 0
 		for _, todo in ipairs(M.todos) do
 			if todo.order_index and todo.order_index > max_order then
@@ -19,7 +19,7 @@ function Todos.setup(M, config)
 			in_progress = false,
 			category = text:match("#(%w+)") or "",
 			created_at = os.time(),
-			priorities = priority_names,
+			priorities = priority_name, -- Now a string instead of an array
 			estimated_hours = nil,
 			notes = "",
 			order_index = max_order + 1,
@@ -212,33 +212,22 @@ function Todos.setup(M, config)
 				return "DoItPending"
 			end
 
-			if todo.priorities and #todo.priorities > 0 and config.options.priority_groups then
-				local sorted_groups = {}
-				for name, group in pairs(config.options.priority_groups) do
-					table.insert(sorted_groups, { name = name, group = group })
+			if todo.priorities and config.options.priority_groups then
+				local priority_name = nil
+				if type(todo.priorities) == "string" then
+					priority_name = todo.priorities
+				elseif type(todo.priorities) == "table" and #todo.priorities > 0 then
+					-- Backward compatibility during migration
+					priority_name = todo.priorities[1]
 				end
-				table.sort(sorted_groups, function(a, b)
-					return #a.group.members > #b.group.members
-				end)
 
-				for _, group_data in ipairs(sorted_groups) do
-					local group = group_data.group
-					local all_members_match = true
-					for _, member in ipairs(group.members) do
-						local found = false
-						for _, prio in ipairs(todo.priorities) do
-							if prio == member then
-								found = true
-								break
+				if priority_name then
+					for name, group in pairs(config.options.priority_groups) do
+						for _, member in ipairs(group.members) do
+							if priority_name == member then
+								return group.hl_group or "DoItPending"
 							end
 						end
-						if not found then
-							all_members_match = false
-							break
-						end
-					end
-					if all_members_match then
-						return group.hl_group or "DoItPending"
 					end
 				end
 			end

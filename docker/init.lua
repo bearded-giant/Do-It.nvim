@@ -1,7 +1,7 @@
 -- Minimal init.lua for doit plugin testing
 vim.opt.rtp:append("/plugin")
 
-vim.opt.termguicolors = tru
+vim.opt.termguicolors = true
 vim.opt.mouse = "a"
 vim.opt.clipboard = "unnamedplus"
 
@@ -288,24 +288,18 @@ require("doit").setup({
 	},
 	priority_groups = {
 		critical = {
-			members = { "critical", "urgent", "important" },
-			color = nil,
-			hl_group = "DiagnosticError",
+			members = { "critical" },
+			color = "#FF0000",
 		},
 		high = {
-			members = { "urgent", "important" },
+			members = { "urgent" },
 			color = nil,
 			hl_group = "DiagnosticError",
 		},
 		medium = {
-			members = { "urgent" },
-			color = nil,
-			hl_group = "DiagnosticWarn",
-		},
-		low = {
 			members = { "important" },
 			color = nil,
-			hl_group = "DiagnosticInfo",
+			hl_group = "DiagnosticWarn",
 		},
 	},
 	hour_score_value = 1 / 8,

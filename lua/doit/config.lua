@@ -49,8 +49,7 @@ M.defaults = {
 	priority_groups = {
 		critical = {
 			members = { "critical", "urgent", "important" },
-			color = nil,
-			hl_group = "DiagnosticError",
+			color = "#FF0000",
 		},
 		high = {
 			members = { "urgent", "important" },

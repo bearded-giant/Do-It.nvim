@@ -71,7 +71,7 @@ local function cleanup_priority_selection(select_buf, select_win, keymaps)
 	end
 end
 
-local function create_priority_selection_window(priorities, selected_priorities, title)
+local function create_priority_selection_window(priorities, selected_priority, title)
 	local priority_options = {}
 	local keymaps = {
 		config.options.keymaps.toggle_priority,
@@ -81,8 +81,8 @@ local function create_priority_selection_window(priorities, selected_priorities,
 	}
 
 	for i, priority in ipairs(priorities) do
-		local is_selected = selected_priorities and selected_priorities[i]
-		priority_options[i] = string.format("[%s] %s", is_selected and "x" or " ", priority.name)
+		local is_selected = selected_priority == priority.name
+		priority_options[i] = string.format("(%s) %s", is_selected and "•" or " ", priority.name)
 	end
 
 	local select_buf = vim.api.nvim_create_buf(false, true)
@@ -102,7 +102,7 @@ local function create_priority_selection_window(priorities, selected_priorities,
 		border = "rounded",
 		title = " " .. title .. " ",
 		title_pos = "center",
-		footer = string.format(" %s: toggle | <Enter>: confirm ", config.options.keymaps.toggle_priority),
+		footer = string.format(" %s: select | <Enter>: confirm ", config.options.keymaps.toggle_priority),
 		footer_pos = "center",
 	})
 
@@ -118,48 +118,41 @@ local function create_priority_selection_window(priorities, selected_priorities,
 		once = true,
 	})
 
-	return select_buf, select_win, keymaps
+	return select_buf, select_win, keymaps, priority_options
 end
 
-local function setup_priority_toggle(select_buf, select_win, selected_priorities)
+local function setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
 	vim.keymap.set("n", config.options.keymaps.toggle_priority, function()
 		if not (select_win and vim.api.nvim_win_is_valid(select_win)) then
 			return
 		end
 		local cursor = vim.api.nvim_win_get_cursor(select_win)
 		local line_num = cursor[1]
-		local line_text = vim.api.nvim_buf_get_lines(select_buf, line_num - 1, line_num, false)[1]
-
-		vim.api.nvim_buf_set_option(select_buf, "modifiable", true)
-		if line_text:match("^%[%s%]") then
-			local new_line = line_text:gsub("^%[%s%]", "[x]")
-			selected_priorities[line_num] = true
-			vim.api.nvim_buf_set_lines(select_buf, line_num - 1, line_num, false, { new_line })
-		else
-			local new_line = line_text:gsub("^%[x%]", "[ ]")
-			selected_priorities[line_num] = nil
-			vim.api.nvim_buf_set_lines(select_buf, line_num - 1, line_num, false, { new_line })
+		
+		-- Update selected priority
+		if priorities[line_num] then
+			selected_priority.value = priorities[line_num].name
 		end
+		
+		-- Update all lines to show the current selection
+		vim.api.nvim_buf_set_option(select_buf, "modifiable", true)
+		for i, priority in ipairs(priorities) do
+			local is_selected = selected_priority.value == priority.name
+			priority_options[i] = string.format("(%s) %s", is_selected and "•" or " ", priority.name)
+		end
+		vim.api.nvim_buf_set_lines(select_buf, 0, -1, false, priority_options)
 		vim.api.nvim_buf_set_option(select_buf, "modifiable", false)
 	end, { buffer = select_buf, nowait = true })
 end
 
-local function setup_priority_confirm(select_buf, select_win, keymaps, priorities, selected_priorities, callback)
+local function setup_priority_confirm(select_buf, select_win, keymaps, priorities, selected_priority, callback)
 	vim.keymap.set("n", "<CR>", function()
 		if not (select_win and vim.api.nvim_win_is_valid(select_win)) then
 			return
 		end
 
-		local selected_priority_names = {}
-		for idx, _ in pairs(selected_priorities) do
-			local prio = priorities[idx]
-			if prio then
-				table.insert(selected_priority_names, prio.name)
-			end
-		end
-
 		cleanup_priority_selection(select_buf, select_win, keymaps)
-		callback(#selected_priority_names > 0 and selected_priority_names or nil)
+		callback(selected_priority.value)
 	end, { buffer = select_buf, nowait = true })
 end
 
@@ -177,15 +170,15 @@ function M.new_todo(on_render)
 		if input then
 			input = input:gsub("\n", " ")
 			if input ~= "" then
-				-- If user has priority config, ask for priorities
+				-- If user has priority config, ask for priority
 				if config.options.priorities and #config.options.priorities > 0 then
 					local priorities = config.options.priorities
-					local selected_priorities = {}
+					local selected_priority = { value = nil }
 
-					local select_buf, select_win, keymaps =
-						create_priority_selection_window(priorities, selected_priorities, "Select Priorities")
+					local select_buf, select_win, keymaps, priority_options =
+						create_priority_selection_window(priorities, selected_priority.value, "Select Priority")
 
-					setup_priority_toggle(select_buf, select_win, selected_priorities)
+					setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
 
 					-- Setup confirmation handling
 					setup_priority_confirm(
@@ -193,9 +186,9 @@ function M.new_todo(on_render)
 						select_win,
 						keymaps,
 						priorities,
-						selected_priorities,
-						function(selected_priority_names)
-							state.add_todo(input, selected_priority_names)
+						selected_priority,
+						function(selected_priority_name)
+							state.add_todo(input, selected_priority_name)
 							maybe_render(on_render)
 						end
 					)
@@ -299,34 +292,22 @@ function M.edit_priorities(win_id, on_render)
 		if todo_index then
 			if config.options.priorities and #config.options.priorities > 0 then
 				local priorities = config.options.priorities
-				local selected_priorities = {}
 				local current_todo = state.todos[todo_index]
+				local selected_priority = { value = current_todo.priorities }
 
-				-- Pre-select existing priorities
-				if current_todo.priorities then
-					for i, priority in ipairs(priorities) do
-						for _, existing_priority in ipairs(current_todo.priorities) do
-							if existing_priority == priority.name then
-								selected_priorities[i] = true
-								break
-							end
-						end
-					end
-				end
+				local select_buf, select_win, keymaps, priority_options =
+					create_priority_selection_window(priorities, selected_priority.value, "Edit Priority")
 
-				local select_buf, select_win, keymaps =
-					create_priority_selection_window(priorities, selected_priorities, "Edit Priorities")
-
-				setup_priority_toggle(select_buf, select_win, selected_priorities)
+				setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
 
 				setup_priority_confirm(
 					select_buf,
 					select_win,
 					keymaps,
 					priorities,
-					selected_priorities,
-					function(selected_priority_names)
-						state.todos[todo_index].priorities = selected_priority_names
+					selected_priority,
+					function(selected_priority_name)
+						state.todos[todo_index].priorities = selected_priority_name
 						state.save_to_disk()
 						maybe_render(on_render)
 					end

@@ -23,7 +23,18 @@ function M.get_namespace_id()
 end
 
 function M.get_priority_highlight(priorities, config)
-	if not priorities or #priorities == 0 then
+	if not priorities or (type(priorities) == "string" and priorities == "") then
+		return highlight_cache.pending
+	end
+	
+	-- Handle the new string format for priority
+	local priority_name = nil
+	if type(priorities) == "string" then
+		priority_name = priorities
+	elseif type(priorities) == "table" and #priorities > 0 then
+		-- Backward compatibility during migration
+		priority_name = priorities[1]
+	else
 		return highlight_cache.pending
 	end
 
@@ -36,42 +47,30 @@ function M.get_priority_highlight(priorities, config)
 		return #a.group.members > #b.group.members
 	end)
 
-	-- Check each group to see if all members match
+	-- Check each group to see if the priority is a member
 	for _, group_data in ipairs(sorted_groups) do
 		local group = group_data.group
-		local all_members_match = true
+		
 		for _, member in ipairs(group.members) do
-			local found = false
-			for _, priority in ipairs(priorities) do
-				if priority == member then
-					found = true
-					break
+			if priority_name == member then
+				-- Create a cache key
+				local cache_key = member
+				if highlight_cache[cache_key] then
+					return highlight_cache[cache_key]
 				end
-			end
-			if not found then
-				all_members_match = false
-				break
-			end
-		end
 
-		if all_members_match then
-			-- Create a cache key
-			local cache_key = table.concat(group.members, "_")
-			if highlight_cache[cache_key] then
-				return highlight_cache[cache_key]
-			end
+				local hl_group = highlight_cache.pending
+				if group.color and type(group.color) == "string" and group.color:match("^#%x%x%x%x%x%x$") then
+					local hl_name = "doit" .. group.color:gsub("#", "")
+					vim.api.nvim_set_hl(0, hl_name, { fg = group.color })
+					hl_group = hl_name
+				elseif group.hl_group then
+					hl_group = group.hl_group
+				end
 
-			local hl_group = highlight_cache.pending
-			if group.color and type(group.color) == "string" and group.color:match("^#%x%x%x%x%x%x$") then
-				local hl_name = "doit" .. group.color:gsub("#", "")
-				vim.api.nvim_set_hl(0, hl_name, { fg = group.color })
-				hl_group = hl_name
-			elseif group.hl_group then
-				hl_group = group.hl_group
+				highlight_cache[cache_key] = hl_group
+				return hl_group
 			end
-
-			highlight_cache[cache_key] = hl_group
-			return hl_group
 		end
 	end
 
