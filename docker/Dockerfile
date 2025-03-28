@@ -9,7 +9,7 @@ RUN mkdir -p /root/.config/nvim/pack/plugins/start
 RUN mkdir -p /data && chmod 777 /data
 WORKDIR /plugin
 COPY ./init.lua /root/.config/nvim/init.lua
-RUN git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git /root/.config/nvim/pack/plugins/start/plenary.nvim
-RUN git clone --depth 1 https://github.com/stevearc/oil.nvim.git /root/.config/nvim/pack/plugins/start/oil.nvim
+RUN git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git /root/.config/nvim/pack/plugins/start/plenary.nvim && \
+    git clone --depth 1 https://github.com/stevearc/oil.nvim.git /root/.config/nvim/pack/plugins/start/oil.nvim
 VOLUME ["/plugin"]
 CMD ["echo", "Please use run-tests.sh to execute tests"]

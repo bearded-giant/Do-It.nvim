@@ -8,6 +8,14 @@ vim.opt.clipboard = "unnamedplus"
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
+-- Set up oil.nvim
+require('oil').setup({
+    keymaps = {
+        ["<Esc>"] = "actions.close",
+    },
+})
+vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Open parent directory" })
+
 -- Set up Neovim commands for doit....based on my personal preferences
 vim.api.nvim_create_user_command("ToDo", function()
 	require("doit").toggle_window()
