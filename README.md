@@ -140,18 +140,23 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
         },
     },
     priorities = {
+        { name = "critical", weight = 16 },
+        {
+            name = "urgent",
+            weight = 8,
+        },
         {
             name = "important",
             weight = 4,
         },
-        {
-            name = "urgent",
-            weight = 2,
-        },
     },
     priority_groups = {
+        critical = {
+            members = { "critical" },
+            color = "#FF0000",
+        },
         high = {
-            members = { "important", "urgent" },
+            members = { "urgent" },
             color = nil,
             hl_group = "DiagnosticError",
         },
@@ -159,11 +164,6 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
             members = { "important" },
             color = nil,
             hl_group = "DiagnosticWarn",
-        },
-        low = {
-            members = { "urgent" },
-            color = nil,
-            hl_group = "DiagnosticInfo",
         },
     },
     hour_score_value = 1/8,
@@ -176,10 +176,10 @@ Do-It.nvim provides several commands to get things done:
 
 - `:doit` - Opens the main window
 - `:doit add [text]` - Adds a new to-do
-  - `-p, --priorities [list]` - Comma-separated list of priorities (e.g. "important,urgent")
+  - `-p, --priority [name]` - Name of the priority to assign (e.g. "important" or "urgent")
 - `:doit list` - Lists all to-dos with their indices and metadata
 - `:doit set [index] [field] [value]` - Modifies to-do properties
-  - `priorities` - Set/update priorities (use "nil" to clear)
+  - `priorities` - Set/update priority (use "nil" to clear)
   - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
 
 ---

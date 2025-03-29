@@ -9,10 +9,10 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
 -- Set up oil.nvim
-require('oil').setup({
-    keymaps = {
-        ["<Esc>"] = "actions.close",
-    },
+require("oil").setup({
+	keymaps = {
+		["<Esc>"] = "actions.close",
+	},
 })
 vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Open parent directory" })
 
@@ -276,6 +276,7 @@ require("doit").setup({
 	},
 
 	priorities = {
+		{ name = "critical", weight = 16 },
 		{
 			name = "urgent",
 			weight = 8,
@@ -286,20 +287,24 @@ require("doit").setup({
 		},
 	},
 	priority_groups = {
-		high = {
-			members = { "urgent", "important" },
-			color = nil,
-			hl_group = "DiagnosticError",
+		critical = {
+			members = { "critical" },
+			color = "#FF0000",
 		},
-		medium = {
+		high = {
 			members = { "urgent" },
 			color = nil,
 			hl_group = "DiagnosticWarn",
 		},
-		low = {
+		medium = {
 			members = { "important" },
 			color = nil,
 			hl_group = "DiagnosticInfo",
+		},
+		low = {
+			members = {},
+			color = "#FFFFFF",
+			-- hl_group = "DiagnosticInfo",
 		},
 	},
 	hour_score_value = 1 / 8,

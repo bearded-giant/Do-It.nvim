@@ -85,53 +85,43 @@ local function create_small_keys_window(main_win_pos)
 	return small_win
 end
 
-local function prompt_export()
-	local default_path = vim.fn.expand("~/todos.json")
+local function prompt_io(operation, on_render)
+	local io_path = config.options.import_export_path or vim.fn.expand("~/todos.json")
+	local is_import = operation == "import"
+	local prompt_text = is_import and "Import todos from file: " or "Export todos to file: "
+	local cancel_message = is_import and "Import cancelled" or "Export cancelled"
 
 	vim.ui.input({
-		prompt = "Export todos to file: ",
-		default = default_path,
+		prompt = prompt_text,
+		default = io_path,
 		completion = "file",
 	}, function(file_path)
 		if not file_path or file_path == "" then
-			vim.notify("Export cancelled", vim.log.levels.INFO)
+			vim.notify(cancel_message, vim.log.levels.INFO)
 			return
 		end
 
 		file_path = vim.fn.expand(file_path)
-		local success, message = state.export_todos(file_path)
+		local fn = is_import and state.import_todos or state.export_todos
+		local success, message = fn(file_path)
+
 		if success then
 			vim.notify(message, vim.log.levels.INFO)
-		else
-			vim.notify(message, vim.log.levels.ERROR)
-		end
-	end)
-end
-
-local function prompt_import(on_render)
-	local default_path = vim.fn.expand("~/todos.json")
-
-	vim.ui.input({
-		prompt = "Import todos from file: ",
-		default = default_path,
-		completion = "file",
-	}, function(file_path)
-		if not file_path or file_path == "" then
-			vim.notify("Import cancelled", vim.log.levels.INFO)
-			return
-		end
-
-		file_path = vim.fn.expand(file_path)
-		local success, message = state.import_todos(file_path)
-		if success then
-			vim.notify(message, vim.log.levels.INFO)
-			if on_render then
+			if is_import and on_render then
 				on_render()
 			end
 		else
 			vim.notify(message, vim.log.levels.ERROR)
 		end
 	end)
+end
+
+local function prompt_export()
+	prompt_io("export")
+end
+
+local function prompt_import(on_render)
+	prompt_io("import", on_render)
 end
 
 function M.render_todos()
@@ -528,14 +518,14 @@ local function create_window()
 		prompt_export()
 	end)
 
-	setup_keymap("remove_duplicates", function()
-		todo_actions.remove_duplicates(function()
+	setup_keymap("import_todos", function()
+		prompt_io("import", function()
 			M.render_todos()
 		end)
 	end)
 
-	setup_keymap("search_todos", function()
-		search_window.create_search_window(win_id)
+	setup_keymap("export_todos", function()
+		prompt_io("export")
 	end)
 end
 

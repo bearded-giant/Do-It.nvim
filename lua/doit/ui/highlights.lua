@@ -23,7 +23,35 @@ function M.get_namespace_id()
 end
 
 function M.get_priority_highlight(priorities, config)
-	if not priorities or #priorities == 0 then
+	local priority_name = nil
+	if type(priorities) == "string" and priorities ~= "" then
+		priority_name = priorities
+	elseif type(priorities) == "table" and #priorities > 0 then
+		-- backward compatibility from the original list
+		priority_name = priorities[1]
+	end
+
+	-- Handle nil or empty priority - use low priority group per config
+	if not priority_name or priority_name == "" then
+		local low_group = config.options.priority_groups and config.options.priority_groups.low
+		if low_group then
+			local cache_key = "low_default"
+			if highlight_cache[cache_key] then
+				return highlight_cache[cache_key]
+			end
+
+			local hl_group = highlight_cache.pending
+			if low_group.color and type(low_group.color) == "string" and low_group.color:match("^#%x%x%x%x%x%x$") then
+				local hl_name = "doit" .. low_group.color:gsub("#", "")
+				vim.api.nvim_set_hl(0, hl_name, { fg = low_group.color })
+				hl_group = hl_name
+			elseif low_group.hl_group then
+				hl_group = low_group.hl_group
+			end
+
+			highlight_cache[cache_key] = hl_group
+			return hl_group
+		end
 		return highlight_cache.pending
 	end
 
@@ -36,43 +64,52 @@ function M.get_priority_highlight(priorities, config)
 		return #a.group.members > #b.group.members
 	end)
 
-	-- Check each group to see if all members match
+	-- Check each group to see if the priority is a member
 	for _, group_data in ipairs(sorted_groups) do
 		local group = group_data.group
-		local all_members_match = true
+
 		for _, member in ipairs(group.members) do
-			local found = false
-			for _, priority in ipairs(priorities) do
-				if priority == member then
-					found = true
-					break
+			if priority_name == member then
+				-- Create a cache key
+				local cache_key = member
+				if highlight_cache[cache_key] then
+					return highlight_cache[cache_key]
 				end
-			end
-			if not found then
-				all_members_match = false
-				break
+
+				local hl_group = highlight_cache.pending
+				if group.color and type(group.color) == "string" and group.color:match("^#%x%x%x%x%x%x$") then
+					local hl_name = "doit" .. group.color:gsub("#", "")
+					vim.api.nvim_set_hl(0, hl_name, { fg = group.color })
+					hl_group = hl_name
+				elseif group.hl_group then
+					hl_group = group.hl_group
+				end
+
+				highlight_cache[cache_key] = hl_group
+				return hl_group
 			end
 		end
+	end
 
-		if all_members_match then
-			-- Create a cache key
-			local cache_key = table.concat(group.members, "_")
-			if highlight_cache[cache_key] then
-				return highlight_cache[cache_key]
-			end
-
-			local hl_group = highlight_cache.pending
-			if group.color and type(group.color) == "string" and group.color:match("^#%x%x%x%x%x%x$") then
-				local hl_name = "doit" .. group.color:gsub("#", "")
-				vim.api.nvim_set_hl(0, hl_name, { fg = group.color })
-				hl_group = hl_name
-			elseif group.hl_group then
-				hl_group = group.hl_group
-			end
-
-			highlight_cache[cache_key] = hl_group
-			return hl_group
+	-- No matching priority found, use low priority group as default
+	local low_group = config.options.priority_groups and config.options.priority_groups.low
+	if low_group then
+		local cache_key = "low_default"
+		if highlight_cache[cache_key] then
+			return highlight_cache[cache_key]
 		end
+
+		local hl_group = highlight_cache.pending
+		if low_group.color and type(low_group.color) == "string" and low_group.color:match("^#%x%x%x%x%x%x$") then
+			local hl_name = "doit" .. low_group.color:gsub("#", "")
+			vim.api.nvim_set_hl(0, hl_name, { fg = low_group.color })
+			hl_group = hl_name
+		elseif low_group.hl_group then
+			hl_group = low_group.hl_group
+		end
+
+		highlight_cache[cache_key] = hl_group
+		return hl_group
 	end
 
 	return highlight_cache.pending

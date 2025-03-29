@@ -31,32 +31,32 @@ describe("priority ordering", function()
                 text = "Important only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "important" } 
+                priorities = "important"
             },
             { 
                 text = "Urgent only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "urgent" } 
+                priorities = "urgent"
             },
             { 
-                text = "Both urgent and important", 
+                text = "Both urgent and important (should be treated as urgent)", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "urgent", "important" } 
+                priorities = "urgent" -- Now single priority
             },
             { 
                 text = "No priority", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = {} 
+                priorities = nil
             },
         }
 
         doit_state.sort_todos()
 
-        assert.are.equal("Both urgent and important", doit_state.todos[1].text)
-        assert.are.equal("Urgent only", doit_state.todos[2].text)
+        assert.are.equal("Urgent only", doit_state.todos[1].text)
+        assert.are.equal("Both urgent and important (should be treated as urgent)", doit_state.todos[2].text)
         assert.are.equal("Important only", doit_state.todos[3].text)
         assert.are.equal("No priority", doit_state.todos[4].text)
     end)
@@ -67,27 +67,27 @@ describe("priority ordering", function()
                 text = "Important only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "important" } 
+                priorities = "important"
             },
             { 
                 text = "Urgent only (in progress)", 
                 done = false, 
                 in_progress = true,
                 created_at = os.time(), 
-                priorities = { "urgent" } 
+                priorities = "urgent"
             },
             { 
                 text = "Important only (in progress)", 
                 done = false, 
                 in_progress = true,
                 created_at = os.time(), 
-                priorities = { "important" } 
+                priorities = "important"
             },
             { 
                 text = "Urgent only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "urgent" } 
+                priorities = "urgent"
             },
         }
 
@@ -105,36 +105,36 @@ describe("priority ordering", function()
                 text = "Important only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "important" },
+                priorities = "important",
                 order_index = 1
             },
             { 
                 text = "Urgent only", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "urgent" },
+                priorities = "urgent",
                 order_index = 2
             },
             { 
                 text = "Both urgent and important", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = { "urgent", "important" },
+                priorities = "urgent",
                 order_index = 3
             },
             { 
                 text = "No priority", 
                 done = false, 
                 created_at = os.time(), 
-                priorities = {},
+                priorities = nil,
                 order_index = 4
             },
         }
 
         doit_state.sort_todos()
 
-        assert.are.equal("Both urgent and important", doit_state.todos[1].text)
-        assert.are.equal("Urgent only", doit_state.todos[2].text)
+        assert.are.equal("Urgent only", doit_state.todos[1].text)
+        assert.are.equal("Both urgent and important", doit_state.todos[2].text)
         assert.are.equal("Important only", doit_state.todos[3].text)
         assert.are.equal("No priority", doit_state.todos[4].text)
     end)

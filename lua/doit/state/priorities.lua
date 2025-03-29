@@ -26,9 +26,15 @@ function Priorities.setup(M, config)
 		end
 
 		local score = 0
-		if todo.priorities and type(todo.priorities) == "table" then
-			for _, prio_name in ipairs(todo.priorities) do
-				score = score + (priority_weights[prio_name] or 0)
+		if todo.priorities then
+			if type(todo.priorities) == "string" then
+				-- New format: single priority string
+				score = priority_weights[todo.priorities] or 0
+			elseif type(todo.priorities) == "table" then
+				-- For backward compatibility during migration
+				for _, prio_name in ipairs(todo.priorities) do
+					score = score + (priority_weights[prio_name] or 0)
+				end
 			end
 		end
 

@@ -36,36 +36,42 @@ M.defaults = {
 		},
 	},
 	priorities = {
+		{ name = "critical", weight = 16 },
 		{
 			name = "urgent",
 			weight = 8,
 		},
 		{
-			name = "important", 
+			name = "important",
 			weight = 4,
 		},
 	},
 	priority_groups = {
-		high = {
-			members = { "urgent", "important" },
-			color = nil,
-			hl_group = "DiagnosticError",
+		critical = {
+			members = { "critical" },
+			color = "#FF0000",
 		},
-		medium = {
+		high = {
 			members = { "urgent" },
 			color = nil,
 			hl_group = "DiagnosticWarn",
 		},
-		low = {
+		medium = {
 			members = { "important" },
 			color = nil,
 			hl_group = "DiagnosticInfo",
 		},
+		low = {
+			members = {},
+			color = "#FFFFFF",
+			-- hl_group = "DiagnosticInfo",
+		},
 	},
 	hour_score_value = 1 / 8,
 	save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
+	import_export_path = vim.fn.expand("~/todos.json"),
 	keymaps = {
-		toggle_window = "<leader>td",
+		toggle_window = "<leader>do",
 		new_todo = "i",
 		toggle_todo = "x",
 		delete_todo = "d",
