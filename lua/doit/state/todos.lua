@@ -79,6 +79,118 @@ function Todos.setup(M, config)
 		M.todos = remaining
 		M.save_to_disk()
 	end
+	
+	function M.delete_completed_with_confirmation(win_id, calendar, callback)
+		-- Count completed todos
+		local completed_count = 0
+		for _, todo in ipairs(M.todos) do
+			if todo.done then
+				completed_count = completed_count + 1
+			end
+		end
+		
+		if completed_count == 0 then
+			vim.notify("No completed to-dos to delete", vim.log.levels.INFO)
+			return
+		end
+
+		-- Create confirmation window
+		local confirm_buf = vim.api.nvim_create_buf(false, true)
+		local message = string.format("Are you sure you want to delete all completed to-dos? (%d to-dos)", completed_count)
+		local lines = { "", "", message, "", "" }
+		
+		vim.api.nvim_buf_set_lines(confirm_buf, 0, -1, false, lines)
+		vim.api.nvim_buf_set_option(confirm_buf, "modifiable", false)
+		vim.api.nvim_buf_set_option(confirm_buf, "buftype", "nofile")
+
+		local ui = vim.api.nvim_list_uis()[1]
+		local width = 70
+		local height = #lines
+		local row = math.floor((ui.height - height) / 2)
+		local col = math.floor((ui.width - width) / 2)
+
+		local delete_key = config.options.keymaps.delete_confirmation or "Y"
+		local footer_text
+		if delete_key:lower() == "y" then
+			footer_text = " [" .. delete_key:upper() .. "]es - [N]o "
+		else
+			footer_text = delete_key .. "-Yes - [N]o "
+		end
+
+		local confirm_win = vim.api.nvim_open_win(confirm_buf, true, {
+			relative = "editor",
+			row = row,
+			col = col,
+			width = width,
+			height = height,
+			style = "minimal",
+			border = "rounded",
+			title = " Delete Completed To-dos ",
+			title_pos = "center",
+			footer = footer_text,
+			footer_pos = "center",
+			noautocmd = true,
+		})
+
+		vim.api.nvim_win_set_option(confirm_win, "cursorline", false)
+		vim.api.nvim_win_set_option(confirm_win, "cursorcolumn", false)
+		vim.api.nvim_win_set_option(confirm_win, "number", false)
+		vim.api.nvim_win_set_option(confirm_win, "relativenumber", false)
+		vim.api.nvim_win_set_option(confirm_win, "signcolumn", "no")
+		vim.api.nvim_win_set_option(confirm_win, "mousemoveevent", false)
+
+		local ns = vim.api.nvim_create_namespace("doit_confirm")
+		vim.api.nvim_buf_add_highlight(confirm_buf, ns, "WarningMsg", 2, 0, -1)
+
+		-- Block movement
+		local movement_keys = {
+			"h", "j", "k", "l",
+			"<Up>", "<Down>", "<Left>", "<Right>",
+			"<C-f>", "<C-b>", "<C-u>", "<C-d>",
+			"w", "b", "e", "ge",
+			"0", "$", "^", "gg", "G",
+		}
+		for _, key in ipairs(movement_keys) do
+			vim.keymap.set("n", key, function() end, { buffer = confirm_buf, nowait = true })
+		end
+
+		local function close_confirm()
+			if vim.api.nvim_win_is_valid(confirm_win) then
+				vim.api.nvim_win_close(confirm_win, true)
+				if win_id and vim.api.nvim_win_is_valid(win_id) then
+					vim.api.nvim_set_current_win(win_id)
+				end
+			end
+		end
+
+		-- Bind keys
+		vim.keymap.set("n", delete_key, function()
+			close_confirm()
+			M.delete_completed()
+			if callback then
+				callback()
+			end
+		end, { buffer = confirm_buf, nowait = true })
+
+		vim.keymap.set("n", delete_key:upper(), function()
+			close_confirm()
+			M.delete_completed()
+			if callback then
+				callback()
+			end
+		end, { buffer = confirm_buf, nowait = true })
+
+		vim.keymap.set("n", "n", close_confirm, { buffer = confirm_buf, nowait = true })
+		vim.keymap.set("n", "N", close_confirm, { buffer = confirm_buf, nowait = true })
+		vim.keymap.set("n", "q", close_confirm, { buffer = confirm_buf, nowait = true })
+		vim.keymap.set("n", "<Esc>", close_confirm, { buffer = confirm_buf, nowait = true })
+
+		vim.api.nvim_create_autocmd("BufLeave", {
+			buffer = confirm_buf,
+			callback = close_confirm,
+			once = true,
+		})
+	end
 
 	function M.undo_delete()
 		if #M.deleted_todos == 0 then
