@@ -218,8 +218,70 @@ function M.toggle_todo(win_id, on_render)
 	if line_content and line_content:match(get_todo_icon_pattern()) then
 		local todo_index = get_real_todo_index(line_num, state.active_filter)
 		if todo_index then
+			-- Store the current status of the todo
+			local was_done = state.todos[todo_index].done
+			local will_be_done = state.todos[todo_index].in_progress -- if in_progress, it will become done
+			
+			-- Toggle the todo status
 			state.toggle_todo(todo_index)
+			
+			-- Render the updated list
 			maybe_render(on_render)
+			
+			-- If the item was marked as done, move to the first item in the list
+			if was_done == false and will_be_done == true then
+				-- Move cursor to first incomplete item
+				local first_line = state.active_filter and 3 or 1
+				
+				-- Find the first non-empty line with a todo
+				local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
+				for i, line in ipairs(buf_lines) do
+					if line:match(get_todo_icon_pattern()) then
+						first_line = i
+						break
+					end
+				end
+				
+				if vim.api.nvim_win_is_valid(win_id) then
+					vim.api.nvim_win_set_cursor(win_id, {first_line, 0})
+				end
+			else
+				-- For other status changes (pending → in_progress), keep tracking the item
+				local todo_ref = state.todos[todo_index]
+				
+				-- Find the new position of the todo after sorting
+				local new_position
+				for i, todo in ipairs(state.todos) do
+					if todo == todo_ref then
+						new_position = i
+						break
+					end
+				end
+				
+				if new_position then
+					-- Calculate the new line number based on filtering
+					local new_line_num
+					if state.active_filter then
+						local visible_count = 0
+						for i, todo in ipairs(state.todos) do
+							if todo.text:match("#" .. state.active_filter) then
+								visible_count = visible_count + 1
+								if i == new_position then
+									new_line_num = visible_count + 2 -- 2 extra lines for filter header
+									break
+								end
+							end
+						end
+					else
+						new_line_num = new_position + 1 -- +1 for the empty line at the top
+					end
+					
+					-- Update cursor position to the new location
+					if new_line_num and vim.api.nvim_win_is_valid(win_id) then
+						vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+					end
+				end
+			end
 		end
 	end
 end
@@ -240,6 +302,22 @@ function M.delete_todo(win_id, on_render)
 		if todo_index then
 			state.delete_todo_with_confirmation(todo_index, win_id, calendar, function()
 				maybe_render(on_render)
+				
+				-- Move cursor to first item in the list
+				local first_line = state.active_filter and 3 or 1
+				
+				-- Find the first non-empty line with a todo
+				local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
+				for i, line in ipairs(buf_lines) do
+					if line:match(get_todo_icon_pattern()) then
+						first_line = i
+						break
+					end
+				end
+				
+				if vim.api.nvim_win_is_valid(win_id) then
+					vim.api.nvim_win_set_cursor(win_id, {first_line, 0})
+				end
 			end)
 		end
 	end
@@ -247,7 +325,28 @@ end
 
 function M.delete_completed(on_render)
 	state.delete_completed()
+	
 	maybe_render(on_render)
+	
+	-- Find the currently active window
+	local win_id = vim.api.nvim_get_current_win()
+	if win_id and vim.api.nvim_win_is_valid(win_id) then
+		local buf_id = vim.api.nvim_win_get_buf(win_id)
+		
+		-- Move cursor to first item in the list
+		local first_line = state.active_filter and 3 or 1
+		
+		-- Find the first non-empty line with a todo
+		local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
+		for i, line in ipairs(buf_lines) do
+			if line:match(get_todo_icon_pattern()) then
+				first_line = i
+				break
+			end
+		end
+		
+		vim.api.nvim_win_set_cursor(win_id, {first_line, 0})
+	end
 end
 
 function M.remove_duplicates(on_render)
@@ -294,6 +393,9 @@ function M.edit_priorities(win_id, on_render)
 				local priorities = config.options.priorities
 				local current_todo = state.todos[todo_index]
 				local selected_priority = { value = current_todo.priorities }
+				
+				-- Save a reference to the todo before changing it
+				local todo_ref = current_todo
 
 				local select_buf, select_win, keymaps, priority_options =
 					create_priority_selection_window(priorities, selected_priority.value, "Edit Priority")
@@ -307,9 +409,45 @@ function M.edit_priorities(win_id, on_render)
 					priorities,
 					selected_priority,
 					function(selected_priority_name)
+						-- Update the priority
 						state.todos[todo_index].priorities = selected_priority_name
 						state.save_to_disk()
+						
+						-- Render the updated list
 						maybe_render(on_render)
+						
+						-- Find the new position of the todo after sorting
+						local new_position
+						for i, todo in ipairs(state.todos) do
+							if todo == todo_ref then
+								new_position = i
+								break
+							end
+						end
+						
+						if new_position then
+							-- Calculate the new line number based on filtering
+							local new_line_num
+							if state.active_filter then
+								local visible_count = 0
+								for i, todo in ipairs(state.todos) do
+									if todo.text:match("#" .. state.active_filter) then
+										visible_count = visible_count + 1
+										if i == new_position then
+											new_line_num = visible_count + 2 -- 2 extra lines for filter header
+											break
+										end
+									end
+								end
+							else
+								new_line_num = new_position + 1 -- +1 for the empty line at the top
+							end
+							
+							-- Update cursor position to the new location
+							if new_line_num and vim.api.nvim_win_is_valid(win_id) then
+								vim.api.nvim_win_set_cursor(win_id, {new_line_num, 0})
+							end
+						end
 					end
 				)
 
