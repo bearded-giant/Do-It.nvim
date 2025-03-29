@@ -294,12 +294,17 @@ require("doit").setup({
 		high = {
 			members = { "urgent" },
 			color = nil,
-			hl_group = "DiagnosticError",
+			hl_group = "DiagnosticWarn",
 		},
 		medium = {
 			members = { "important" },
 			color = nil,
-			hl_group = "DiagnosticWarn",
+			hl_group = "DiagnosticInfo",
+		},
+		low = {
+			members = {},
+			color = "#FFFFFF",
+			-- hl_group = "DiagnosticInfo",
 		},
 	},
 	hour_score_value = 1 / 8,

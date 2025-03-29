@@ -48,23 +48,23 @@ M.defaults = {
 	},
 	priority_groups = {
 		critical = {
-			members = { "critical", "urgent", "important" },
+			members = { "critical" },
 			color = "#FF0000",
 		},
 		high = {
-			members = { "urgent", "important" },
-			color = nil,
-			hl_group = "DiagnosticError",
-		},
-		medium = {
 			members = { "urgent" },
 			color = nil,
 			hl_group = "DiagnosticWarn",
 		},
-		low = {
+		medium = {
 			members = { "important" },
 			color = nil,
 			hl_group = "DiagnosticInfo",
+		},
+		low = {
+			members = {},
+			color = "#FFFFFF",
+			-- hl_group = "DiagnosticInfo",
 		},
 	},
 	hour_score_value = 1 / 8,

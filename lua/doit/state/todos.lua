@@ -217,7 +217,7 @@ function Todos.setup(M, config)
 				if type(todo.priorities) == "string" then
 					priority_name = todo.priorities
 				elseif type(todo.priorities) == "table" and #todo.priorities > 0 then
-					-- Backward compatibility during migration
+					-- backward compatibility from the original list
 					priority_name = todo.priorities[1]
 				end
 
@@ -331,3 +331,4 @@ function Todos.setup(M, config)
 end
 
 return Todos
+
