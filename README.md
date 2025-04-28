@@ -26,6 +26,8 @@ If you want to contribute or have any ideas, feel free to open an issue or make 
 - Import/Export of to-do json for backups, obsidian integration...whatever you want
 - To-do reordering with customizable keybindings
 - In-progress (active) to-dos automatically float to the top of the list and sort by priority
+- Quick list view of active to-dos with auto-refresh
+- Lualine integration to show your active to-do in statusline
 
 ---
 
@@ -74,6 +76,15 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
             right = 2,
         },
     },
+    list_window = {
+        width = 40,             -- Width of the active todos list window
+        height = 10,            -- Height of the active todos list window
+        position = 'bottom-right', -- Position of the active todos list window
+    },
+    lualine = {
+        enabled = true,         -- Enable lualine integration
+        max_length = 30,        -- Maximum length of the todo text in lualine
+    },
     formatting = {              -- To-do formatting
         pending = {
             icon = "○",
@@ -97,6 +108,7 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
     },
     keymaps = {
         toggle_window = "<leader>td",
+        toggle_list_window = "<leader>dl",
         new_todo = "i",
         toggle_todo = "x",
         delete_todo = "d",
@@ -174,13 +186,14 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
 
 Do-It.nvim provides several commands to get things done:
 
-- `:doit` - Opens the main window
-- `:doit add [text]` - Adds a new to-do
+- `:Doit` - Opens the main window
+- `:Doit add [text]` - Adds a new to-do
   - `-p, --priority [name]` - Name of the priority to assign (e.g. "important" or "urgent")
-- `:doit list` - Lists all to-dos with their indices and metadata
-- `:doit set [index] [field] [value]` - Modifies to-do properties
+- `:Doit list` - Lists all to-dos with their indices and metadata
+- `:Doit set [index] [field] [value]` - Modifies to-do properties
   - `priorities` - Set/update priority (use "nil" to clear)
   - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
+- `:DoItList` - Toggle a floating window with active to-dos
 
 ---
 
@@ -191,6 +204,7 @@ Do-It.nvim provides several commands to get things done:
 | Key           | Action                        |
 |--------------|------------------------------|
 | `<leader>td` | Toggle to-do window           |
+| `<leader>dl` | Toggle active to-dos list     |
 | `i`          | Add new to-do                 |
 | `x`          | Toggle status                 |
 | `d`          | Delete current to-do          |
@@ -244,12 +258,31 @@ Do-It.nvim provides several commands to get things done:
 | `<CR>` | Select date       |
 | `q`    | Close calendar    |
 
+## Lualine Integration
+
+To add the active todo to your Lualine setup, add this to your Lualine configuration:
+
+```lua
+require("lualine").setup({
+  sections = {
+    lualine_c = {
+      -- Your other components
+      { require("doit").lualine.active_todo }
+    }
+  }
+})
+```
+
+This will show your current active to-do in the Lualine status bar.
+
 ---
 
 ## Roadmap...Sort of
 
 - [x] Reorder To-dos
 - [x] Active To-do to Top
+- [x] Quick list view of active to-dos
+- [x] Lualine integration
 - [ ] Named (and Multiple) To-do Lists
 - [ ] To-do Categories View
 

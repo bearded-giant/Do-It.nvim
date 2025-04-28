@@ -14,6 +14,15 @@ M.defaults = {
 			right = 2,
 		},
 	},
+	list_window = {
+		width = 40,
+		height = 10,
+		position = "bottom-right",
+	},
+	lualine = {
+		enabled = true,
+		max_length = 30,
+	},
 	quick_keys = true,
 	notes = {
 		icon = "📓",
@@ -72,6 +81,7 @@ M.defaults = {
 	import_export_path = vim.fn.expand("~/todos.json"),
 	keymaps = {
 		toggle_window = "<leader>do",
+		toggle_list_window = "<leader>dl",
 		new_todo = "i",
 		toggle_todo = "x",
 		delete_todo = "d",

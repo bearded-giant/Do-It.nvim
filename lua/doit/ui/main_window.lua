@@ -17,6 +17,10 @@ local M = {}
 local win_id = nil
 local buf_id = nil
 
+function M.get_window_id()
+    return win_id
+end
+
 -- smaller "quick keys" UI below main window (optional)
 local function create_small_keys_window(main_win_pos)
 	if not config.options.quick_keys then

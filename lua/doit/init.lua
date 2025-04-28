@@ -4,10 +4,13 @@ local config = require("doit.config")
 local state = require("doit.state")
 local ui = require("doit.ui")
 local main_window = ui.main_window
+local list_window = ui.list_window
 local todo_actions = ui.todo_actions
+local lualine = require("doit.lualine")
 
 M.state = state
 M.ui = ui
+M.lualine = lualine
 
 function M.setup(opts)
 	config.setup(opts)
@@ -15,6 +18,12 @@ function M.setup(opts)
 
 	-- Primary user commands
 	-- :Doit - Main command
+	vim.api.nvim_create_user_command("DoItList", function()
+		list_window.toggle_list_window()
+	end, {
+		desc = "Toggle Active Todos List window",
+	})
+
 	vim.api.nvim_create_user_command("Doit", function(opts)
 		local args = vim.split(opts.args, "%s+", { trimempty = true })
 		if #args == 0 then
@@ -239,6 +248,12 @@ function M.setup(opts)
 		vim.keymap.set("n", config.options.keymaps.toggle_window, function()
 			main_window.toggle_todo_window()
 		end, { desc = "Toggle Todo List" })
+	end
+	
+	if config.options.keymaps.toggle_list_window then
+		vim.keymap.set("n", config.options.keymaps.toggle_list_window, function()
+			list_window.toggle_list_window()
+		end, { desc = "Toggle Active Todo List" })
 	end
 end
 

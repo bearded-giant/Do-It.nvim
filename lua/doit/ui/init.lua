@@ -28,5 +28,6 @@ M.tag_window = require("doit.ui.tag_window")
 M.search_window = require("doit.ui.search_window")
 M.scratchpad = require("doit.ui.scratchpad")
 M.main_window = require("doit.ui.main_window")
+M.list_window = require("doit.ui.list_window")
 
 return M
