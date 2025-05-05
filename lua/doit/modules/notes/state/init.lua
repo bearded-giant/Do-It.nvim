@@ -2,12 +2,12 @@
 local M = {}
 
 -- Initialize notes state
-function M.setup()
+function M.setup(parent_module)
     -- Load storage module
     local storage = require("doit.modules.notes.state.storage")
     
-    -- Initialize with storage
-    storage.setup(M)
+    -- Initialize with storage and parent module
+    storage.setup(M, parent_module)
     
     -- Forward storage functions
     for name, func in pairs(storage) do

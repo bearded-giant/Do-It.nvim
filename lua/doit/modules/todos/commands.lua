@@ -5,8 +5,8 @@ local M = {}
 function M.setup(module)
     local commands = {}
     
-    -- Main Doit command
-    commands.Doit = {
+    -- Main DoIt command
+    commands.DoIt = {
         callback = function(opts)
             local state = module.state
             local config = module.config

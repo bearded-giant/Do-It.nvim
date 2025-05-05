@@ -13,12 +13,14 @@ function M.setup(opts)
     local config = require("doit.modules.todos.config")
     M.config = config.setup(opts)
     
-    -- Initialize state
-    M.state = require("doit.modules.todos.state")
+    -- Initialize state with module reference
+    local state_module = require("doit.modules.todos.state")
+    M.state = state_module.setup(M)
     M.state.load_todos()
     
-    -- Initialize UI
-    M.ui = require("doit.modules.todos.ui")
+    -- Initialize UI with module reference
+    local ui_module = require("doit.modules.todos.ui")
+    M.ui = ui_module.setup(M)
     
     -- Initialize commands
     M.commands = require("doit.modules.todos.commands").setup(M)

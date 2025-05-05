@@ -16,10 +16,10 @@ require("oil").setup({
 })
 vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Open parent directory" })
 
--- Set up Neovim commands for doit....based on my personal preferences
-vim.api.nvim_create_user_command("ToDo", function()
+-- Set up Neovim commands for DoIt....based on my personal preferences
+vim.api.nvim_create_user_command("DoIt", function()
 	require("doit").toggle_window()
-end, { desc = "Toggle doit window" })
+end, { desc = "Toggle DoIt window" })
 
 -- Ensure the toggle_window function exists
 vim.api.nvim_create_autocmd("VimEnter", {

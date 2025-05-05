@@ -14,10 +14,12 @@ function M.setup(opts)
     M.config = config.setup(opts)
     
     -- Initialize state
-    M.state = require("doit.modules.notes.state")
+    local state_module = require("doit.modules.notes.state")
+    M.state = state_module.setup(M)
     
-    -- Initialize UI
-    M.ui = require("doit.modules.notes.ui")
+    -- Initialize UI with module reference
+    local ui_module = require("doit.modules.notes.ui")
+    M.ui = ui_module.setup(M)
     
     -- Initialize commands
     M.commands = require("doit.modules.notes.commands").setup(M)

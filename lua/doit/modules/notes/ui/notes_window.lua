@@ -6,15 +6,19 @@ local M = {}
 local config
 local state
 local core
+local parent_module
 
 -- Local state
 local buf = nil
 local win = nil
 
 -- Initialize module
-function M.setup()
-    config = require("doit.modules.notes.config").options
-    state = require("doit.modules.notes.state")
+function M.setup(module)
+    parent_module = module
+    
+    -- Get module components
+    config = module.config
+    state = module.state
     
     -- Try to get core UI utilities
     local success, core_module = pcall(require, "doit.core")
@@ -197,7 +201,7 @@ function M.setup_keymaps()
     end)
     
     -- Set up autocmd to save notes on buffer change and window close
-    local save_augroup = api.nvim_create_augroup("DoitNotesSave", { clear = true })
+    local save_augroup = api.nvim_create_augroup("DoItNotesSave", { clear = true })
     api.nvim_create_autocmd({"BufLeave", "WinLeave"}, {
         group = save_augroup,
         buffer = buf,
@@ -229,8 +233,5 @@ function M.toggle_notes_window()
     -- Setup keymaps
     M.setup_keymaps()
 end
-
--- Setup the module
-M.setup()
 
 return M

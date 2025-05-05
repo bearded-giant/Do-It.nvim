@@ -70,6 +70,107 @@ function M.setup(opts)
     -- Add lualine component
     M.lualine = require("doit.lualine")
     
+    -- Create dashboard function
+    function M.show_dashboard()
+        local dashboard_buf = vim.api.nvim_create_buf(false, true)
+        local width = 60
+        local height = 20
+        local ui = vim.api.nvim_list_uis()[1]
+        local row = math.floor((ui.height - height) / 2)
+        local col = math.floor((ui.width - width) / 2)
+        
+        -- Adjust window dimensions to accommodate ASCII art
+        width = 70
+        height = 35
+        
+        local dashboard_win = vim.api.nvim_open_win(dashboard_buf, true, {
+            relative = "editor",
+            row = row,
+            col = col,
+            width = width,
+            height = height,
+            style = "minimal",
+            border = "rounded",
+            title = " DoIt Dashboard ",
+            title_pos = "center",
+        })
+        
+        -- Create content for the dashboard
+        local content = {
+            "",
+            "          ██████╗  ██████╗     ██╗████████╗",
+            "          ██╔══██╗██╔═══██╗    ██║╚══██╔══╝",
+            "          ██║  ██║██║   ██║    ██║   ██║   ",
+            "          ██║  ██║██║   ██║    ██║   ██║   ",
+            "          ██████╔╝╚██████╔╝    ██║   ██║   ",
+            "          ╚═════╝  ╚═════╝     ╚═╝   ╚═╝   ",
+            "",
+            "                    .--.",
+            "                   /  ..|",
+            "                  /  /  |",
+            "                 /  /   |",
+            "      _.-._     /  /   /",
+            "     | | | `._ /  /   /",
+            "     | | |  | `   /   /",
+            "     | | |  | |   /   /",
+            "     | | |  | |   /   /",
+            "     | | |  | |\\    /",
+            "     | | |  | | \\   \\",
+            "     | | |  / |  \\   \\",
+            "     | | |  | |   \\   \\",
+            "     | |.'  | |    \\   .",
+            "     | |    | |     \\   \\",
+            "     | |    | |      \\   .",
+            "     | |    | |       \\   .",
+            "     | |    | |        \\   .",
+            "",
+            "  Framework Version: " .. M.version,
+            "",
+            "  Installed Modules:",
+        }
+        
+        -- Display loaded modules
+        for name, module in pairs(M) do
+            if type(module) == "table" and module.version then
+                table.insert(content, "  • " .. name .. " (v" .. module.version .. ")")
+            end
+        end
+        
+        -- Add additional module info if available
+        if M.todos then
+            table.insert(content, "")
+            table.insert(content, "  Todo Count: " .. #(M.todos.state.todos or {}))
+        end
+        
+        -- Add commands info
+        table.insert(content, "")
+        table.insert(content, "  Available Commands:")
+        table.insert(content, "  • :DoIt - Open main todo window")
+        
+        if M.todos then
+            table.insert(content, "  • :DoItList - Open quick todo list")
+        end
+        
+        if M.notes then 
+            table.insert(content, "  • :DoItNotes - Open notes interface")
+        end
+        
+        -- Add keybinding to close and fun quotes
+        table.insert(content, "")
+        table.insert(content, "  \"Do It. Just... Do It!\"")
+        table.insert(content, "")
+        table.insert(content, "  Press 'q' to close this dashboard")
+        
+        -- Set buffer content and options
+        vim.api.nvim_buf_set_lines(dashboard_buf, 0, -1, false, content)
+        vim.api.nvim_buf_set_option(dashboard_buf, "modifiable", false)
+        
+        -- Set up keymaps
+        vim.keymap.set("n", "q", function()
+            vim.api.nvim_win_close(dashboard_win, true)
+        end, { buffer = dashboard_buf, nowait = true })
+    end
+    
     return M
 end
 

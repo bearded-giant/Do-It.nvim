@@ -6,7 +6,7 @@ function M.setup(module)
     local commands = {}
     
     -- Notes command
-    commands.DoitNotes = {
+    commands.DoItNotes = {
         callback = function()
             module.ui.notes_window.toggle_notes_window()
         end,

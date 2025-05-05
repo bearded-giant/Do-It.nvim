@@ -2,8 +2,13 @@
 local M = {}
 
 -- Setup storage
-function M.setup(state)
-    local config = require("doit.modules.notes.config").options
+function M.setup(state, parent_module)
+    local config
+    if parent_module and parent_module.config then
+        config = parent_module.config
+    else
+        config = require("doit.modules.notes.config").options
+    end
     
     -- Get project identifier from core
     function M.get_project_identifier()

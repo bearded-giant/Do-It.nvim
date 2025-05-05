@@ -82,7 +82,7 @@ return {
 - `:Doit list` - Lists all to-dos with their metadata
 - `:Doit set [index] [field] [value]` - Modifies to-do properties
 - `:DoItList` - Toggle a floating window with active to-dos
-- `:DoitNotes` - Toggle the project notes window
+- `:DoItNotes` - Toggle the project notes window
 
 ## Keybindings
 

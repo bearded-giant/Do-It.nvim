@@ -108,7 +108,7 @@ Create a new UI module for rendering and interacting with notes in a floating wi
 
 6. **Command Interface:**
 
-Add new commands like `:DoitNotes` to toggle the notes window.
+Add new commands like `:DoItNotes` to toggle the notes window.
 
 ## Code Differences from maple.nvim
 
@@ -412,7 +412,7 @@ function M.setup_keymaps()
     end)
     
     -- Set up autocmd to save notes on buffer change and window close
-    local save_augroup = api.nvim_create_augroup("DoitNotesSave", { clear = true })
+    local save_augroup = api.nvim_create_augroup("DoItNotesSave", { clear = true })
     api.nvim_create_autocmd({"BufLeave", "WinLeave"}, {
         group = save_augroup,
         buffer = buf,
@@ -456,7 +456,7 @@ local notes_window = require("doit.ui.notes_window")
 
 -- Add to setup function:
 if config.options.notes and config.options.notes.enabled then
-    vim.api.nvim_create_user_command("DoitNotes", function()
+    vim.api.nvim_create_user_command("DoItNotes", function()
         notes_window.toggle_notes_window()
     end, {
         desc = "Toggle notes window",

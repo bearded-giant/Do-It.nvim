@@ -149,7 +149,7 @@ function M.setup_keymaps()
     end)
     
     -- Set up autocmd to save notes on buffer change and window close
-    local save_augroup = api.nvim_create_augroup("DoitNotesSave", { clear = true })
+    local save_augroup = api.nvim_create_augroup("DoItNotesSave", { clear = true })
     api.nvim_create_autocmd({"BufLeave", "WinLeave"}, {
         group = save_augroup,
         buffer = buf,

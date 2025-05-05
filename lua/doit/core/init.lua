@@ -86,6 +86,14 @@ function M.setup(opts)
     -- Initialize API
     M.api = require("doit.core.api").setup(M)
     
+    -- Register the dashboard command
+    vim.api.nvim_create_user_command("DoItDashboard", function()
+        -- Call the dashboard function from the main module
+        require("doit").show_dashboard()
+    end, {
+        desc = "Show DoIt dashboard with installed modules"
+    })
+    
     return M
 end
 

@@ -56,10 +56,10 @@ function M.setup()
     
     -- Create links to existing syntax highlighting groups for notes
     vim.cmd [[
-        highlight default link DoitNotesHeading Title
-        highlight default link DoitNotesLink Underlined
-        highlight default link DoitNotesBold Statement
-        highlight default link DoitNotesItalic Comment
+        highlight default link DoItNotesHeading Title
+        highlight default link DoItNotesLink Underlined
+        highlight default link DoItNotesBold Statement
+        highlight default link DoItNotesItalic Comment
     ]]
 end
 

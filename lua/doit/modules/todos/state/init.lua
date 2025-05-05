@@ -7,13 +7,21 @@ M.save_to_disk = function() end
 M.update_priority_weights = function() end
 
 -- Setup function for state
-function M.setup()
+function M.setup(parent_module)
     -- Core state data
     M.todos = {} -- main list of todos
     M.active_filter = nil -- optional active tag filter
     M.deleted_todos = {} -- history of deleted todos for undo
     M.MAX_UNDO_HISTORY = 100
     M.reordering_todo_index = nil -- currently reordering todo index
+    
+    -- Get parent module config
+    local config
+    if parent_module and parent_module.config then
+        config = parent_module.config
+    else
+        config = require("doit.modules.todos.config").options
+    end
     
     -- Load sub-modules
     local storage_module = require("doit.modules.todos.state.storage")
