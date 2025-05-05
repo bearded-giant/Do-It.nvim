@@ -4,13 +4,13 @@
 
 Do-It.nvim is a minimalist to-do list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim.
 
-Do-It.nvim is my personal way of how I want to track my tasks and to-dos. As a Principal Engineer, I have a lot of things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of to-do list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
+Do-It.nvim is my personal way of how I want to track my tasks and keep simple markdown noted per project. As a Principal Engineer, I have a lot of disparate things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of to-do list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
 
-I also wanted a sandbox to play with Lua and some docker ideas around containerized Neovim plugin development and testing.  Oh also I'm dabbling some with Claude Code in this repo, to see how AI can help me learn a new-ish language...so that's something.   Anyway, here we are.
+I also wanted a sandbox to play with Lua and some docker ideas around containerized Neovim plugin development and testing.
 
-If you want to contribute or have any ideas, feel free to open an issue or make a PR. I don't know why you would, but hey, I'm not here to judge.  Cheers!
+If you want to contribute or have any ideas, feel free to open an issue or make a PR. I don't know why you would, but hey, I'm not here to judge. Cheers!
 
-> This project is 100% built on top of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Do-It.nvim is a fork with some heavy modifications for customizations for how I work, while maintaining the core functionality.
+> This project is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Do-It.nvim contains heavy modifications for customizations (I don't want to say "enhancements") for how I work.
 
 {...pics and video coming soon...}
 
@@ -56,7 +56,7 @@ return {
 
 ### Default Configuration
 
-Do-It.nvim comes with sensible defaults that you can customize as you like.  Defaults:
+Do-It.nvim comes with sensible defaults that you can customize as you like. Defaults:
 
 ```lua
 {
@@ -83,8 +83,8 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
         position = 'bottom-right', -- Position of the active todos list window
     },
     lualine = {
-        enabled = true,         -- Enable lualine integration
-        max_length = 30,        -- Maximum length of the todo text in lualine
+        enabled = true,
+        max_length = 30,
     },
     formatting = {              -- To-do formatting
         pending = {
@@ -100,7 +100,7 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
             format = { "icon", "notes_icon", "text", "due_date", "ect" },
         },
     },
-    quick_keys = true, 
+    quick_keys = true,
     project = {
         enabled = true,
         detection = {
@@ -228,70 +228,70 @@ Do-It.nvim provides several commands to get things done:
 
 #### Main Window
 
-| Key           | Action                        |
-|--------------|------------------------------|
-| `<leader>td` | Toggle to-do window           |
-| `<leader>dl` | Toggle active to-dos list     |
-| `<leader>dn` | Toggle project notes window   |
-| `i`          | Add new to-do                 |
-| `x`          | Toggle status                 |
-| `d`          | Delete current to-do          |
-| `D`          | Delete all completed          |
-| `q`          | Close window                  |
-| `H`          | Add due date                  |
-| `r`          | Remove due date               |
-| `T`          | Add time estimation           |
-| `R`          | Remove time estimation        |
-| `?`          | Toggle help window            |
-| `t`          | Toggle tags window            |
-| `c`          | Clear active tag filter       |
-| `e`          | Edit to-do                    |
-| `p`          | Edit priorities               |
-| `u`          | Undo delete                   |
-| `/`          | Search to-dos                 |
-| `I`          | Import to-dos                 |
-| `E`          | Export to-dos                 |
-| `<leader>D`  | Remove duplicates             |
-| `<Space>`    | Toggle priority               |
-| `<leader>p`  | Open scratchpad               |
-| `r`          | Enter reordering mode         |
+| Key          | Action                      |
+| ------------ | --------------------------- |
+| `<leader>td` | Toggle to-do window         |
+| `<leader>dl` | Toggle active to-dos list   |
+| `<leader>dn` | Toggle project notes window |
+| `i`          | Add new to-do               |
+| `x`          | Toggle status               |
+| `d`          | Delete current to-do        |
+| `D`          | Delete all completed        |
+| `q`          | Close window                |
+| `H`          | Add due date                |
+| `r`          | Remove due date             |
+| `T`          | Add time estimation         |
+| `R`          | Remove time estimation      |
+| `?`          | Toggle help window          |
+| `t`          | Toggle tags window          |
+| `c`          | Clear active tag filter     |
+| `e`          | Edit to-do                  |
+| `p`          | Edit priorities             |
+| `u`          | Undo delete                 |
+| `/`          | Search to-dos               |
+| `I`          | Import to-dos               |
+| `E`          | Export to-dos               |
+| `<leader>D`  | Remove duplicates           |
+| `<Space>`    | Toggle priority             |
+| `<leader>p`  | Open scratchpad             |
+| `r`          | Enter reordering mode       |
 
 #### Reordering to-dos
 
-| Key    | Action                        |
-|--------|------------------------------|
-| `k`    | Move to-do up                  |
-| `j`    | Move to-do down                |
-| `r`    | Save and exit reordering |
+| Key | Action                   |
+| --- | ------------------------ |
+| `k` | Move to-do up            |
+| `j` | Move to-do down          |
+| `r` | Save and exit reordering |
 
 #### Tags Window
 
 | Key    | Action        |
-|--------|--------------|
-| `e`    | Edit tag     |
-| `d`    | Delete tag   |
-| `<CR>` | Filter by tag|
-| `q`    | Close window |
+| ------ | ------------- |
+| `e`    | Edit tag      |
+| `d`    | Delete tag    |
+| `<CR>` | Filter by tag |
+| `q`    | Close window  |
 
 #### Notes Window
 
-| Key    | Action                      |
-|--------|----------------------------|
-| `q`    | Close notes window         |
-| `m`    | Switch between global/project|
+| Key | Action                        |
+| --- | ----------------------------- |
+| `q` | Close notes window            |
+| `m` | Switch between global/project |
 
 #### Calendar Window
 
-| Key    | Action              |
-|--------|-------------------|
-| `h`    | Previous day       |
-| `l`    | Next day          |
-| `k`    | Previous week     |
-| `j`    | Next week         |
-| `H`    | Previous month    |
-| `L`    | Next month        |
-| `<CR>` | Select date       |
-| `q`    | Close calendar    |
+| Key    | Action         |
+| ------ | -------------- |
+| `h`    | Previous day   |
+| `l`    | Next day       |
+| `k`    | Previous week  |
+| `j`    | Next week      |
+| `H`    | Previous month |
+| `L`    | Next month     |
+| `<CR>` | Select date    |
+| `q`    | Close calendar |
 
 ## Lualine Integration
 
@@ -330,7 +330,7 @@ Do-it.nvim includes project notes functionality similar to maple.nvim:
 
 - Project-specific notes based on Git repository or current directory
 - Switch between global and project-specific notes with the 'm' key
-- Store project documentation, ideas, and reference material 
+- Store project documentation, ideas, and reference material
 - Uses Markdown syntax highlighting for better readability
 
 Access project notes with `:DoitNotes` or use the configured keybinding (default: `<leader>dn`).
@@ -340,3 +340,4 @@ Access project notes with `:DoitNotes` or use the configured keybinding (default
 Do-It.nvim is FOR SURE based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
 
 The project notes feature was inspired by maple.nvim's project notes functionality.
+
