@@ -24,8 +24,33 @@ M.defaults = {
 		max_length = 30,
 	},
 	quick_keys = true,
+	project = {
+		enabled = true,
+		detection = {
+			use_git = true,
+			fallback_to_cwd = true,
+		},
+		storage = {
+			path = vim.fn.stdpath("data") .. "/doit/projects",
+		},
+	},
 	notes = {
+		enabled = true,
 		icon = "📓",
+		storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+		mode = "project", -- "global" or "project"
+		window = {
+			width = 0.6,
+			height = 0.6,
+			border = "rounded",
+			title = " Notes ",
+			title_pos = "center",
+		},
+		keymaps = {
+			toggle = "<leader>dn",
+			close = "q",
+			switch_mode = "m",
+		},
 	},
 	timestamp = {
 		enabled = true,

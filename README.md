@@ -28,6 +28,7 @@ If you want to contribute or have any ideas, feel free to open an issue or make 
 - In-progress (active) to-dos automatically float to the top of the list and sort by priority
 - Quick list view of active to-dos with auto-refresh
 - Lualine integration to show your active to-do in statusline
+- Project-specific notes for documenting your work
 
 ---
 
@@ -100,8 +101,33 @@ Do-It.nvim comes with sensible defaults that you can customize as you like.  Def
         },
     },
     quick_keys = true, 
+    project = {
+        enabled = true,
+        detection = {
+            use_git = true,
+            fallback_to_cwd = true,
+        },
+        storage = {
+            path = vim.fn.stdpath("data") .. "/doit/projects",
+        },
+    },
     notes = {
+        enabled = true,
         icon = "📓",
+        storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+        mode = "project", -- "global" or "project"
+        window = {
+            width = 0.6,
+            height = 0.6,
+            border = "rounded",
+            title = " Notes ",
+            title_pos = "center",
+        },
+        keymaps = {
+            toggle = "<leader>dn",
+            close = "q",
+            switch_mode = "m",
+        },
     },
     scratchpad = {
         syntax_highlight = "markdown",
@@ -194,6 +220,7 @@ Do-It.nvim provides several commands to get things done:
   - `priorities` - Set/update priority (use "nil" to clear)
   - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
 - `:DoItList` - Toggle a floating window with active to-dos
+- `:DoitNotes` - Toggle the project notes window
 
 ---
 
@@ -205,6 +232,7 @@ Do-It.nvim provides several commands to get things done:
 |--------------|------------------------------|
 | `<leader>td` | Toggle to-do window           |
 | `<leader>dl` | Toggle active to-dos list     |
+| `<leader>dn` | Toggle project notes window   |
 | `i`          | Add new to-do                 |
 | `x`          | Toggle status                 |
 | `d`          | Delete current to-do          |
@@ -245,6 +273,13 @@ Do-It.nvim provides several commands to get things done:
 | `<CR>` | Filter by tag|
 | `q`    | Close window |
 
+#### Notes Window
+
+| Key    | Action                      |
+|--------|----------------------------|
+| `q`    | Close notes window         |
+| `m`    | Switch between global/project|
+
 #### Calendar Window
 
 | Key    | Action              |
@@ -283,11 +318,25 @@ This will show your current active to-do in the Lualine status bar.
 - [x] Active To-do to Top
 - [x] Quick list view of active to-dos
 - [x] Lualine integration
+- [x] Project-specific notes
 - [ ] Named (and Multiple) To-do Lists
 - [ ] To-do Categories View
 
 ---
 
+## Project Notes
+
+Do-it.nvim includes project notes functionality similar to maple.nvim:
+
+- Project-specific notes based on Git repository or current directory
+- Switch between global and project-specific notes with the 'm' key
+- Store project documentation, ideas, and reference material 
+- Uses Markdown syntax highlighting for better readability
+
+Access project notes with `:DoitNotes` or use the configured keybinding (default: `<leader>dn`).
+
 ## Acknowledgments
 
 Do-It.nvim is FOR SURE based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
+
+The project notes feature was inspired by maple.nvim's project notes functionality.

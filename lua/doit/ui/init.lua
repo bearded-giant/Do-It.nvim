@@ -16,6 +16,7 @@ local vim = vim
 ---@field tag_window table   # The "tags" popup window logic.
 ---@field search_window table  # The "search" popup window logic.
 ---@field scratchpad table   # The scratchpad logic for editing notes.
+---@field notes_window table  # The notes popup window logic.
 ---@field todo_actions table # The set of actions that can be performed on a to-do.
 ---@field highlights table   # Highlighting utilities for the UI.
 local M = {}
@@ -27,6 +28,7 @@ M.help_window = require("doit.ui.help_window")
 M.tag_window = require("doit.ui.tag_window")
 M.search_window = require("doit.ui.search_window")
 M.scratchpad = require("doit.ui.scratchpad")
+M.notes_window = require("doit.ui.notes_window")
 M.main_window = require("doit.ui.main_window")
 M.list_window = require("doit.ui.list_window")
 

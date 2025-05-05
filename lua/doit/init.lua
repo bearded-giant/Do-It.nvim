@@ -6,6 +6,7 @@ local ui = require("doit.ui")
 local main_window = ui.main_window
 local list_window = ui.list_window
 local todo_actions = ui.todo_actions
+local notes_window = ui.notes_window
 local lualine = require("doit.lualine")
 
 M.state = state
@@ -23,6 +24,21 @@ function M.setup(opts)
 	end, {
 		desc = "Toggle Active Todos List window",
 	})
+	
+	-- Notes window command
+	if config.options.notes and config.options.notes.enabled then
+		vim.api.nvim_create_user_command("DoitNotes", function()
+			notes_window.toggle_notes_window()
+		end, {
+			desc = "Toggle notes window",
+		})
+		
+		if config.options.notes.keymaps.toggle then
+			vim.keymap.set("n", config.options.notes.keymaps.toggle, function()
+				notes_window.toggle_notes_window()
+			end, { desc = "Toggle Notes Window" })
+		end
+	end
 
 	vim.api.nvim_create_user_command("Doit", function(opts)
 		local args = vim.split(opts.args, "%s+", { trimempty = true })

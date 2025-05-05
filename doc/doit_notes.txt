@@ -1,0 +1,117 @@
+*doit_notes.txt*              Project Notes for Do-It.nvim                *doit-notes*
+
+==============================================================================
+Table of Contents                                        *doit-notes-contents*
+
+1. Project Notes Overview                                *doit-notes-overview*
+  - Features                                             *doit-notes-features*
+  - Requirements                                     *doit-notes-requirements*
+2. Configuration                                   *doit-notes-configuration*
+3. Usage                                                   *doit-notes-usage*
+  - Commands                                             *doit-notes-commands*
+  - Keybindings                                       *doit-notes-keybindings*
+4. Integration with To-dos                             *doit-notes-integration*
+
+==============================================================================
+1. Project Notes Overview                                *doit-notes-overview*
+
+Project Notes adds maple.nvim-like project-specific notes functionality to 
+Do-It.nvim. This feature allows you to maintain separate notes for each 
+project while working in Neovim, making it easy to document project-specific
+information and thoughts without leaving your editor.
+
+FEATURES                                                 *doit-notes-features*
+
+- Project-specific notes that follow your Git repository or working directory
+- Global notes mode for system-wide documentation
+- Easy switching between global and project modes
+- Persistent storage of notes in JSON format
+- Markdown highlighting for better readability
+- Floating window interface consistent with other Do-It.nvim components
+
+REQUIREMENTS                                         *doit-notes-requirements*
+
+Project Notes requires the same dependencies as Do-It.nvim:
+- Neovim >= 0.10.0
+
+==============================================================================
+2. Configuration                                   *doit-notes-configuration*
+
+Project Notes configuration is part of the Do-It.nvim setup:
+
+>lua
+    require("doit").setup({
+        project = {
+            enabled = true,
+            detection = {
+                use_git = true,                -- Use Git repository for project detection
+                fallback_to_cwd = true,        -- Fallback to working directory if no Git repo
+            },
+            storage = {
+                path = vim.fn.stdpath("data") .. "/doit/projects",
+            },
+        },
+        notes = {
+            enabled = true,                    -- Enable notes functionality
+            icon = "📓",                       -- Icon used in to-do lists
+            storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+            mode = "project",                  -- Default mode: "global" or "project"
+            window = {
+                width = 0.6,                   -- Width as percentage of screen
+                height = 0.6,                  -- Height as percentage of screen
+                border = "rounded",            -- Border style
+                title = " Notes ",             -- Window title
+                title_pos = "center",          -- Title position
+            },
+            keymaps = {
+                toggle = "<leader>dn",         -- Toggle notes window
+                close = "q",                   -- Close notes window
+                switch_mode = "m",             -- Switch between global/project mode
+            },
+        },
+    })
+<
+
+==============================================================================
+3. Usage                                                   *doit-notes-usage*
+
+COMMANDS                                                *doit-notes-commands*
+
+                                                              *:DoitNotes*
+Toggle the notes window.
+
+Examples: >vim
+    :DoitNotes     " Opens or closes the notes window
+<
+
+KEYBINDINGS                                          *doit-notes-keybindings*
+
+Global Keybindings~
+    <leader>dn   Toggle notes window (customizable in config)
+
+Notes Window~
+    q           Close notes window
+    m           Switch between global and project notes
+
+==============================================================================
+4. Integration with To-dos                             *doit-notes-integration*
+
+Project Notes is designed to complement your to-do workflow:
+
+- Store project-specific documentation alongside your to-dos
+- Document implementation details, decisions, and references
+- Keep track of project-related thoughts and ideas
+- Use markdown formatting for better organization
+
+The notes are automatically saved when:
+- The notes window is closed
+- You switch between global and project modes
+- You navigate away from the buffer
+
+==============================================================================
+
+ACKNOWLEDGMENTS
+
+The Project Notes feature was inspired by maple.nvim's project notes functionality.
+
+vim:tw=78:ts=8:ft=help:norl:
