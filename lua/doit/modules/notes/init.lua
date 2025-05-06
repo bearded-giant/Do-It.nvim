@@ -4,6 +4,23 @@ local M = {}
 -- Module version
 M.version = "1.0.0"
 
+-- Module metadata for registry
+M.metadata = {
+    name = "notes",
+    version = M.version,
+    description = "Project-specific and global notes management",
+    author = "bearded-giant",
+    path = "doit.modules.notes",
+    dependencies = {},
+    config_schema = {
+        enabled = { type = "boolean", default = true },
+        storage_path = { type = "string" },
+        mode = { type = "string", default = "project" },
+        window = { type = "table" },
+        keymaps = { type = "table" }
+    }
+}
+
 -- Setup function for the notes module
 function M.setup(opts)
     -- Initialize module with core framework
@@ -31,8 +48,34 @@ function M.setup(opts)
     M.setup_keymaps()
     
     -- Emit events for other modules
+    -- Note created event
+    M.on_note_created = function(note)
+        core.events.emit("note_created", {
+            id = note.id,
+            title = note.title,
+            summary = M.state.generate_summary(note.content),
+            metadata = note.metadata or {},
+            project = M.state.get_current_project()
+        })
+    end
+    
+    -- Note updated event
     M.on_note_updated = function(note)
-        core.events.emit("note_updated", note)
+        core.events.emit("note_updated", {
+            id = note.id,
+            title = note.title,
+            summary = M.state.generate_summary(note.content),
+            metadata = note.metadata or {},
+            project = M.state.get_current_project()
+        })
+    end
+    
+    -- Note deleted event
+    M.on_note_deleted = function(note)
+        core.events.emit("note_deleted", {
+            id = note.id,
+            metadata = note.metadata or {}
+        })
     end
     
     return M

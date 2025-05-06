@@ -242,6 +242,136 @@ function M.setup(module)
         }
     }
     
+    -- Todo List Manager command
+    commands.DoItLists = {
+        callback = function(opts)
+            if #opts.fargs == 0 then
+                -- Toggle the list manager window
+                module.ui.list_manager_window.toggle_window()
+                return
+            end
+            
+            local command = opts.fargs[1]
+            table.remove(opts.fargs, 1)
+            
+            if command == "switch" or command == "use" then
+                -- Switch to the specified list
+                local list_name = opts.fargs[1]
+                if not list_name then
+                    vim.notify("Usage: DoItLists switch <list_name>", vim.log.levels.ERROR)
+                    return
+                end
+                
+                local success, msg = module.state.load_list(list_name)
+                vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+                
+                -- Refresh main window if open
+                if module.ui.main_window and module.ui.main_window.render_todos then
+                    module.ui.main_window.render_todos()
+                end
+            elseif command == "create" or command == "new" then
+                -- Create a new list
+                local list_name = opts.fargs[1]
+                if not list_name then
+                    vim.notify("Usage: DoItLists create <list_name>", vim.log.levels.ERROR)
+                    return
+                end
+                
+                local success, msg = module.state.create_list(list_name, {})
+                vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+            elseif command == "delete" or command == "remove" then
+                -- Delete a list
+                local list_name = opts.fargs[1]
+                if not list_name then
+                    vim.notify("Usage: DoItLists delete <list_name>", vim.log.levels.ERROR)
+                    return
+                end
+                
+                local success, msg = module.state.delete_list(list_name)
+                vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+                
+                -- Refresh main window if open
+                if module.ui.main_window and module.ui.main_window.render_todos then
+                    module.ui.main_window.render_todos()
+                end
+            elseif command == "rename" then
+                -- Rename a list
+                local old_name = opts.fargs[1]
+                local new_name = opts.fargs[2]
+                if not old_name or not new_name then
+                    vim.notify("Usage: DoItLists rename <old_name> <new_name>", vim.log.levels.ERROR)
+                    return
+                end
+                
+                local success, msg = module.state.rename_list(old_name, new_name)
+                vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+                
+                -- Refresh main window if open
+                if module.ui.main_window and module.ui.main_window.render_todos then
+                    module.ui.main_window.render_todos()
+                end
+            elseif command == "list" or command == "ls" then
+                -- List available lists
+                local lists = module.state.get_available_lists()
+                local active_list = module.state.todo_lists.active
+                
+                if #lists == 0 then
+                    vim.notify("No todo lists found", vim.log.levels.INFO)
+                    return
+                end
+                
+                -- Print each list name with active indicator
+                for _, list in ipairs(lists) do
+                    local active_marker = list.name == active_list and "* " or "  "
+                    local todo_count = 0
+                    
+                    -- Count todos if this is the active list
+                    if list.name == active_list then
+                        todo_count = #(module.state.todos or {})
+                    end
+                    
+                    local count_str = todo_count > 0 and string.format(" (%d todos)", todo_count) or ""
+                    vim.notify(active_marker .. list.name .. count_str, vim.log.levels.INFO)
+                end
+            else
+                -- Unknown subcommand, show usage
+                vim.notify([[
+Usage: DoItLists <command> [args...]
+
+Commands:
+  (no command)     Toggle the list manager window
+  switch <name>    Switch to the specified list
+  create <name>    Create a new empty list
+  delete <name>    Delete a list
+  rename <old> <new>  Rename a list
+  list             Show available lists
+                ]], vim.log.levels.INFO)
+            end
+        end,
+        opts = {
+            desc = "Manage Todo Lists",
+            nargs = "*",
+            complete = function(arglead, cmdline, cursorpos)
+                local args = vim.split(cmdline, "%s+", { trimempty = true })
+                
+                if #args <= 2 then
+                    -- Complete subcommands
+                    return { "switch", "use", "create", "new", "delete", "remove", "rename", "list", "ls" }
+                elseif args[2] == "switch" or args[2] == "use" or args[2] == "delete" or args[2] == "remove" or args[2] == "rename" then
+                    -- Complete list names
+                    local lists = module.state.get_available_lists()
+                    local list_names = {}
+                    for _, list in ipairs(lists) do
+                        table.insert(list_names, list.name)
+                    end
+                    return list_names
+                end
+                
+                return {}
+            end
+        }
+    }
+    
     return commands
 end
 

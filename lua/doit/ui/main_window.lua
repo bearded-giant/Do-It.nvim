@@ -6,8 +6,13 @@ local highlights = require("doit.ui.highlights")
 local todo_actions = require("doit.ui.todo_actions")
 local help_window = require("doit.ui.help_window")
 local tag_window = require("doit.ui.tag_window")
+local category_window = require("doit.ui.category_window")
 local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
+
+-- Get reference to the todos module
+local core = require("doit.core")
+local todo_module = core.get_module("todos")
 
 local state = require("doit.state")
 state.load_todos()
@@ -142,11 +147,43 @@ function M.render_todos()
 	local lines = { "" }
 	if state.active_filter then
 		table.insert(lines, "")
-		table.insert(lines, "  Filtered by: #" .. state.active_filter)
+		table.insert(lines, "  Filtered by tag: #" .. state.active_filter)
+	end
+	
+	if state.active_category then
+		table.insert(lines, "")
+		
+		-- Get category name from module if possible
+		local category_name = state.active_category
+		if todo_module and todo_module.state and todo_module.state.categories_by_id 
+			and todo_module.state.categories_by_id[state.active_category] then
+			category_name = todo_module.state.categories_by_id[state.active_category].name
+		end
+		
+		table.insert(lines, "  Filtered by category: " .. category_name)
 	end
 
 	for _, todo in ipairs(state.todos) do
-		if not state.active_filter or todo.text:match("#" .. state.active_filter) then
+		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+		local show_by_category = true
+		
+		-- Handle category filtering
+		if state.active_category then
+			if todo_module and todo_module.state and todo_module.state.get_todo_category then
+				-- Use new module system for category determination
+				local todo_category_id = todo_module.state.get_todo_category(todo.id)
+				show_by_category = (todo_category_id == state.active_category) or
+								  (state.active_category == "uncategorized" and 
+								   (todo_category_id == "uncategorized" or not todo_category_id))
+			else
+				-- Fallback to legacy category handling
+				show_by_category = (todo.category == state.active_category) or
+								  (state.active_category == "Uncategorized" and 
+								   (not todo.category or todo.category == ""))
+			end
+		end
+		
+		if show_by_tag and show_by_category then
 			table.insert(lines, "  " .. M.format_todo_line(todo))
 		end
 	end
@@ -166,7 +203,7 @@ function M.render_todos()
 	for i, line in ipairs(lines) do
 		local line_nr = i - 1
 		if line:match("^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]") then
-			local todo_index = i - (state.active_filter and 3 or 1)
+			local todo_index = i - M.calculate_line_offset()
 			local todo = state.todos[todo_index]
 			if todo then
 				if todo.done then
@@ -204,7 +241,7 @@ function M.render_todos()
 					end
 				end
 			end
-		elseif line:match("Filtered by:") then
+		elseif line:match("Filtered by tag:") or line:match("Filtered by category:") then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "WarningMsg", line_nr, 0, -1)
 		end
 	end
@@ -235,7 +272,9 @@ function M.format_todo_line(todo)
 	end
 
 	local notes_icon = ""
-	if todo.notes and todo.notes ~= "" then
+	if todo.note_id then
+		notes_icon = config.options.notes.linked_icon or "🔗"
+	elseif todo.notes and todo.notes ~= "" then
 		notes_icon = config.options.notes.icon or "✎"
 	end
 
@@ -330,6 +369,18 @@ function M.format_todo_line(todo)
 	end
 
 	return table.concat(components, " ")
+end
+
+-- Calculate the offset for todo indices based on filter headers in the rendered list
+function M.calculate_line_offset()
+	local offset = 1 -- Always have at least one blank line at the top
+	if state.active_filter then
+		offset = offset + 2 -- Add 2 more lines for tag filter header
+	end
+	if state.active_category then
+		offset = offset + 2 -- Add 2 more lines for category filter header
+	end
+	return offset
 end
 
 local function create_window()
@@ -460,9 +511,19 @@ local function create_window()
 		tag_window.create_tag_window(win_id)
 		M.render_todos()
 	end)
+	
+	setup_keymap("toggle_categories", function()
+		if todo_module and todo_module.ui and todo_module.ui.category_window then
+			todo_module.ui.category_window.toggle_window()
+		else
+			category_window.create_category_window(win_id)
+		end
+		M.render_todos()
+	end)
 
 	setup_keymap("clear_filter", function()
 		state.set_filter(nil)
+		state.clear_category_filter()
 		M.render_todos()
 	end)
 
@@ -510,6 +571,14 @@ local function create_window()
 
 	setup_keymap("open_todo_scratchpad", function()
 		scratchpad.open_todo_scratchpad(win_id)
+	end)
+	
+	setup_keymap("toggle_list_manager", function()
+		if todo_module and todo_module.ui and todo_module.ui.list_manager_window then
+			todo_module.ui.list_manager_window.toggle_window()
+		else
+			vim.notify("List manager window not available", vim.log.levels.WARN)
+		end
 	end)
 
 	setup_keymap("import_todos", function()

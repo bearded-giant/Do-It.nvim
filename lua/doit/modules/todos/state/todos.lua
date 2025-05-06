@@ -3,9 +3,15 @@ local M = {}
 
 -- Setup module
 function M.setup(state)
+    -- Generate a unique ID for a todo
+    local function generate_todo_id()
+        return os.time() .. "_" .. math.random(1000000, 9999999)
+    end
+    
     -- Add a new todo 
     function M.add_todo(text, priorities)
         local new_todo = {
+            id = generate_todo_id(),
             text = text,
             done = false,
             timestamp = os.time(),
@@ -20,6 +26,31 @@ function M.setup(state)
         state.save_todos()
         
         return new_todo
+    end
+    
+    -- Get a todo by its ID
+    function M.get_todo_by_id(id)
+        if not id then return nil end
+        
+        for _, todo in ipairs(state.todos) do
+            if todo.id == id then
+                return todo
+            end
+        end
+        return nil
+    end
+    
+    -- Get all todos linked to a specific note ID
+    function M.get_todos_by_note_id(note_id)
+        if not note_id then return {} end
+        
+        local linked_todos = {}
+        for _, todo in ipairs(state.todos) do
+            if todo.note_id == note_id then
+                table.insert(linked_todos, todo)
+            end
+        end
+        return linked_todos
     end
     
     -- Toggle a todo status

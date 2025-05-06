@@ -4,6 +4,23 @@ local M = {}
 -- Module version
 M.version = "2.0.0"
 
+-- Module metadata for registry
+M.metadata = {
+    name = "todos",
+    version = M.version,
+    description = "Todo management with support for priorities, due dates, and multiple lists",
+    author = "bearded-giant",
+    path = "doit.modules.todos",
+    dependencies = {},
+    config_schema = {
+        enabled = { type = "boolean", default = true },
+        save_path = { type = "string" },
+        window = { type = "table" },
+        formatting = { type = "table" },
+        keymaps = { type = "table" }
+    }
+}
+
 -- Setup function for the todos module
 function M.setup(opts)
     -- Initialize module with core framework
@@ -33,10 +50,75 @@ function M.setup(opts)
     
     -- Listen for events from other modules if they exist
     if core.get_module("notes") then
+        -- Listen for note updates to sync linked todos
         core.events.on("note_updated", function(data)
-            -- Handle note updates if needed
+            if data and data.id then
+                -- Update any todos linked to this note
+                local linked_todos = M.state.get_todos_by_note_id(data.id)
+                if linked_todos and #linked_todos > 0 then
+                    -- Update the linked todos with the latest note information
+                    for _, todo in ipairs(linked_todos) do
+                        todo.note_summary = data.summary or data.title or "Linked note"
+                        todo.note_updated_at = os.time()
+                    end
+                    M.state.save_todos()
+                    
+                    -- Emit event for UI to refresh
+                    core.events.emit("todos_updated", { 
+                        reason = "note_updated",
+                        note_id = data.id 
+                    })
+                end
+            end
+        end)
+        
+        -- Listen for note creation to potentially link to todos
+        core.events.on("note_created", function(data)
+            if data and data.id and data.metadata and data.metadata.todo_id then
+                -- Link this note to an existing todo
+                local todo_id = data.metadata.todo_id
+                local todo = M.state.get_todo_by_id(todo_id)
+                if todo then
+                    todo.note_id = data.id
+                    todo.note_summary = data.summary or data.title or "Linked note"
+                    todo.note_updated_at = os.time()
+                    M.state.save_todos()
+                    
+                    -- Emit event for UI to refresh
+                    core.events.emit("todos_updated", { 
+                        reason = "note_linked",
+                        todo_id = todo_id,
+                        note_id = data.id 
+                    })
+                end
+            end
+        end)
+        
+        -- Listen for note deletion to unlink from todos
+        core.events.on("note_deleted", function(data)
+            if data and data.id then
+                -- Unlink any todos linked to this note
+                local linked_todos = M.state.get_todos_by_note_id(data.id)
+                if linked_todos and #linked_todos > 0 then
+                    for _, todo in ipairs(linked_todos) do
+                        todo.note_id = nil
+                        todo.note_summary = nil
+                        todo.note_updated_at = nil
+                    end
+                    M.state.save_todos()
+                    
+                    -- Emit event for UI to refresh
+                    core.events.emit("todos_updated", { 
+                        reason = "note_deleted",
+                        note_id = data.id 
+                    })
+                end
+            end
         end)
     end
+    
+    -- Emit events for todos that other modules can listen to
+    M.emit_events = true
     
     return M
 end

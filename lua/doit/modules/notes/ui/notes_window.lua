@@ -31,13 +31,15 @@ end
 
 -- Create buffer for notes
 function M.create_buf()
-    if core and core.ui then
+    -- Check if core UI is properly initialized with window module
+    if core and core.ui and core.ui.window then
         buf = core.ui.create_buffer({
             filetype = "markdown",
             modifiable = true,
             bufhidden = "wipe"
         })
     else
+        -- Fallback to direct nvim API
         buf = api.nvim_create_buf(false, true)
         api.nvim_buf_set_option(buf, "bufhidden", "wipe")
         api.nvim_buf_set_option(buf, "modifiable", true)
@@ -67,7 +69,7 @@ function M.create_win()
         title_pos = config.window.title_pos,
     }
     
-    if core and core.ui then
+    if core and core.ui and core.ui.window then
         win = core.ui.create_float({
             buf = buf,
             width = config.window.width,
@@ -100,7 +102,7 @@ function M.update_title()
         title_pos = config.window.title_pos,
     }
     
-    if core and core.ui then
+    if core and core.ui and core.ui.window then
         core.ui.update_window_title(win, string.format("%s (%s)", config.window.title, mode_text), 
             { title_pos = config.window.title_pos })
     else
@@ -115,7 +117,7 @@ function M.close_win()
         local content = M.get_notes_content()
         state.save_notes({ content = content })
         
-        if core and core.ui then
+        if core and core.ui and core.ui.window then
             core.ui.close_window(win)
         else
             api.nvim_win_close(win, true)

@@ -14,7 +14,9 @@ function M.setup(module)
         "search_window", 
         "scratchpad", 
         "main_window", 
-        "list_window"
+        "list_window",
+        "list_manager_window",
+        "category_window"
     }
     
     for _, name in ipairs(components) do

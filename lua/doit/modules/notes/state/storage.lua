@@ -49,7 +49,14 @@ function M.setup(state, parent_module)
     function M.load_notes()
         local is_global = state.notes.current_mode == "global"
         local file_path = M.get_storage_path(is_global)
-        local result = { content = "" }
+        local result = { 
+            id = state.generate_note_id(),
+            content = "",
+            title = is_global and "Global Notes" or "Project Notes",
+            created_at = os.time(),
+            updated_at = os.time(),
+            metadata = {}
+        }
         
         local success, f = pcall(io.open, file_path, "r")
         if success and f then
@@ -58,6 +65,13 @@ function M.setup(state, parent_module)
             if content and content ~= "" then
                 local status, notes_data = pcall(vim.fn.json_decode, content)
                 if status and notes_data and notes_data.content then
+                    -- Ensure we have proper note metadata
+                    notes_data.id = notes_data.id or state.generate_note_id()
+                    notes_data.title = notes_data.title or (is_global and "Global Notes" or "Project Notes")
+                    notes_data.created_at = notes_data.created_at or os.time()
+                    notes_data.updated_at = notes_data.updated_at or os.time()
+                    notes_data.metadata = notes_data.metadata or {}
+                    
                     result = notes_data
                 end
             end
@@ -79,8 +93,15 @@ function M.setup(state, parent_module)
     function M.save_notes(notes_content)
         if not notes_content then
             vim.notify("Invalid notes data provided", vim.log.levels.ERROR)
-            return
+            return false
         end
+        
+        -- Ensure we have the required fields
+        notes_content.id = notes_content.id or state.generate_note_id()
+        notes_content.title = notes_content.title or (state.notes.current_mode == "global" and "Global Notes" or "Project Notes")
+        notes_content.created_at = notes_content.created_at or os.time()
+        notes_content.updated_at = os.time() -- Always update the timestamp
+        notes_content.metadata = notes_content.metadata or {}
         
         local is_global = state.notes.current_mode == "global"
         local file_path = M.get_storage_path(is_global)
@@ -92,20 +113,41 @@ function M.setup(state, parent_module)
                 f:write(json_content)
                 f:close()
                 
+                -- Check if this is a new note or an update
+                local is_new = false
+                local existing = nil
+                
                 if is_global then
+                    existing = state.notes.global
                     state.notes.global = notes_content
                 else
                     local project_id = M.get_project_identifier()
                     if project_id then
+                        existing = state.notes.project[project_id]
                         state.notes.project[project_id] = notes_content
                     end
                 end
+                
+                is_new = not existing or not existing.id
+                
+                -- Emit appropriate event
+                local parent_module = parent_module
+                
+                if is_new and parent_module and parent_module.on_note_created then
+                    parent_module.on_note_created(notes_content)
+                elseif parent_module and parent_module.on_note_updated then
+                    parent_module.on_note_updated(notes_content)
+                end
+                
+                return true
             else
                 vim.notify("Error encoding notes data", vim.log.levels.ERROR)
                 f:close()
+                return false
             end
         else
             vim.notify("Failed to save notes to file", vim.log.levels.ERROR)
+            return false
         end
     end
     

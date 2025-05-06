@@ -5,6 +5,7 @@ local config = require("doit.config")
 local M = {
 	todos = {}, -- main list of todos
 	active_filter = nil, -- optional active tag filter
+	active_category = nil, -- optional active category filter
 	deleted_todos = {}, -- history of deleted todos for undo
 	MAX_UNDO_HISTORY = 100,
 	reordering_todo_index = nil, -- currently reordering todo index
@@ -38,6 +39,18 @@ end
 -- alias for initial refactoring
 function M.save_todos()
 	M.save_to_disk()
+end
+
+-- Category filter functionality
+function M.set_category_filter(category)
+	if category == "" then
+		category = nil
+	end
+	M.active_category = category
+end
+
+function M.clear_category_filter()
+	M.active_category = nil
 end
 
 return M
