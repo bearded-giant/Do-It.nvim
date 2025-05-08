@@ -1,0 +1,78 @@
+*doit_linking.txt*  Documentation for do-it.nvim note linking feature
+
+==============================================================================
+NOTE LINKING                                         *doit-note-linking*
+
+The note linking feature allows you to link todos and notes together using
+Obsidian-like [[]] syntax.
+
+------------------------------------------------------------------------------
+USAGE                                               *doit-linking-usage*
+
+There are two ways to link a todo to a note:
+
+1. Using the link interface:
+   - Position the cursor on a todo
+   - Press `n` to open the note linking interface
+   - Select an existing note or choose to create a new link
+   - If creating a new link, enter the note title
+
+2. Direct editing:
+   - When creating or editing a todo, include [[note-title]] anywhere in the text
+   - The system will automatically create a link to a note with that title if it exists
+
+To navigate from a todo to its linked note:
+
+1. Position the cursor on a todo with a link
+2. Press `o` to open the linked note
+3. The todo window will close and the notes window will open
+
+------------------------------------------------------------------------------
+VISUAL INDICATORS                                  *doit-linking-visual*
+
+Todos with linked notes are visually indicated in two ways:
+
+1. The [[note-title]] syntax in the todo text is highlighted in green
+2. A link icon (🔗) appears at the beginning of the todo line
+
+------------------------------------------------------------------------------
+KEY MAPPINGS                                        *doit-linking-keys*
+
+Key mappings related to note linking:
+
+`n`   - Link a todo to a note (open note selection interface)
+`o`   - Open a linked note
+
+------------------------------------------------------------------------------
+CONFIGURATION                                     *doit-linking-config*
+
+The feature uses the following configuration options:
+
+```lua
+-- In config.lua
+notes = {
+    linked_icon = "🔗", -- Icon for todos linked to notes
+},
+keymaps = {
+    open_linked_note = "o", -- Key to open a linked note
+    -- The link_to_note function uses 'n' by default
+}
+```
+
+------------------------------------------------------------------------------
+EXAMPLES                                          *doit-linking-examples*
+
+Creating a todo with a link:
+```
+Buy groceries [[Shopping List]]
+```
+
+The link will be highlighted in the UI and pressing 'o' will open the
+"Shopping List" note if it exists.
+
+Using the link interface:
+1. Create a todo: "Buy groceries"
+2. Press 'n' to open the linking interface
+3. Select "Shopping List" from existing notes or create a new link
+
+==============================================================================

@@ -12,6 +12,12 @@ local scratchpad = require("doit.ui.scratchpad")
 
 -- Get reference to the todos module
 local core = require("doit.core")
+
+-- Initialize core.ui if it's not already initialized
+if not core.ui then
+    core.ui = require("doit.core.ui").setup()
+end
+
 local todo_module = core.get_module("todos")
 
 local state = require("doit.state")
@@ -218,6 +224,23 @@ function M.render_todos()
 					local start_idx = line:find("#" .. tag) - 1
 					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
 				end
+				
+				-- Note link highlight for [[note-title]] syntax
+				for link in line:gmatch("%[%[([^%]]+)%]%]") do
+					local link_pattern = "%[%[" .. link .. "%]%]"
+					local start_idx = line:find(link_pattern, 1, true) - 1
+					if start_idx then
+						local end_idx = start_idx + #link_pattern
+						vim.api.nvim_buf_add_highlight(
+							buf_id,
+							ns_id,
+							"DoItNoteLink",
+							line_nr,
+							start_idx,
+							end_idx
+						)
+					end
+				end
 
 				-- Overdue highlight
 				if line:match("%[OVERDUE%]") then
@@ -250,12 +273,48 @@ function M.render_todos()
 end
 
 function M.format_todo_line(todo)
-	local formatting = config.options.formatting
-	if not formatting or not formatting.pending or not formatting.done then
-		error("Invalid 'formatting' configuration in config.lua")
+	-- Create default formatting if missing
+	if not config.options.formatting then
+		config.options.formatting = {
+			pending = {
+				icon = "○",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			},
+			in_progress = {
+				icon = "◐",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			},
+			done = {
+				icon = "✓",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			}
+		}
 	end
 
-	local format = todo.done and formatting.done.format or formatting.pending.format
+	local formatting = config.options.formatting
+	
+	-- Still missing format keys? Create at least pending and done
+	if not formatting.pending then
+		formatting.pending = {
+			icon = "○",
+			format = { "icon", "text", "relative_time" }
+		}
+	end
+	if not formatting.done then
+		formatting.done = {
+			icon = "✓",
+			format = { "icon", "text", "relative_time" }
+		}
+	end
+	if not formatting.in_progress then
+		formatting.in_progress = {
+			icon = "◐",
+			format = { "icon", "text", "relative_time" }
+		}
+	end
+
+	local format = todo.done and formatting.done.format or 
+	               (todo.in_progress and formatting.in_progress.format or formatting.pending.format)
 	if not format then
 		format = { "icon", "text", "ect", "relative_time" } -- fallback
 	end
@@ -273,9 +332,9 @@ function M.format_todo_line(todo)
 
 	local notes_icon = ""
 	if todo.note_id then
-		notes_icon = config.options.notes.linked_icon or "🔗"
+		notes_icon = config.options.notes and config.options.notes.linked_icon or "🔗"
 	elseif todo.notes and todo.notes ~= "" then
-		notes_icon = config.options.notes.icon or "✎"
+		notes_icon = config.options.notes and config.options.notes.icon or "✎"
 	end
 
 	local components = {}
@@ -311,7 +370,7 @@ function M.format_todo_line(todo)
 				formatted = string.format("%s %d, %d", month, date.day, date.year)
 			end
 
-			local icon = config.options.calendar.icon or ""
+			local icon = config.options.calendar and config.options.calendar.icon or ""
 			local due_date_str = (icon ~= "") and ("[" .. icon .. " " .. formatted .. "]") or ("[" .. formatted .. "]")
 			if (not todo.done) and (todo.due_at < os.time()) then
 				due_date_str = due_date_str .. " [OVERDUE]"
@@ -385,6 +444,37 @@ end
 
 local function create_window()
 	local ui = vim.api.nvim_list_uis()[1]
+	
+	-- Set default window options if they're missing
+	if not config.options then
+		config.options = {}
+	end
+	if not config.options.window then
+		config.options.window = {
+			width = 55,
+			height = 20,
+			border = "rounded",
+			position = "center"
+		}
+	end
+	-- Ensure formatting exists
+	if not config.options.formatting then
+		config.options.formatting = {
+			pending = {
+				icon = "○",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			},
+			in_progress = {
+				icon = "◐",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			},
+			done = {
+				icon = "✓",
+				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+			}
+		}
+	}
+	
 	local width = config.options.window.width
 	local height = config.options.window.height
 	local position = config.options.window.position or "right"
@@ -462,6 +552,11 @@ local function create_window()
 	vim.api.nvim_win_set_option(win_id, "showbreak", " ")
 
 	local function setup_keymap(key_option, fn)
+		-- Make sure config.options and config.options.keymaps exist
+		if not config.options or not config.options.keymaps then
+			return -- Skip if keymaps aren't available
+		end
+		
 		local key = config.options.keymaps[key_option]
 		if key then
 			vim.keymap.set("n", key, fn, { buffer = buf_id, nowait = true })
@@ -568,6 +663,19 @@ local function create_window()
 			M.render_todos()
 		end)
 	end)
+	
+	-- Add keymap for opening linked notes
+	setup_keymap("open_linked_note", function()
+		M.open_linked_note()
+	end)
+	
+	-- Add keymap for linking to notes
+	-- Since this might not be in config.options.keymaps yet, add it manually
+	vim.keymap.set("n", "n", function()
+		todo_actions.link_to_note(win_id, function()
+			M.render_todos()
+		end)
+	end, { buffer = buf_id, nowait = true, desc = "Link todo to note" })
 
 	setup_keymap("open_todo_scratchpad", function()
 		scratchpad.open_todo_scratchpad(win_id)
@@ -600,6 +708,89 @@ local function create_window()
 	setup_keymap("export_todos", function()
 		prompt_io("export")
 	end)
+end
+
+-- Open linked note for a todo
+function M.open_linked_note()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local cursor_pos = vim.api.nvim_win_get_cursor(win_id)
+	local line_nr = cursor_pos[1]
+	local todo_index = line_nr - M.calculate_line_offset()
+	local todo = state.todos[todo_index]
+
+	if not todo then
+		vim.notify("No todo selected", vim.log.levels.WARN)
+		return
+	end
+
+	-- First check if there's a direct note_id link
+	if todo.note_id then
+		-- Try to get a reference to the notes module
+		local notes_module = core.get_module("notes")
+		if notes_module then
+			-- Make sure the UI is initialized
+			if not notes_module.ui then
+				vim.notify("Notes UI not initialized", vim.log.levels.WARN)
+				return
+			end
+			
+			-- Make sure notes_window is available
+			if not notes_module.ui.notes_window then
+				vim.notify("Notes window not available", vim.log.levels.WARN)
+				return
+			end
+
+			-- Close todos window
+			M.close_window()
+			-- Open notes window
+			notes_module.ui.notes_window.toggle_notes_window()
+			-- TODO: Ideally we would jump to the specific note, but that's handled by the notes module
+			return
+		end
+	end
+
+	-- If there's no direct link, check for [[]] links in the text
+	if not todo.text:match("%[%[.+%]%]") then
+		vim.notify("No linked note found", vim.log.levels.WARN)
+		return
+	end
+
+	-- Try to get a reference to the notes module
+	local notes_module = core.get_module("notes")
+	if not notes_module or not notes_module.state then
+		vim.notify("Notes module not available", vim.log.levels.WARN)
+		return
+	end
+
+	-- Extract the first link
+	local links = notes_module.state.parse_note_links(todo.text)
+	if #links == 0 then
+		vim.notify("No note links found", vim.log.levels.WARN)
+		return
+	end
+
+	-- Try to find the note by title pattern
+	local note = notes_module.state.find_note_by_title(links[1])
+	if not note then
+		vim.notify("Linked note not found: " .. links[1], vim.log.levels.WARN)
+		return
+	end
+
+	-- Open the notes window
+	M.close_window()
+	
+	-- Make sure the notes UI is initialized
+	if not notes_module.ui or not notes_module.ui.notes_window then
+		vim.notify("Notes window not available", vim.log.levels.WARN)
+		return
+	end
+	
+	notes_module.ui.notes_window.toggle_notes_window()
+	-- The notes window will open with the current note mode
+	-- TODO: Ideally we would jump to the specific note
 end
 
 function M.toggle_todo_window()

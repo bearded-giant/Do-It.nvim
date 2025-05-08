@@ -71,6 +71,11 @@ function M.setup(module)
         core_actions.reorder_todo(win_id, on_render)
     end
     
+    function M.link_to_note(win_id, on_render)
+        local core_actions = require("doit.ui.todo_actions")
+        core_actions.link_to_note(win_id, on_render)
+    end
+    
     -- Return module with all functions
     return M
 end

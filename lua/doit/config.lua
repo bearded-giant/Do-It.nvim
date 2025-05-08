@@ -137,6 +137,7 @@ M.defaults = {
 		reorder_todo = "r",
 		move_todo_up = "k",
 		move_todo_down = "j",
+		open_linked_note = "o",    -- Open linked note from a todo
 	},
 	calendar = {
 		language = "en",

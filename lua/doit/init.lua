@@ -15,6 +15,11 @@ function M.setup(opts)
     -- Initialize core
     M.core = require("doit.core").setup(opts)
     
+    -- Ensure core.ui is initialized
+    if M.core and not M.core.ui then
+        M.core.ui = require("doit.core.ui").setup()
+    end
+    
     -- Initialize registry and discover modules
     if M.core and M.core.registry then
         -- Auto-discover modules if enabled

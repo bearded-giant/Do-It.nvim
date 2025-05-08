@@ -28,7 +28,7 @@ function M.create_help_window()
 
 	help_buf_id = vim.api.nvim_create_buf(false, true)
 	local width = 50
-	local height = 40
+	local height = 47  -- Increased to accommodate new content
 	local ui = vim.api.nvim_list_uis()[1]
 	local col = math.floor((ui.width - width) / 2) + width + 2
 	local row = math.floor((ui.height - height) / 2)
@@ -72,6 +72,15 @@ function M.create_help_window()
 		string.format(" %-12s - Open to-do scratchpad", keys.open_todo_scratchpad),
 		string.format(" %-12s - Toggle priority", keys.toggle_priority),
 		string.format(" %-12s - Enter reordering mode", keys.reorder_todo),
+		string.format(" %-12s - Link to-do to note", "n"),
+		string.format(" %-12s - Open linked note", keys.open_linked_note or "o"),
+		"",
+		" Note linking:",
+		" You can link to-dos to notes in two ways:",
+		" 1. Use the 'n' key to select an existing note",
+		" 2. Add [[note-title]] directly in your to-do text",
+		" Linked notes will have a 🔗 icon and can be opened",
+		" with the 'o' key.",
 		"",
 		" Reordering to-dos:",
 		string.format(" %-12s - Move to-do up", keys.move_todo_up),
@@ -140,4 +149,3 @@ function M.create_help_window()
 end
 
 return M
-

@@ -3,8 +3,16 @@ local M = {}
 
 -- Initialize UI utilities
 function M.setup()
+    -- Ensure the window and theme modules are loaded
     M.window = require("doit.core.ui.window")
     M.theme = require("doit.core.ui.theme")
+    
+    -- Provide forward functions from the window module
+    M.create_float = M.window.create_float
+    M.close_window = M.window.close
+    M.update_window_title = M.window.update_title
+    M.create_buffer = M.window.create_buffer
+    
     return M
 end
 

@@ -12,10 +12,12 @@ function M.setup_highlights()
 	vim.api.nvim_set_hl(0, "DoItDone", { link = "Comment", default = true })
 	vim.api.nvim_set_hl(0, "DoItHelpText", { link = "Directory", default = true })
 	vim.api.nvim_set_hl(0, "DoItTimestamp", { link = "Comment", default = true })
+	vim.api.nvim_set_hl(0, "DoItNoteLink", { fg = "#88FF88", underline = true, default = true })
 
 	highlight_cache.pending = "DoItPending"
 	highlight_cache.done = "DoItDone"
 	highlight_cache.help = "DoItHelpText"
+	highlight_cache.note_link = "DoItNoteLink"
 end
 
 function M.get_namespace_id()

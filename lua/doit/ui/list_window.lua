@@ -52,10 +52,20 @@ function M.render_list()
     -- Apply highlighting
     vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Title", 0, 0, -1)
     
+    -- Set default formatting if not available
+    if not config.options.formatting then
+        config.options.formatting = {
+            pending = { icon = "○" },
+            in_progress = { icon = "◐" },
+            done = { icon = "✓" }
+        }
+    end
+    
     -- Highlight each todo line
     for i = 2, #lines do
         local line_nr = i
-        if lines[i]:match("^%s+[" .. config.options.formatting.in_progress.icon .. "]") then
+        local in_progress_icon = config.options.formatting.in_progress and config.options.formatting.in_progress.icon or "◐"
+        if lines[i]:match("^%s+[" .. in_progress_icon .. "]") then
             local todo_index = i - 2  -- Adjust for header lines
             local todo = active_todos[todo_index]
             

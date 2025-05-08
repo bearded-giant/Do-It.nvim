@@ -22,10 +22,39 @@ function M.setup(state)
             new_todo.priorities = priorities
         end
         
+        -- Process any note links in the todo text
+        M.process_note_links(new_todo)
+        
         table.insert(state.todos, new_todo)
         state.save_todos()
         
         return new_todo
+    end
+    
+    -- Parse note links from todo text and update todo.note_id if found
+    function M.process_note_links(todo)
+        if not todo or not todo.text then return end
+        
+        -- Try to get a reference to the notes module
+        local core = package.loaded["doit.core"]
+        local notes_module = core and core.get_module and core.get_module("notes")
+        
+        if not notes_module or not notes_module.state then
+            return -- Cannot process links without notes module
+        end
+        
+        -- Extract note links from text
+        local links = notes_module.state.parse_note_links(todo.text)
+        
+        -- If links found, try to match with the first one
+        if #links > 0 then
+            local note = notes_module.state.find_note_by_title(links[1])
+            if note and note.id then
+                todo.note_id = note.id
+                todo.note_summary = notes_module.state.generate_summary(note.content)
+                todo.note_updated_at = os.time()
+            end
+        end
     end
     
     -- Get a todo by its ID
@@ -147,9 +176,42 @@ function M.setup(state)
     -- Edit a todo
     function M.edit_todo(index, new_text)
         if state.todos[index] then
-            state.todos[index].text = new_text
+            local todo = state.todos[index]
+            todo.text = new_text
+            
+            -- Re-process note links when text is edited
+            M.process_note_links(todo)
+            
             state.save_todos()
         end
+    end
+    
+    -- Link a todo to a note directly
+    function M.link_todo_to_note(todo_index, note_id, note_summary)
+        if not state.todos[todo_index] then
+            return false
+        end
+        
+        state.todos[todo_index].note_id = note_id
+        state.todos[todo_index].note_summary = note_summary
+        state.todos[todo_index].note_updated_at = os.time()
+        state.save_todos()
+        
+        return true
+    end
+    
+    -- Unlink a todo from its note
+    function M.unlink_todo_from_note(todo_index)
+        if not state.todos[todo_index] then
+            return false
+        end
+        
+        state.todos[todo_index].note_id = nil
+        state.todos[todo_index].note_summary = nil
+        state.todos[todo_index].note_updated_at = nil
+        state.save_todos()
+        
+        return true
     end
     
     -- Remove duplicate todos

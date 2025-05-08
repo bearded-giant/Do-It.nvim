@@ -46,6 +46,83 @@ function M.setup(parent_module)
         end
     end
     
+    -- Parse and extract note links in a string (using [[note-title]] syntax)
+    function M.parse_note_links(text)
+        if not text or text == "" then
+            return {}
+        end
+        
+        local links = {}
+        for link in text:gmatch("%[%[([^%]]+)%]%]") do
+            table.insert(links, link)
+        end
+        return links
+    end
+    
+    -- Find a note by title pattern (for linking)
+    function M.find_note_by_title(title_pattern)
+        if not title_pattern or title_pattern == "" then
+            return nil
+        end
+        
+        -- Normalize the title pattern for case-insensitive matching
+        local pattern = title_pattern:lower()
+        
+        -- Check global notes first
+        if M.notes.global and M.notes.global.content then
+            local summary = M.generate_summary(M.notes.global.content)
+            if summary:lower():find(pattern, 1, true) then
+                return M.notes.global
+            end
+        end
+        
+        -- Check project notes
+        for _, note in pairs(M.notes.project) do
+            if note and note.content then
+                local summary = M.generate_summary(note.content)
+                if summary:lower():find(pattern, 1, true) then
+                    return note
+                end
+            end
+        end
+        
+        return nil
+    end
+    
+    -- Get all available notes for link autocomplete
+    function M.get_all_notes_titles()
+        local titles = {}
+        
+        -- Add global note if available
+        if M.notes.global and M.notes.global.content and M.notes.global.content ~= "" then
+            local summary = M.generate_summary(M.notes.global.content)
+            if summary ~= "" then
+                table.insert(titles, {
+                    id = M.notes.global.id,
+                    title = summary,
+                    mode = "global"
+                })
+            end
+        end
+        
+        -- Add project notes
+        for project_id, note in pairs(M.notes.project) do
+            if note and note.content and note.content ~= "" then
+                local summary = M.generate_summary(note.content)
+                if summary ~= "" then
+                    table.insert(titles, {
+                        id = note.id,
+                        title = summary,
+                        mode = "project",
+                        project = project_id
+                    })
+                end
+            end
+        end
+        
+        return titles
+    end
+    
     -- Get the current project identifier
     function M.get_current_project()
         local core = require("doit.core")

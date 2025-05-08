@@ -1,19 +1,19 @@
 *doit_framework.txt*      Modular Framework for Do-It.nvim     *doit-framework*
 
 ==============================================================================
-Table of Contents                                      *doit-framework-contents*
+Table of Contents                                      *doit-framework-toc*
 
-1. Framework Overview                                     *doit-framework-overview*
-  - Architecture                                        *doit-framework-architecture*
-  - Modules                                                  *doit-framework-modules*
-2. Configuration                                      *doit-framework-configuration*
-  - Framework Options                                           *doit-framework-opts*
-  - Module Configuration                                  *doit-framework-module-cfg*
-3. Standalone Usage                                       *doit-framework-standalone*
-4. Module Development                                   *doit-framework-development*
-  - Core API                                                    *doit-framework-api*
-  - Module Structure                                     *doit-framework-structure*
-  - Events                                                    *doit-framework-events*
+1. Framework Overview                                     |doit-framework-overview|
+  - Architecture                                        |doit-framework-arch|
+  - Modules                                                  |doit-framework-modules|
+2. Configuration                                      |doit-framework-configuration|
+  - Framework Options                                           |doit-framework-opts|
+  - Module Configuration                                  |doit-framework-mod-cfg|
+3. Standalone Usage                                       |doit-framework-standalone|
+4. Module Development                                   |doit-framework-development|
+  - Core API                                                    |doit-framework-api|
+  - Module Structure                                     |doit-framework-structure|
+  - Events                                                    |doit-framework-events|
 
 ==============================================================================
 1. Framework Overview                                  *doit-framework-overview*
@@ -23,7 +23,7 @@ to work independently or together as part of a cohesive system. This approach
 provides greater flexibility and extensibility while maintaining the simplicity
 of the original plugin.
 
-ARCHITECTURE                                       *doit-framework-architecture*
+ARCHITECTURE                                       *doit-framework-arch*
 
 The framework consists of the following components:
 
@@ -85,7 +85,7 @@ The framework can be configured when calling setup:
     })
 <
 
-MODULE CONFIGURATION                                 *doit-framework-module-cfg*
+MODULE CONFIGURATION                                 *doit-framework-mod-cfg*
 
 Modules can be configured individually:
 
