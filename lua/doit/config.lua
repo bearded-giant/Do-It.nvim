@@ -14,9 +14,44 @@ M.defaults = {
 			right = 2,
 		},
 	},
+	list_window = {
+		width = 40,
+		height = 10,
+		position = "bottom-right",
+	},
+	lualine = {
+		enabled = true,
+		max_length = 30,
+	},
 	quick_keys = true,
+	project = {
+		enabled = true,
+		detection = {
+			use_git = true,
+			fallback_to_cwd = true,
+		},
+		storage = {
+			path = vim.fn.stdpath("data") .. "/doit/projects",
+		},
+	},
 	notes = {
+		enabled = true,
 		icon = "📓",
+		linked_icon = "🔗",
+		storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+		mode = "project", -- "global" or "project"
+		window = {
+			width = 0.6,
+			height = 0.6,
+			border = "rounded",
+			title = " Notes ",
+			title_pos = "center",
+		},
+		keymaps = {
+			toggle = "<leader>dn",
+			close = "q",
+			switch_mode = "m",
+		},
 	},
 	timestamp = {
 		enabled = true,
@@ -72,6 +107,7 @@ M.defaults = {
 	import_export_path = vim.fn.expand("~/todos.json"),
 	keymaps = {
 		toggle_window = "<leader>do",
+		toggle_list_window = "<leader>dl",
 		new_todo = "i",
 		toggle_todo = "x",
 		delete_todo = "d",
@@ -83,6 +119,7 @@ M.defaults = {
 		remove_due_date = "r",
 		toggle_help = "?",
 		toggle_tags = "t",
+		toggle_categories = "C",
 		toggle_priority = "<Space>",
 		clear_filter = "c",
 		edit_todo = "e",
@@ -100,6 +137,7 @@ M.defaults = {
 		reorder_todo = "r",
 		move_todo_up = "k",
 		move_todo_down = "j",
+		open_linked_note = "o",    -- Open linked note from a todo
 	},
 	calendar = {
 		language = "en",

@@ -15,6 +15,7 @@ Table of Contents                                          *doit-contents*
   - Calendar                                                 |doit-calendar|
   - Priority System                                         |doit-priorities|
   - Import/Export                                             |doit-import|
+  - Project Notes                                              |doit-notes|
 3. Colors                                                      |doit-colors|
 4. Roadmap                                                    |doit-roadmap|
 
@@ -48,6 +49,9 @@ FEATURES                                                      *doit-features*
 - Import/Export of to-do json for backups, obsidian integration...whatever you want
 - To-do reordering with customizable keybindings
 - In-progress (active) to-dos automatically float to the top of the list and sort by priority
+- Quick list view of active to-dos with auto-refresh
+- Lualine integration to show your top active to-do
+- Project-specific notes for documenting your work
 
 REQUIREMENTS                                              *doit-requirements*
 
@@ -92,6 +96,15 @@ Here are the default settings:
                 right = 2,
             },
         },
+        list_window = {
+            width = 40,             -- Width of the active todos list window
+            height = 10,            -- Height of the active todos list window
+            position = 'bottom-right', -- Position of the active todos list window
+        },
+        lualine = {
+            enabled = true,         -- Enable lualine integration
+            max_length = 30,        -- Maximum length of the todo text in lualine
+        },
         formatting = {              -- To-do formatting
             pending = {
                 icon = "○",
@@ -107,8 +120,33 @@ Here are the default settings:
             },
         },
         quick_keys = true, 
+        project = {
+            enabled = true,
+            detection = {
+                use_git = true,                -- Use Git repository for project detection
+                fallback_to_cwd = true,        -- Fallback to working directory if no Git repo
+            },
+            storage = {
+                path = vim.fn.stdpath("data") .. "/doit/projects",
+            },
+        },
         notes = {
-            icon = "📓",
+            enabled = true,                    -- Enable notes functionality
+            icon = "📓",                       -- Icon used in to-do lists
+            storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+            mode = "project",                  -- Default mode: "global" or "project"
+            window = {
+                width = 0.6,                   -- Width as percentage of screen
+                height = 0.6,                  -- Height as percentage of screen
+                border = "rounded",            -- Border style
+                title = " Notes ",             -- Window title
+                title_pos = "center",          -- Title position
+            },
+            keymaps = {
+                toggle = "<leader>dn",         -- Toggle notes window
+                close = "q",                   -- Close notes window
+                switch_mode = "m",             -- Switch between global/project mode
+            },
         },
         scratchpad = {
             syntax_highlight = "markdown",
@@ -208,6 +246,12 @@ Arguments:~
     list            Lists all to-dos in the command line
     set             Modifies to-do properties
 
+                                                                    *:DoItList*
+Toggle a floating window showing active to-dos.
+
+                                                                    *:DoitNotes*
+Toggle the project notes window.
+
 Examples: >vim
     :Doit
     :Doit add My new task #work
@@ -215,12 +259,15 @@ Examples: >vim
     :Doit list
     :Doit set 1 priorities important
     :Doit set 2 ect 2h
+    :DoitNotes     " Opens or closes the notes window
 <
 
 KEYBINDINGS                                                *doit-keybindings*
 
 Main Window~
     <leader>td   Toggle to-do window
+    <leader>dl   Toggle active to-dos list window
+    <leader>dn   Toggle project notes window
     i           Add new to-do
     x           Toggle to-do status
     d           Delete current to-do
@@ -264,6 +311,10 @@ Calendar Window~
     L           Next month
     <CR>        Select date
     q           Close calendar
+    
+Notes Window~
+    q           Close notes window
+    m           Switch between global and project notes
 
 ==============================================================================
 2. Advanced                                                    *doit-advanced*
@@ -347,11 +398,38 @@ Highlight Groups~
 `DoItQuickKey`      Quick keys keybindings
 `DoItQuickDesc`     Quick keys descriptions
 
+PROJECT NOTES                                                 *doit-notes*
+
+Project Notes adds project-specific notes functionality to Do-It.nvim, inspired by 
+maple.nvim. This feature allows you to maintain separate notes for each project
+while working in Neovim, making it easy to document project-specific information 
+and thoughts without leaving your editor.
+
+Features:
+- Project-specific notes that follow your Git repository or working directory
+- Global notes mode for system-wide documentation
+- Easy switching between global and project modes
+- Persistent storage of notes in JSON format
+- Markdown highlighting for better readability
+- Floating window interface consistent with other Do-It.nvim components
+
+Project Notes is designed to complement your to-do workflow:
+- Store project-specific documentation alongside your to-dos
+- Document implementation details, decisions, and references
+- Keep track of project-related thoughts and ideas
+- Use markdown formatting for better organization
+
+The notes are automatically saved when:
+- The notes window is closed
+- You switch between global and project modes
+- You navigate away from the buffer
+
 ==============================================================================
 4. Roadmap                                                    *doit-roadmap*
 
 - ✓ Reorder To-dos
 - ✓ Active To-do to Top
+- ✓ Project Notes
 - Named (and Multiple) To-do Lists
 - To-do Categories View
 
@@ -361,4 +439,6 @@ ACKNOWLEDGMENTS
 
 Do-It.nvim is FOR SURE based on Dooing by atiladefreitas. Special thanks to 
 him for creating the original plugin that inspired this fork.
+
+The Project Notes feature was inspired by maple.nvim's project notes functionality.
 

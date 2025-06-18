@@ -1,0 +1,217 @@
+*doit_framework.txt*      Modular Framework for Do-It.nvim     *doit-framework*
+
+==============================================================================
+Table of Contents                                      *doit-framework-toc*
+
+1. Framework Overview                                     |doit-framework-overview|
+  - Architecture                                        |doit-framework-arch|
+  - Modules                                                  |doit-framework-modules|
+2. Configuration                                      |doit-framework-configuration|
+  - Framework Options                                           |doit-framework-opts|
+  - Module Configuration                                  |doit-framework-mod-cfg|
+3. Standalone Usage                                       |doit-framework-standalone|
+4. Module Development                                   |doit-framework-development|
+  - Core API                                                    |doit-framework-api|
+  - Module Structure                                     |doit-framework-structure|
+  - Events                                                    |doit-framework-events|
+
+==============================================================================
+1. Framework Overview                                  *doit-framework-overview*
+
+Do-It.nvim 2.0 introduces a modular framework that allows individual components
+to work independently or together as part of a cohesive system. This approach
+provides greater flexibility and extensibility while maintaining the simplicity
+of the original plugin.
+
+ARCHITECTURE                                       *doit-framework-arch*
+
+The framework consists of the following components:
+
+- Core: Provides common utilities, configuration management, and module coordination
+- Modules: Independent components that implement specific functionality
+- API: Communication interface for cross-module integration
+- Events: Pub/sub system for loosely coupled module interaction
+
+This structure enables:
+- Loading only the modules you need
+- Using modules independently or together
+- Adding custom modules that integrate with the existing system
+- Extension of functionality without modifying core code
+
+MODULES                                                 *doit-framework-modules*
+
+The framework includes the following built-in modules:
+
+- todos: Task management functionality (original do-it.nvim core)
+- notes: Project-specific notes (maple.nvim-inspired notes)
+
+Each module can be:
+- Enabled/disabled independently
+- Configured separately
+- Used standalone without loading the full framework
+- Extended with additional functionality
+
+==============================================================================
+2. Configuration                                    *doit-framework-configuration*
+
+FRAMEWORK OPTIONS                                          *doit-framework-opts*
+
+The framework can be configured when calling setup:
+
+>lua
+    require("doit").setup({
+        -- Core framework options
+        project = {
+            enabled = true,
+            detection = {
+                use_git = true,             -- Detect projects by Git root
+                fallback_to_cwd = true,     -- Fallback to cwd if no Git repo
+            },
+            storage = {
+                path = vim.fn.stdpath("data") .. "/doit", -- Base storage path
+            },
+        },
+        
+        -- Plugin system
+        plugins = {
+            auto_discover = true,           -- Auto-discover modules
+            load_path = "doit.modules",     -- Base path for modules
+        },
+        
+        -- Module configurations
+        modules = {
+            -- See Module Configuration section
+        }
+    })
+<
+
+MODULE CONFIGURATION                                 *doit-framework-mod-cfg*
+
+Modules can be configured individually:
+
+>lua
+    require("doit").setup({
+        modules = {
+            -- Todos module configuration
+            todos = {
+                enabled = true,
+                save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
+                -- Other todos-specific options...
+            },
+            
+            -- Notes module configuration
+            notes = {
+                enabled = true,
+                storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+                mode = "project",   -- "global" or "project"
+                -- Other notes-specific options...
+            }
+        }
+    })
+<
+
+==============================================================================
+3. Standalone Usage                                     *doit-framework-standalone*
+
+Each module can be used independently without loading the full framework:
+
+>lua
+    -- Use just the todos module
+    require("doit_todos").setup({
+        -- todos-specific configuration
+    })
+    
+    -- Use just the notes module
+    require("doit_notes").setup({
+        -- notes-specific configuration
+    })
+<
+
+This allows for a minimal installation that includes only the functionality
+you need, reducing overhead and potential conflicts.
+
+==============================================================================
+4. Module Development                                 *doit-framework-development*
+
+CORE API                                                   *doit-framework-api*
+
+The core framework provides an API for modules to interact with each other:
+
+>lua
+    local core = require("doit.core")
+    
+    -- Access other modules
+    local notes_module = core.get_module("notes")
+    
+    -- Register events
+    core.events.on("note_updated", function(data)
+        -- React to notes being updated
+    end)
+    
+    -- Emit events
+    core.events.emit("todo_created", { id = "123", text = "New todo" })
+<
+
+MODULE STRUCTURE                                    *doit-framework-structure*
+
+A module should have the following basic structure:
+
+>lua
+    -- modules/my_module/init.lua
+    local M = {}
+    
+    function M.setup(opts)
+        -- Initialize module
+        local core = require("doit.core")
+        
+        -- Setup configuration
+        M.config = require("doit.modules.my_module.config").setup(opts)
+        
+        -- Initialize state
+        M.state = require("doit.modules.my_module.state")
+        
+        -- Initialize UI
+        M.ui = require("doit.modules.my_module.ui")
+        
+        -- Register commands
+        M.commands = require("doit.modules.my_module.commands").setup(M)
+        
+        -- Register with core
+        core.register_module("my_module", M)
+        
+        return M
+    end
+    
+    -- Optional standalone entry point
+    function M.standalone_setup(opts)
+        -- Minimal implementation for standalone use
+    end
+    
+    return M
+<
+
+EVENTS                                                   *doit-framework-events*
+
+Modules can communicate using these standard events:
+
+- `todo_created`: When a new todo is created
+- `todo_updated`: When a todo is modified
+- `todo_deleted`: When a todo is deleted
+- `todo_toggled`: When a todo status is toggled
+- `note_created`: When a new note is created
+- `note_updated`: When a note is modified
+- `note_deleted`: When a note is deleted
+- `project_changed`: When the current project changes
+
+Custom events can be defined for module-specific functionality.
+
+==============================================================================
+
+ACKNOWLEDGMENTS
+
+This framework architecture was inspired by other modular Neovim plugins like:
+- mini.nvim
+- snack.nvim
+- lsp ecosystem
+
+vim:tw=78:ts=8:ft=help:norl:

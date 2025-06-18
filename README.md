@@ -2,259 +2,202 @@
 
 [![Tests](https://github.com/bearded-giant/do-it.nvim/actions/workflows/run-tests.yml/badge.svg)](https://github.com/bearded-giant/do-it.nvim/actions/workflows/run-tests.yml)
 
-Do-It.nvim is a minimalist to-do list manager for Neovim, designed with simplicity and efficiency in mind. It provides a clean, distraction-free interface to manage your tasks directly within Neovim.
+Do-It.nvim is a modular task management framework for Neovim, providing a clean, distraction-free interface to manage your tasks and notes directly within your editor.
 
-Do-It.nvim is my personal way of how I want to track my tasks and to-dos. As a Principal Engineer, I have a lot of things to keep track of, and I wanted a simple way to do that without leaving my editor. I've tried a lot of to-do list managers, and they all seem to be too much for me. I just want to keep track of what I need to do, and that's it. I don't need a bunch of bells and whistles. I just need to know what I need to do.
+Do-It.nvim began as a way to track tasks and keep simple markdown notes per project. As a Principal Engineer with many disparate things to keep track of, I wanted a simple way to do that without leaving my editor. I've tried many task managers, but they all seemed too complex - I just needed to know what I needed to do, without bells and whistles.
 
-I also wanted a sandbox to play with Lua and some docker ideas around containerized Neovim plugin development and testing.  Oh also I'm dabbling some with Claude Code in this repo, to see how AI can help me learn a new-ish language...so that's something.   Anyway, here we are.
-
-If you want to contribute or have any ideas, feel free to open an issue or make a PR. I don't know why you would, but hey, I'm not here to judge.  Cheers!
-
-> This project is 100% built on top of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Do-It.nvim is a fork with some heavy modifications for customizations for how I work, while maintaining the core functionality.
-
-{...pics and video coming soon...}
+> This project is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas), expanded with a modular framework and additional features like project notes.
 
 ## Features
 
-- Manage to-dos in a simple and efficient way
-- Categorize tasks with #tags
-- Simple task management with clear visual feedback
-- Persistent storage of your to-dos
-- Adapts to your Neovim colorscheme
-- Compatible with **Lazy.nvim** for effortless installation
-- Relative timestamps showing when to-dos were created
-- Import/Export of to-do json for backups, obsidian integration...whatever you want
-- To-do reordering with customizable keybindings
-- In-progress (active) to-dos automatically float to the top of the list and sort by priority
+- **Modular Framework** - Use only the components you need
+- **Task Management** - Create, organize, and track to-dos
+- **Project Notes** - Maintain project-specific documentation
+- **Tags & Filtering** - Categorize tasks with #tags
+- **Due Dates** - Set deadlines with calendar integration
+- **Priorities** - Assign and sort by importance
+- **Time Estimation** - Track estimated completion time
+- **Import/Export** - Backup or share your tasks
+- **Lualine Integration** - Show active tasks in your statusline
 
----
+## Quick Start
 
-## Installation
+### Installation with Lazy.nvim
+
+```lua
+return {
+    "bearded-giant/do-it.nvim",
+    config = function()
+        require("doit").setup()
+    end,
+}
+```
+
+### Basic Usage
+
+1. **Open todos**: `:Doit` or `<leader>td`
+2. **Add a todo**: Press `i` in the todo window
+3. **Toggle status**: Press `x` on a todo
+4. **Open notes**: `:DoItNotes` or `<leader>dn`
+
+## Installation Options
 
 ### Prerequisites
 
 - Neovim `>= 0.10.0`
 - [Lazy.nvim](https://github.com/folke/lazy.nvim) as your plugin manager
 
-### Using Lazy.nvim
+### Full Framework (Recommended)
 
 ```lua
 return {
     "bearded-giant/do-it.nvim",
     config = function()
         require("doit").setup({
-            -- optional configurations here...
+            modules = {
+                todos = { enabled = true },
+                notes = { enabled = true }
+            }
         })
     end,
 }
 ```
 
-`:Lazy sync` to install and sync the plugin, or relaunch Neovim.
+### Standalone Modules
 
-### Default Configuration
-
-Do-It.nvim comes with sensible defaults that you can customize as you like.  Defaults:
+Use individual modules without the framework:
 
 ```lua
-{
-    save_path = vim.fn.stdpath("data") .. "/doit_todos.json",  -- Data storage path
-    timestamp = {
-        enabled = true,         -- Show relative timestamps (e.g., @5m ago, @2h ago)
-    },
-    window = {
-        width = 55,             -- Width of the floating window
-        height = 20,            -- Height of the floating window
-        border = 'rounded',     -- Border style
-        position = 'center',    -- Window position: 'right', 'left', 'top', 'bottom', 'center',
-                                    -- 'top-right', 'top-left', 'bottom-right', 'bottom-left'
-        padding = {
-            top = 1,
-            bottom = 1,
-            left = 2,
-            right = 2,
-        },
-    },
-    formatting = {              -- To-do formatting
-        pending = {
-            icon = "○",
-            format = { "icon", "notes_icon", "text", "due_date", "ect" },
-        },
-        in_progress = {
-            icon = "◐",
-            format = { "icon", "text", "due_date", "ect" },
-        },
-        done = {
-            icon = "✓",
-            format = { "icon", "notes_icon", "text", "due_date", "ect" },
-        },
-    },
-    quick_keys = true, 
-    notes = {
-        icon = "📓",
-    },
-    scratchpad = {
-        syntax_highlight = "markdown",
-    },
-    keymaps = {
-        toggle_window = "<leader>td",
-        new_todo = "i",
-        toggle_todo = "x",
-        delete_todo = "d",
-        delete_completed = "D",
-        delete_confirmation = "<Y>",
-        close_window = "q",
-        undo_delete = "u",
-        add_due_date = "H",
-        remove_due_date = "r",
-        toggle_help = "?",
-        toggle_tags = "t",
-        toggle_priority = "<Space>",
-        clear_filter = "c",
-        edit_todo = "e",
-        edit_tag = "e",
-        edit_priorities = "p",
-        delete_tag = "d",
-        search_todos = "/",
-        add_time_estimation = "T",
-        remove_time_estimation = "R",
-        import_todos = "I",
-        export_todos = "E",
-        remove_duplicates = "<leader>D",
-        open_todo_scratchpad = "<leader>p",
-        reorder_todo = "r",
-        move_todo_up = "k",
-        move_todo_down = "j",
-    },
-    calendar = {
-        language = "en",
-        icon = "",
-        keymaps = {
-            previous_day = "h",
-            next_day = "l",
-            previous_week = "k",
-            next_week = "j",
-            previous_month = "H",
-            next_month = "L",
-            select_day = "<CR>",
-            close_calendar = "q",
-        },
-    },
-    priorities = {
-        { name = "critical", weight = 16 },
-        {
-            name = "urgent",
-            weight = 8,
-        },
-        {
-            name = "important",
-            weight = 4,
-        },
-    },
-    priority_groups = {
-        critical = {
-            members = { "critical" },
-            color = "#FF0000",
-        },
-        high = {
-            members = { "urgent" },
-            color = nil,
-            hl_group = "DiagnosticError",
-        },
-        medium = {
-            members = { "important" },
-            color = nil,
-            hl_group = "DiagnosticWarn",
-        },
-    },
-    hour_score_value = 1/8,
+-- Just todos
+return {
+    "bearded-giant/do-it.nvim",
+    config = function()
+        require("doit_todos").setup()
+    end,
+}
+
+-- Just notes
+return {
+    "bearded-giant/do-it.nvim",
+    config = function()
+        require("doit_notes").setup()
+    end,
 }
 ```
 
 ## Commands
 
-Do-It.nvim provides several commands to get things done:
+- `:Doit` - Opens the main to-do window
+- `:Doit add [text]` - Adds a new to-do
+  - `-p, --priority [name]` - Set priority (e.g., "important", "urgent")
+- `:Doit list` - Lists all to-dos with their metadata
+- `:Doit set [index] [field] [value]` - Modifies to-do properties
+- `:DoItList` - Toggle a floating window with active to-dos
+- `:DoItNotes` - Toggle the project notes window
 
-- `:doit` - Opens the main window
-- `:doit add [text]` - Adds a new to-do
-  - `-p, --priority [name]` - Name of the priority to assign (e.g. "important" or "urgent")
-- `:doit list` - Lists all to-dos with their indices and metadata
-- `:doit set [index] [field] [value]` - Modifies to-do properties
-  - `priorities` - Set/update priority (use "nil" to clear)
-  - `ect` - Set estimated completion time (e.g. "30m", "2h", "1d", "0.5w")
+## Keybindings
 
----
-
-## Keybinds
-
-#### Main Window
-
-| Key           | Action                        |
+| Key           | Action                      |
 |--------------|------------------------------|
-| `<leader>td` | Toggle to-do window           |
-| `i`          | Add new to-do                 |
-| `x`          | Toggle status                 |
-| `d`          | Delete current to-do          |
-| `D`          | Delete all completed          |
-| `q`          | Close window                  |
-| `H`          | Add due date                  |
-| `r`          | Remove due date               |
-| `T`          | Add time estimation           |
-| `R`          | Remove time estimation        |
-| `?`          | Toggle help window            |
-| `t`          | Toggle tags window            |
-| `c`          | Clear active tag filter       |
-| `e`          | Edit to-do                    |
-| `p`          | Edit priorities               |
-| `u`          | Undo delete                   |
-| `/`          | Search to-dos                 |
-| `I`          | Import to-dos                 |
-| `E`          | Export to-dos                 |
-| `<leader>D`  | Remove duplicates             |
-| `<Space>`    | Toggle priority               |
-| `<leader>p`  | Open scratchpad               |
-| `r`          | Enter reordering mode         |
+| `<leader>td` | Toggle to-do window          |
+| `<leader>dl` | Toggle active to-dos list    |
+| `<leader>dn` | Toggle project notes window  |
+| `i`          | Add new to-do                |
+| `x`          | Toggle to-do status          |
+| `d`          | Delete current to-do         |
+| `H`          | Add due date                 |
+| `t`          | Toggle tags window           |
+| `p`          | Edit priorities              |
+| `/`          | Search to-dos                |
+| `r`          | Enter reordering mode        |
 
-#### Reordering to-dos
+See `:help doit-keybindings` for a full list of keybindings.
 
-| Key    | Action                        |
-|--------|------------------------------|
-| `k`    | Move to-do up                  |
-| `j`    | Move to-do down                |
-| `r`    | Save and exit reordering |
+## Modules
 
-#### Tags Window
+### Todos Module
 
-| Key    | Action        |
-|--------|--------------|
-| `e`    | Edit tag     |
-| `d`    | Delete tag   |
-| `<CR>` | Filter by tag|
-| `q`    | Close window |
+The todos module provides task management functionality:
 
-#### Calendar Window
+- Create, edit, and organize to-dos
+- Tag-based filtering and organization
+- Priority-based sorting
+- Due dates with calendar integration
+- Time estimation tracking
+- Import/export capabilities
 
-| Key    | Action              |
-|--------|-------------------|
-| `h`    | Previous day       |
-| `l`    | Next day          |
-| `k`    | Previous week     |
-| `j`    | Next week         |
-| `H`    | Previous month    |
-| `L`    | Next month        |
-| `<CR>` | Select date       |
-| `q`    | Close calendar    |
+### Notes Module
 
----
+The notes module provides project-specific notes:
 
-## Roadmap...Sort of
+- Project-specific notes based on Git repository
+- Global notes mode for system-wide documentation
+- Markdown syntax highlighting
+- Floating window interface
+- Automatic saving
+
+## Documentation
+
+- **User Guide**: See `:help doit` in Neovim
+- **Framework Documentation**: `:help doit-framework`
+- **Developer Documentation**: [docs/](./docs/) directory
+- **API Reference**: `:help doit-api`
+
+## Configuration
+
+See `:help doit-configuration` for the full list of configuration options. Here's a minimal example:
+
+```lua
+require("doit").setup({
+    modules = {
+        todos = {
+            -- Custom todos configuration
+        },
+        notes = {
+            -- Custom notes configuration
+        }
+    }
+})
+```
+
+## Lualine Integration
+
+Add your active to-do to Lualine:
+
+```lua
+require("lualine").setup({
+  sections = {
+    lualine_c = {
+      -- Other components...
+      { require("doit").lualine.active_todo }
+    }
+  }
+})
+```
+
+## Contributing
+
+See the [developer documentation](./docs/) for:
+- [Development setup and debugging](./docs/development/DEVELOPMENT.md)
+- [Framework architecture](./docs/development/framework.md)
+- [Module development guide](./docs/modules/)
+- [Implementation notes](./docs/implementation/)
+
+## Roadmap
 
 - [x] Reorder To-dos
 - [x] Active To-do to Top
-- [ ] Named (and Multiple) To-do Lists
+- [x] Project Notes
+- [x] Modular Framework
+- [ ] Named (Multiple) To-do Lists
 - [ ] To-do Categories View
-
----
+- [ ] Cross-module Integration
+- [ ] Custom Module Registry
 
 ## Acknowledgments
 
-Do-It.nvim is FOR SURE based on [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin that inspired this fork.
+Do-It.nvim is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin.
+
+The project notes feature was inspired by maple.nvim's project notes functionality.
+
+The framework architecture was inspired by other modular Neovim plugins like mini.nvim and snack.nvim.

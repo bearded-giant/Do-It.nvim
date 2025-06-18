@@ -1,246 +1,348 @@
 local M = {}
 
-local config = require("doit.config")
-local state = require("doit.state")
-local ui = require("doit.ui")
-local main_window = ui.main_window
-local todo_actions = ui.todo_actions
+-- Framework version
+M.version = "2.0.0"
 
-M.state = state
-M.ui = ui
-
+-- Setup function for the entire framework
 function M.setup(opts)
-	config.setup(opts)
-	state.load_todos()
+    opts = opts or {}
+    
+    -- Ensure modules table exists
+    if not opts.modules then
+        opts.modules = {}
+    end
+    
+    -- Initialize core
+    M.core = require("doit.core").setup(opts)
+    
+    -- Ensure core.ui is initialized
+    if M.core and not M.core.ui then
+        M.core.ui = require("doit.core.ui").setup()
+    end
+    
+    -- Initialize registry and discover modules
+    if M.core and M.core.registry then
+        -- Auto-discover modules if enabled
+        if opts.plugins and opts.plugins.auto_discover then
+            M.core.registry.discover()
+        end
+    end
+    
+    -- Discover modules if enabled (legacy mode)
+    if opts.plugins and opts.plugins.auto_discover then
+        local plugins = require("doit.core.plugins")
+        local discovered = plugins.discover_modules()
+        
+        for _, name in ipairs(discovered) do
+            local module_opts = opts.modules[name] or {}
+            if module_opts.enabled ~= false then
+                M.load_module(name, module_opts)
+            end
+        end
+    end
+    
+    -- Load explicitly configured modules
+    for name, module_opts in pairs(opts.modules) do
+        if module_opts.enabled ~= false and not M[name] then
+            M.load_module(name, module_opts)
+        end
+    end
+    
+    -- Legacy behavior: Always load todos and notes modules if not disabled
+    if not M.todos and (not opts.modules or (opts.modules.todos and opts.modules.todos.enabled ~= false)) then
+        M.load_module("todos", (opts.modules and opts.modules.todos) or {})
+    end
+    
+    if not M.notes and (not opts.modules or (opts.modules.notes and opts.modules.notes.enabled ~= false)) then
+        M.load_module("notes", (opts.modules and opts.modules.notes) or {})
+    end
+    
+    -- Forward old API calls for backwards compatibility
+    M.state = M.todos and M.todos.state or {}
+    M.ui = {}
+    
+    if M.todos then
+        -- Forward state functions
+        for name, func in pairs(M.todos.state) do
+            if type(func) == "function" and not M.state[name] then
+                M.state[name] = func
+            end
+        end
+        
+        -- Forward UI components
+        for name, component in pairs(M.todos.ui) do
+            M.ui[name] = component
+        end
+    end
+    
+    if M.notes then
+        -- Forward notes UI
+        M.ui.notes_window = M.notes.ui.notes_window
+    end
+    
+    -- Add lualine component
+    M.lualine = require("doit.lualine")
+    
+    -- Register module commands to ensure they're available
+    M.register_module_commands()
+    
+    -- Create dashboard function
+    function M.show_dashboard()
+        local dashboard_buf = vim.api.nvim_create_buf(false, true)
+        local width = 70
+        local height = 40
+        local ui = vim.api.nvim_list_uis()[1]
+        local row = math.floor((ui.height - height) / 2)
+        local col = math.floor((ui.width - width) / 2)
+        
+        local dashboard_win = vim.api.nvim_open_win(dashboard_buf, true, {
+            relative = "editor",
+            row = row,
+            col = col,
+            width = width,
+            height = height,
+            style = "minimal",
+            border = "rounded",
+            title = " DoIt Dashboard ",
+            title_pos = "center",
+        })
+        
+        -- Create content for the dashboard
+        local content = {
+            "",
+            "          ██████╗  ██████╗     ██╗████████╗",
+            "          ██╔══██╗██╔═══██╗    ██║╚══██╔══╝",
+            "          ██║  ██║██║   ██║    ██║   ██║   ",
+            "          ██║  ██║██║   ██║    ██║   ██║   ",
+            "          ██████╔╝╚██████╔╝    ██║   ██║   ",
+            "          ╚═════╝  ╚═════╝     ╚═╝   ╚═╝   ",
+            "",
+            "                    .--.",
+            "                   /  ..|",
+            "                  /  /  |",
+            "                 /  /   |",
+            "      _.-._     /  /   /",
+            "     | | | `._ /  /   /",
+            "     | | |  | `   /   /",
+            "     | | |  | |   /   /",
+            "     | | |  | |   /   /",
+            "     | | |  | |\\    /",
+            "     | | |  | | \\   \\",
+            "     | | |  / |  \\   \\",
+            "     | | |  | |   \\   \\",
+            "     | |.'  | |    \\   .",
+            "     | |    | |     \\   \\",
+            "     | |    | |      \\   .",
+            "     | |    | |       \\   .",
+            "     | |    | |        \\   .",
+            "",
+            "  Framework Version: " .. M.version,
+            "",
+        }
+        
+        -- Get modules from registry if available
+        local registry_modules = {}
+        if M.core and M.core.registry then
+            registry_modules = M.core.registry.list()
+        end
+        
+        if #registry_modules > 0 then
+            table.insert(content, "  Registered Modules:")
+            for _, module in ipairs(registry_modules) do
+                local version = module.version and (" (v" .. module.version .. ")") or ""
+                local author = module.author and (" by " .. module.author) or ""
+                local custom = module.custom and " [custom]" or ""
+                table.insert(content, "  • " .. module.name .. version .. custom .. author)
+            end
+        else
+            -- Fallback to loaded modules if registry is not available
+            table.insert(content, "  Loaded Modules:")
+            for name, module in pairs(M) do
+                if type(module) == "table" and module.version then
+                    table.insert(content, "  • " .. name .. " (v" .. module.version .. ")")
+                end
+            end
+        end
+        
+        -- Add section divider
+        table.insert(content, "")
+        
+        -- Add system stats
+        if M.todos then
+            if M.todos.state.todo_lists then
+                -- New multi-list stats
+                local active_list = M.todos.state.todo_lists.active or "default"
+                local todo_count = #(M.todos.state.todos or {})
+                local lists = M.todos.state.get_available_lists()
+                local list_count = #lists
+                
+                table.insert(content, "  Todo Lists: " .. list_count)
+                table.insert(content, "  Active List: " .. active_list)
+                table.insert(content, "  Todo Count: " .. todo_count)
+            else
+                -- Legacy single list stats
+                table.insert(content, "  Todo Count: " .. #(M.todos.state.todos or {}))
+            end
+        end
+        
+        -- Add commands section
+        table.insert(content, "")
+        table.insert(content, "  Available Commands:")
+        table.insert(content, "  • :DoIt - Open main todo window")
+        
+        if M.todos then
+            table.insert(content, "  • :DoItList - Open quick todo list")
+            table.insert(content, "  • :DoItLists - Manage todo lists")
+        end
+        
+        if M.notes then 
+            table.insert(content, "  • :DoItNotes - Open notes interface")
+        end
+        
+        -- Add plugin management commands
+        if M.core and M.core.registry then
+            table.insert(content, "")
+            table.insert(content, "  Plugin Management Commands:")
+            table.insert(content, "  • :DoItPlugins list - List available plugins")
+            table.insert(content, "  • :DoItPlugins info <name> - Show plugin details")
+            table.insert(content, "  • :DoItPlugins install <name> <path> - Install custom plugin")
+            table.insert(content, "  • :DoItPlugins discover - Discover new plugins")
+        end
+        
+        -- Add keybinding to close and fun quotes
+        table.insert(content, "")
+        table.insert(content, "  \"Do It. Just... Do It!\"")
+        table.insert(content, "")
+        table.insert(content, "  Press 'q' to close this dashboard")
+        
+        -- Set buffer content and options
+        vim.api.nvim_buf_set_lines(dashboard_buf, 0, -1, false, content)
+        vim.api.nvim_buf_set_option(dashboard_buf, "modifiable", false)
+        
+        -- Set up keymaps
+        vim.keymap.set("n", "q", function()
+            vim.api.nvim_win_close(dashboard_win, true)
+        end, { buffer = dashboard_buf, nowait = true })
+    end
+    
+    return M
+end
 
-	-- Primary user commands
-	-- :Doit - Main command
-	vim.api.nvim_create_user_command("Doit", function(opts)
-		local args = vim.split(opts.args, "%s+", { trimempty = true })
-		if #args == 0 then
-			-- No args => toggle the main todo window
-			main_window.toggle_todo_window()
-			return
-		end
+-- Register commands from modules to ensure they're available in all modes
+function M.register_module_commands()
+    -- Create standard commands
+    local commands = {
+        DoIt = {
+            callback = function()
+                if M.todos and M.todos.ui and M.todos.ui.main_window then
+                    M.todos.ui.main_window.toggle_todo_window()
+                elseif M.ui and M.ui.main_window then
+                    -- Legacy fallback
+                    M.ui.main_window.toggle_todo_window()
+                else
+                    vim.notify("Todo module not available", vim.log.levels.ERROR)
+                end
+            end,
+            opts = {
+                desc = "Toggle todo window"
+            }
+        },
+        DoItList = {
+            callback = function()
+                if M.todos and M.todos.ui and M.todos.ui.list_window then
+                    M.todos.ui.list_window.toggle_list_window()
+                elseif M.ui and M.ui.list_window then
+                    -- Legacy fallback
+                    M.ui.list_window.toggle_list_window()
+                else
+                    vim.notify("Todo module not available", vim.log.levels.ERROR)
+                end
+            end,
+            opts = {
+                desc = "Toggle todo list window"
+            }
+        },
+        DoItNotes = {
+            callback = function()
+                if M.notes and M.notes.ui and M.notes.ui.notes_window then
+                    M.notes.ui.notes_window.toggle_notes_window()
+                elseif M.ui and M.ui.notes_window then
+                    -- Legacy fallback
+                    M.ui.notes_window.toggle_notes_window()
+                else
+                    vim.notify("Notes module not available", vim.log.levels.ERROR)
+                end
+            end,
+            opts = {
+                desc = "Toggle notes window"
+            }
+        },
+        DoItLists = {
+            callback = function()
+                if M.todos and M.todos.ui and M.todos.ui.list_manager_window then
+                    M.todos.ui.list_manager_window.toggle_window()
+                else
+                    vim.notify("List manager not available", vim.log.levels.ERROR)
+                end
+            end,
+            opts = {
+                desc = "Manage todo lists"
+            }
+        }
+    }
+    
+    -- Register each command
+    for name, cmd in pairs(commands) do
+        -- Check if command already exists
+        local exists = pcall(function() 
+            vim.api.nvim_get_commands({})
+            return vim.api.nvim_get_commands({})[name] ~= nil
+        end)
+        
+        if not exists then
+            pcall(vim.api.nvim_create_user_command, name, cmd.callback, cmd.opts or {})
+        end
+    end
+end
 
-		local command = args[1]
-		table.remove(args, 1) -- Remove the command from the front
-
-		if command == "add" then
-			--------------------------------------------------
-			-- doit add [arguments...]
-			--------------------------------------------------
-			-- Possible usage:
-			-- :doit add some text
-			-- :doit add -p priority1,priority2 "some text"
-			--
-			-- This block handles parsing out -p / --priorities and then
-			-- adds the todo to state
-			local priorities = nil
-			local todo_text = ""
-
-			local i = 1
-			while i <= #args do
-				if args[i] == "-p" or args[i] == "--priorities" then
-					-- If we see -p or --priorities, the next item in args
-					-- is a comma-separated list of priorities
-					if i + 1 <= #args then
-						local priority_str = args[i + 1]
-						local priority_list = vim.split(priority_str, ",", { trimempty = true })
-
-						local valid_priorities = {}
-						local invalid_priorities = {}
-						for _, p in ipairs(priority_list) do
-							local is_valid = false
-							for _, config_p in ipairs(config.options.priorities) do
-								if p == config_p.name then
-									is_valid = true
-									table.insert(valid_priorities, p)
-									break
-								end
-							end
-							if not is_valid then
-								table.insert(invalid_priorities, p)
-							end
-						end
-
-						if #invalid_priorities > 0 then
-							vim.notify(
-								"Invalid priorities: " .. table.concat(invalid_priorities, ", "),
-								vim.log.levels.WARN,
-								{ title = "doit" }
-							)
-						end
-
-						if #valid_priorities > 0 then
-							priorities = valid_priorities
-						end
-
-						i = i + 2 -- Skip past the flag and its argument
-					else
-						vim.notify("Missing priority value after " .. args[i], vim.log.levels.ERROR, { title = "doit" })
-						return
-					end
-				else
-					-- Everything else is part of the to-do text
-					todo_text = todo_text .. " " .. args[i]
-					i = i + 1
-				end
-			end
-
-			todo_text = vim.trim(todo_text)
-			if todo_text ~= "" then
-				-- Actually add the todo
-				state.add_todo(todo_text, priorities)
-
-				local msg = "Todo created: " .. todo_text
-				if priorities then
-					msg = msg .. " (priorities: " .. table.concat(priorities, ", ") .. ")"
-				end
-				vim.notify(msg, vim.log.levels.INFO, { title = "doit" })
-			end
-		elseif command == "list" then
-			--------------------------------------------------
-			-- doit list
-			--------------------------------------------------
-			-- Shows all todos, printed with `:messages`
-			for i, todo in ipairs(state.todos) do
-				local status = todo.done and "✓" or "○"
-
-				-- Collect metadata
-				local metadata = {}
-				if todo.priorities and #todo.priorities > 0 then
-					table.insert(metadata, "priorities: " .. table.concat(todo.priorities, ", "))
-				end
-				if todo.due_date then
-					table.insert(metadata, "due: " .. todo.due_date)
-				end
-				if todo.estimated_hours then
-					table.insert(metadata, string.format("estimate: %.1fh", todo.estimated_hours))
-				end
-
-				local score = state.get_priority_score(todo)
-				table.insert(metadata, string.format("score: %.1f", score))
-
-				local metadata_text = #metadata > 0 and (" (" .. table.concat(metadata, ", ") .. ")") or ""
-
-				vim.notify(string.format("%d. %s %s%s", i, status, todo.text, metadata_text), vim.log.levels.INFO)
-			end
-		elseif command == "set" then
-			--------------------------------------------------
-			-- doit set <index> <field> <value>
-			--------------------------------------------------
-			-- Example usage:
-			-- :doit set 3 priorities p1,p2
-			-- :doit set 2 ect 2h
-			--
-			if #args < 3 then
-				vim.notify("Usage: doit set <index> <field> <value>", vim.log.levels.ERROR)
-				return
-			end
-
-			local index = tonumber(args[1])
-			if not index or not state.todos[index] then
-				vim.notify("Invalid todo index: " .. args[1], vim.log.levels.ERROR)
-				return
-			end
-
-			local field = args[2]
-			local value = args[3]
-
-			if field == "priorities" then
-				-- If user typed "nil", it means clear priorities
-				if value == "nil" then
-					state.todos[index].priorities = nil
-					state.save_todos()
-					vim.notify("Cleared priorities for todo " .. index, vim.log.levels.INFO)
-				else
-					local priority_list = vim.split(value, ",", { trimempty = true })
-					local valid_priorities = {}
-					local invalid_priorities = {}
-
-					for _, p in ipairs(priority_list) do
-						local is_valid = false
-						for _, config_p in ipairs(config.options.priorities) do
-							if p == config_p.name then
-								is_valid = true
-								table.insert(valid_priorities, p)
-								break
-							end
-						end
-						if not is_valid then
-							table.insert(invalid_priorities, p)
-						end
-					end
-
-					if #invalid_priorities > 0 then
-						vim.notify(
-							"Invalid priorities: " .. table.concat(invalid_priorities, ", "),
-							vim.log.levels.WARN
-						)
-					end
-
-					if #valid_priorities > 0 then
-						state.todos[index].priorities = valid_priorities
-						state.save_todos()
-						vim.notify("Updated priorities for todo " .. index, vim.log.levels.INFO)
-					end
-				end
-			elseif field == "ect" then
-				-- Use the parse_time_estimation from the newly refactored todo_actions
-				local hours, err = todo_actions.parse_time_estimation(value)
-				if hours then
-					state.todos[index].estimated_hours = hours
-					state.save_todos()
-					vim.notify("Updated estimated completion time for todo " .. index, vim.log.levels.INFO)
-				else
-					vim.notify("Error: " .. (err or "Invalid time format"), vim.log.levels.ERROR)
-				end
-			else
-				vim.notify("Unknown field: " .. field, vim.log.levels.ERROR)
-			end
-		else
-			-- If no recognized subcommand, just toggle the window
-			main_window.toggle_todo_window()
-		end
-	end, {
-		desc = "Toggle Todo List window or add new todo",
-		nargs = "*",
-		complete = function(arglead, cmdline, cursorpos)
-			local args = vim.split(cmdline, "%s+", { trimempty = true })
-			if #args <= 2 then
-				return { "add", "list", "set" }
-			elseif args[1] == "set" and #args == 3 then
-				return { "priorities", "ect" }
-			elseif args[1] == "set" and (args[3] == "priorities") then
-				local priorities = { "nil" } -- Let user type "nil" to clear
-				for _, p in ipairs(config.options.priorities) do
-					table.insert(priorities, p.name)
-				end
-				return priorities
-			elseif args[#args - 1] == "-p" or args[#args - 1] == "--priorities" then
-				-- Return available priorities for completion
-				local priorities = {}
-				for _, p in ipairs(config.options.priorities) do
-					table.insert(priorities, p.name)
-				end
-				return priorities
-			elseif #args == 3 then
-				return { "-p", "--priorities" }
-			end
-			return {}
-		end,
-	})
-
-	-- Set up development tools if enabled
-	require("doit.development").setup()
-
-	if config.options.keymaps.toggle_window then
-		vim.keymap.set("n", config.options.keymaps.toggle_window, function()
-			main_window.toggle_todo_window()
-		end, { desc = "Toggle Todo List" })
-	end
+-- Load a specific module
+function M.load_module(name, opts)
+    local core = M.core
+    local registry = core and core.registry
+    
+    -- Try loading via registry first if available
+    if registry and registry.is_registered(name) then
+        local module, err = registry.initialize_module(name, opts)
+        if module then
+            M[name] = module
+            return module
+        else
+            vim.notify("Do-It.nvim: Failed to load module '" .. name .. "': " .. (err or "Unknown error"), vim.log.levels.WARN)
+            return nil
+        end
+    end
+    
+    -- Fallback to direct loading
+    local success, module = pcall(require, "doit.modules." .. name)
+    
+    if success and module then
+        -- Register the module in the registry if available
+        if registry then
+            local metadata = module.metadata or {
+                name = name,
+                path = "doit.modules." .. name,
+                version = module.version
+            }
+            registry.register(name, metadata)
+        end
+        
+        -- Initialize the module
+        M[name] = module.setup(opts)
+        return M[name]
+    else
+        vim.notify("Do-It.nvim: Failed to load module '" .. name .. "'", vim.log.levels.WARN)
+        return nil
+    end
 end
 
 return M
-

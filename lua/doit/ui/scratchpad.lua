@@ -18,10 +18,46 @@ function M.open_todo_scratchpad(win_id)
 		vim.notify("No todo selected", vim.log.levels.WARN)
 		return
 	end
-
-	if todo.notes == nil then
-		todo.notes = ""
-	end
+    
+    -- Check if we should use the notes module instead
+    local core = package.loaded["doit.core"]
+    local notes_module = core and core.get_module and core.get_module("notes")
+    
+    if notes_module and todo.id then
+        -- Use the notes module for a richer experience
+        if not todo.note_id then
+            -- Create a new note linked to this todo
+            local new_note = {
+                content = todo.notes or "",
+                title = "Notes for: " .. todo.text:sub(1, 30) .. (todo.text:len() > 30 and "..." or ""),
+                metadata = {
+                    todo_id = todo.id
+                }
+            }
+            
+            -- Save the note and update todo with the note ID
+            local saved = notes_module.state.save_notes(new_note)
+            if saved then
+                local current_notes = notes_module.state.get_current_notes()
+                todo.note_id = current_notes.id
+                todo.note_summary = notes_module.state.generate_summary(current_notes.content)
+                state.save_todos()
+                
+                -- Open the notes window
+                notes_module.ui.notes_window.toggle_notes_window()
+                return
+            end
+        else
+            -- Open existing linked note
+            notes_module.ui.notes_window.toggle_notes_window()
+            return
+        end
+    end
+    
+    -- Fallback to the old notes implementation if notes module not available
+    if todo.notes == nil then
+        todo.notes = ""
+    end
 
 	local function is_valid_filetype(filetype)
 		local syntax_file = vim.fn.globpath(vim.o.runtimepath, "syntax/" .. filetype .. ".vim")
