@@ -10,10 +10,8 @@ local category_window = require("doit.ui.category_window")
 local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
 
--- Get reference to the todos module
 local core = require("doit.core")
 
--- Initialize core.ui if it's not already initialized
 if not core.ui then
     core.ui = require("doit.core.ui").setup()
 end
@@ -32,7 +30,6 @@ function M.get_window_id()
     return win_id
 end
 
--- smaller "quick keys" UI below main window (optional)
 local function create_small_keys_window(main_win_pos)
 	if not config.options.quick_keys then
 		return nil
@@ -90,11 +87,8 @@ local function create_small_keys_window(main_win_pos)
 		footer_pos = "center",
 	})
 
-	-- Basic highlighting
 	local ns = vim.api.nvim_create_namespace("doit_small_keys")
 	for i = 1, #lines do
-		-- you can highlight lines or columns here as needed
-		-- e.g. vim.api.nvim_buf_add_highlight(small_buf, ns, "String", i-1, 0, -1)
 	end
 
 	return small_win
@@ -159,7 +153,6 @@ function M.render_todos()
 	if state.active_category then
 		table.insert(lines, "")
 		
-		-- Get category name from module if possible
 		local category_name = state.active_category
 		if todo_module and todo_module.state and todo_module.state.categories_by_id 
 			and todo_module.state.categories_by_id[state.active_category] then
@@ -173,16 +166,13 @@ function M.render_todos()
 		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
 		local show_by_category = true
 		
-		-- Handle category filtering
 		if state.active_category then
 			if todo_module and todo_module.state and todo_module.state.get_todo_category then
-				-- Use new module system for category determination
 				local todo_category_id = todo_module.state.get_todo_category(todo.id)
 				show_by_category = (todo_category_id == state.active_category) or
 								  (state.active_category == "uncategorized" and 
 								   (todo_category_id == "uncategorized" or not todo_category_id))
 			else
-				-- Fallback to legacy category handling
 				show_by_category = (todo.category == state.active_category) or
 								  (state.active_category == "Uncategorized" and 
 								   (not todo.category or todo.category == ""))

@@ -1,4 +1,3 @@
--- Logic for parsing dates & adding/removing due dates
 
 local vim = vim
 

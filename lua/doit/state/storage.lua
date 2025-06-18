@@ -1,4 +1,3 @@
--- Handles loading/saving from disk, plus importing/exporting.
 
 local vim = vim
 
@@ -31,7 +30,7 @@ function Storage.setup(M, config)
 
 				local needs_migration = false
 				
-				-- Migration: Add order_index if missing
+				-- Migration: Add order_index field to older todos
 				for i, todo in ipairs(M.todos) do
 					if not todo.order_index then
 						todo.order_index = i
@@ -39,7 +38,7 @@ function Storage.setup(M, config)
 					end
 				end
 				
-				-- Migration: Convert priorities from array to string
+				-- Migration: Convert legacy array priorities to single string
 				for _, todo in ipairs(M.todos) do
 					if todo.priorities and type(todo.priorities) == "table" then
 						local highest_priority = nil
@@ -79,7 +78,6 @@ function Storage.setup(M, config)
 			return false, "Error parsing JSON file"
 		end
 
-		-- Merge
 		for _, todo in ipairs(imported_todos) do
 			table.insert(M.todos, todo)
 		end
