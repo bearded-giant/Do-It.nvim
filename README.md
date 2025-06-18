@@ -20,56 +20,67 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Import/Export** - Backup or share your tasks
 - **Lualine Integration** - Show active tasks in your statusline
 
-## Installation
+## Quick Start
+
+### Installation with Lazy.nvim
+
+```lua
+return {
+    "bearded-giant/do-it.nvim",
+    config = function()
+        require("doit").setup()
+    end,
+}
+```
+
+### Basic Usage
+
+1. **Open todos**: `:Doit` or `<leader>td`
+2. **Add a todo**: Press `i` in the todo window
+3. **Toggle status**: Press `x` on a todo
+4. **Open notes**: `:DoItNotes` or `<leader>dn`
+
+## Installation Options
 
 ### Prerequisites
 
 - Neovim `>= 0.10.0`
 - [Lazy.nvim](https://github.com/folke/lazy.nvim) as your plugin manager
 
-### Full Framework
+### Full Framework (Recommended)
 
 ```lua
 return {
     "bearded-giant/do-it.nvim",
     config = function()
         require("doit").setup({
-            -- Framework configuration
             modules = {
-                todos = {
-                    -- Todos module configuration
-                },
-                notes = {
-                    -- Notes module configuration
-                }
+                todos = { enabled = true },
+                notes = { enabled = true }
             }
         })
     end,
 }
 ```
 
-### Individual Modules
+### Standalone Modules
 
-You can also use just the modules you need:
+Use individual modules without the framework:
 
 ```lua
--- Just the todos module
+-- Just todos
 return {
     "bearded-giant/do-it.nvim",
     config = function()
-        require("doit_todos").setup({
-            -- Todos configuration
-        })
+        require("doit_todos").setup()
     end,
 }
 
--- Just the notes module
+-- Just notes
 return {
     "bearded-giant/do-it.nvim",
     config = function()
-        require("doit_notes").setup({
-            -- Notes configuration
-        })
+        require("doit_notes").setup()
     end,
 }
 ```
@@ -125,95 +136,28 @@ The notes module provides project-specific notes:
 - Floating window interface
 - Automatic saving
 
-## Framework Architecture
+## Documentation
 
-Do-It.nvim 2.0 introduces a modular framework that allows components to work independently or together. This architecture enables:
+- **User Guide**: See `:help doit` in Neovim
+- **Framework Documentation**: `:help doit-framework`
+- **Developer Documentation**: [docs/](./docs/) directory
+- **API Reference**: `:help doit-api`
 
-- Loading only the modules you need
-- Using modules standalone or together
-- Adding custom modules that integrate with the system
-- Extending functionality without modifying core code
+## Configuration
 
-See `:help doit-framework` for details on the framework architecture and module development.
-
-## Default Configuration
+See `:help doit-configuration` for the full list of configuration options. Here's a minimal example:
 
 ```lua
-{
-    -- Framework configuration
-    project = {
-        enabled = true,
-        detection = {
-            use_git = true,
-            fallback_to_cwd = true,
-        },
-        storage = {
-            path = vim.fn.stdpath("data") .. "/doit",
-        },
-    },
-    
-    plugins = {
-        auto_discover = true,
-        load_path = "doit.modules",
-    },
-    
-    -- Module configurations
+require("doit").setup({
     modules = {
-        -- Todos module
         todos = {
-            enabled = true,
-            save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
-            timestamp = { enabled = true },
-            window = {
-                width = 55,
-                height = 20,
-                border = "rounded",
-                position = "center",
-                padding = { top = 1, bottom = 1, left = 2, right = 2 },
-            },
-            list_window = {
-                width = 40,
-                height = 10,
-                position = "bottom-right",
-            },
-            formatting = {
-                pending = {
-                    icon = "○",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
-                },
-                in_progress = {
-                    icon = "◐",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
-                },
-                done = {
-                    icon = "✓",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
-                },
-            },
-            -- See :help doit-configuration for all options
+            -- Custom todos configuration
         },
-        
-        -- Notes module
         notes = {
-            enabled = true,
-            icon = "📓",
-            storage_path = vim.fn.stdpath("data") .. "/doit/notes",
-            mode = "project", -- "global" or "project"
-            window = {
-                width = 0.6,
-                height = 0.6,
-                border = "rounded",
-                title = " Notes ",
-                title_pos = "center",
-            },
-            keymaps = {
-                toggle = "<leader>dn",
-                close = "q",
-                switch_mode = "m",
-            },
-        },
+            -- Custom notes configuration
+        }
     }
-}
+})
 ```
 
 ## Lualine Integration
@@ -230,6 +174,14 @@ require("lualine").setup({
   }
 })
 ```
+
+## Contributing
+
+See the [developer documentation](./docs/) for:
+- [Development setup and debugging](./docs/development/DEVELOPMENT.md)
+- [Framework architecture](./docs/development/framework.md)
+- [Module development guide](./docs/modules/)
+- [Implementation notes](./docs/implementation/)
 
 ## Roadmap
 

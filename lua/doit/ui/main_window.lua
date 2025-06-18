@@ -473,7 +473,7 @@ local function create_window()
 				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			}
 		}
-	}
+	end
 	
 	local width = config.options.window.width
 	local height = config.options.window.height
