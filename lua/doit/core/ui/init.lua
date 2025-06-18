@@ -6,6 +6,7 @@ function M.setup()
     -- Ensure the window and theme modules are loaded
     M.window = require("doit.core.ui.window")
     M.theme = require("doit.core.ui.theme")
+    M.modal = require("doit.core.ui.modal")
     
     -- Provide forward functions from the window module
     M.create_float = M.window.create_float
