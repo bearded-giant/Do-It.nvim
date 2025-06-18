@@ -1,13 +1,10 @@
--- Window management utilities for doit.nvim
 local M = {}
 
--- Create a buffer
 function M.create_buffer(opts)
     opts = opts or {}
     
     local buf = vim.api.nvim_create_buf(false, true)
     
-    -- Apply buffer options
     if opts.filetype then
         vim.api.nvim_buf_set_option(buf, "filetype", opts.filetype)
     end
@@ -18,7 +15,6 @@ function M.create_buffer(opts)
     return buf
 end
 
--- Calculate window position
 function M.calculate_position(width, height, position)
     local pos = {
         row = 0,
@@ -28,7 +24,6 @@ function M.calculate_position(width, height, position)
     local editor_width = vim.o.columns
     local editor_height = vim.o.lines
     
-    -- Handle percentage dimensions
     if width <= 1 then
         width = math.floor(editor_width * width)
     end
@@ -37,7 +32,6 @@ function M.calculate_position(width, height, position)
         height = math.floor(editor_height * height)
     end
     
-    -- Position the window based on specified position
     if position == "center" then
         pos.row = math.floor((editor_height - height) / 2)
         pos.col = math.floor((editor_width - width) / 2)
@@ -75,22 +69,17 @@ function M.calculate_position(width, height, position)
     }
 end
 
--- Create a floating window
 function M.create_float(opts)
     opts = opts or {}
     
-    -- Create buffer if not provided
     local buf = opts.buf or M.create_buffer(opts)
     
-    -- Default values
     local width = opts.width or 50
     local height = opts.height or 15
     local position = opts.position or "center"
     
-    -- Calculate position
     local pos = M.calculate_position(width, height, position)
     
-    -- Window options
     local win_opts = {
         relative = opts.relative or "editor",
         width = pos.width,
@@ -101,16 +90,13 @@ function M.create_float(opts)
         border = opts.border or "rounded",
     }
     
-    -- Add title if provided
     if opts.title then
         win_opts.title = opts.title
         win_opts.title_pos = opts.title_pos or "center"
     end
     
-    -- Create window
     local win = vim.api.nvim_open_win(buf, opts.focus ~= false, win_opts)
     
-    -- Apply window options
     if opts.winblend then
         vim.api.nvim_win_set_option(win, "winblend", opts.winblend)
     end
@@ -126,7 +112,6 @@ function M.create_float(opts)
     return win, buf
 end
 
--- Close window
 function M.close(win)
     if win and vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
@@ -135,7 +120,6 @@ function M.close(win)
     return false
 end
 
--- Update window configuration
 function M.update_config(win, opts)
     if win and vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_set_config(win, opts)
@@ -144,7 +128,6 @@ function M.update_config(win, opts)
     return false
 end
 
--- Update window title
 function M.update_title(win, title, opts)
     if win and vim.api.nvim_win_is_valid(win) then
         local win_opts = {
@@ -157,7 +140,6 @@ function M.update_title(win, title, opts)
     return false
 end
 
--- Check if window is valid
 function M.is_valid(win)
     return win and vim.api.nvim_win_is_valid(win)
 end

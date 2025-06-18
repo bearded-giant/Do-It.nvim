@@ -1,4 +1,3 @@
--- These are only enabled when config.development_mode is true
 local M = {}
 local config
 
@@ -106,7 +105,7 @@ function M.start_debug_server_and_connect()
 			dap.continue()
 			vim.notify("DAP connected to debug server", vim.log.levels.INFO)
 		end)
-	end, 500) -- 500ms delay to ensure server is ready
+	end, 500) -- Delay to ensure server is ready
 end
 
 function M.check_dap_status()
