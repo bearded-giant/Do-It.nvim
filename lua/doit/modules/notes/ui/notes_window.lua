@@ -64,10 +64,52 @@ end
 
 -- Create window for notes
 function M.create_win()
-    local width = math.floor(vim.o.columns * config.window.width)
-    local height = math.floor(vim.o.lines * config.window.height)
-    local row = math.floor((vim.o.lines - height) / 2)
-    local col = math.floor((vim.o.columns - width) / 2)
+    -- Get window config, supporting both new and legacy config paths
+    local win_config = config.ui and config.ui.window or config.window
+    
+    local width, height
+    
+    -- Support both absolute and relative sizing
+    if win_config.use_relative then
+        width = math.floor(vim.o.columns * (win_config.relative_width or win_config.width))
+        height = math.floor(vim.o.lines * (win_config.relative_height or win_config.height))
+    else
+        -- Use absolute values or fall back to relative calculation
+        if type(win_config.width) == "number" and win_config.width > 1 then
+            width = win_config.width
+        else
+            width = math.floor(vim.o.columns * win_config.width)
+        end
+        
+        if type(win_config.height) == "number" and win_config.height > 1 then
+            height = win_config.height
+        else
+            height = math.floor(vim.o.lines * win_config.height)
+        end
+    end
+    
+    -- Calculate position based on config
+    local row, col
+    if win_config.position == "center" then
+        row = math.floor((vim.o.lines - height) / 2)
+        col = math.floor((vim.o.columns - width) / 2)
+    elseif win_config.position == "top-left" then
+        row = 2
+        col = 2
+    elseif win_config.position == "top-right" then
+        row = 2
+        col = vim.o.columns - width - 2
+    elseif win_config.position == "bottom-left" then
+        row = vim.o.lines - height - 2
+        col = 2
+    elseif win_config.position == "bottom-right" then
+        row = vim.o.lines - height - 2
+        col = vim.o.columns - width - 2
+    else
+        -- Default to center
+        row = math.floor((vim.o.lines - height) / 2)
+        col = math.floor((vim.o.columns - width) / 2)
+    end
     
     local mode_text = state.notes.current_mode == "global" and "Global Notes" or "Project Notes"
     
@@ -78,19 +120,19 @@ function M.create_win()
         row = row,
         col = col,
         style = "minimal",
-        border = config.window.border,
-        title = string.format("%s (%s)", config.window.title, mode_text),
-        title_pos = config.window.title_pos,
+        border = win_config.border,
+        title = string.format("%s (%s)", win_config.title, mode_text),
+        title_pos = win_config.title_pos,
     }
     
     if core and core.ui and core.ui.window then
         win = core.ui.create_float({
             buf = buf,
-            width = config.window.width,
-            height = config.window.height,
-            border = config.window.border,
-            title = string.format("%s (%s)", config.window.title, mode_text),
-            title_pos = config.window.title_pos,
+            width = win_config.width,
+            height = win_config.height,
+            border = win_config.border,
+            title = string.format("%s (%s)", win_config.title, mode_text),
+            title_pos = win_config.title_pos,
         })
     else
         win = api.nvim_open_win(buf, true, opts)
@@ -120,15 +162,18 @@ function M.update_title()
         return
     end
     
+    -- Get window config, supporting both new and legacy config paths
+    local win_config = config.ui and config.ui.window or config.window
+    
     local mode_text = state.notes.current_mode == "global" and "Global Notes" or "Project Notes"
     local opts = {
-        title = string.format("%s (%s)", config.window.title, mode_text),
-        title_pos = config.window.title_pos,
+        title = string.format("%s (%s)", win_config.title, mode_text),
+        title_pos = win_config.title_pos,
     }
     
     if core and core.ui and core.ui.window then
-        core.ui.update_window_title(win, string.format("%s (%s)", config.window.title, mode_text), 
-            { title_pos = config.window.title_pos })
+        core.ui.update_window_title(win, string.format("%s (%s)", win_config.title, mode_text), 
+            { title_pos = win_config.title_pos })
     else
         api.nvim_win_set_config(win, opts)
     end

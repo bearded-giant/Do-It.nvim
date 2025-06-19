@@ -4,15 +4,26 @@ local M = {}
 -- Default module configuration
 M.defaults = {
     enabled = true,
-    icon = "📓",
-    storage_path = vim.fn.stdpath("data") .. "/doit/notes",
-    mode = "project", -- "global" or "project"
-    window = {
-        width = 0.6,
-        height = 0.6,
-        border = "rounded",
-        title = " Notes ",
-        title_pos = "center",
+    ui = {
+        window = {
+            width = 80,  -- Width in columns
+            height = 30, -- Height in lines
+            border = "rounded",
+            title = " Notes ",
+            title_pos = "center",
+            position = "center", -- center, top-left, top-right, bottom-left, bottom-right
+            relative_width = 0.6,  -- Use this instead of width for percentage
+            relative_height = 0.6, -- Use this instead of height for percentage
+            use_relative = true,   -- Toggle between absolute and relative sizing
+        },
+        icons = {
+            note = "📓",
+            linked = "🔗",
+        },
+    },
+    storage = {
+        path = vim.fn.stdpath("data") .. "/doit/notes",
+        mode = "project", -- "global" or "project"
     },
     markdown = {
         highlight = true,   -- Enable or disable markdown highlighting
@@ -34,6 +45,18 @@ M.defaults = {
         italic = "<leader>i",  -- Make text italic
         link = "<leader>l",    -- Insert link
         list_item = "<leader>-", -- Insert list item
+    },
+    
+    -- Legacy configuration (backward compatibility)
+    icon = "📓",
+    storage_path = vim.fn.stdpath("data") .. "/doit/notes",
+    mode = "project",
+    window = {
+        width = 0.6,
+        height = 0.6,
+        border = "rounded",
+        title = " Notes ",
+        title_pos = "center",
     },
 }
 

@@ -145,20 +145,79 @@ The notes module provides project-specific notes:
 
 ## Configuration
 
-See `:help doit-configuration` for the full list of configuration options. Here's a minimal example:
+Do-It.nvim uses a nested configuration structure that separates core framework settings from module-specific options. This makes it easier to navigate and customize.
+
+### Configuration Structure
 
 ```lua
 require("doit").setup({
+    -- Core framework settings
+    development_mode = false,
+    quick_keys = true,
+    timestamp = { enabled = true },
+    lualine = { enabled = true, max_length = 30 },
+    project = {
+        enabled = true,
+        detection = { use_git = true, fallback_to_cwd = true },
+    },
+    
+    -- Module configurations
     modules = {
         todos = {
-            -- Custom todos configuration
+            enabled = true,
+            ui = {
+                window = {
+                    width = 55,
+                    height = 20,
+                    border = "rounded",
+                },
+                -- More UI settings...
+            },
+            formatting = {
+                pending = { icon = "○" },
+                in_progress = { icon = "◐" },
+                done = { icon = "✓" },
+            },
+            priorities = {
+                { name = "critical", weight = 16 },
+                { name = "urgent", weight = 8 },
+                { name = "important", weight = 4 },
+            },
+            -- More todos settings...
         },
         notes = {
-            -- Custom notes configuration
-        }
-    }
+            enabled = true,
+            ui = {
+                window = {
+                    -- Absolute sizing
+                    width = 80,   -- columns
+                    height = 30,  -- lines
+                    -- Or relative sizing
+                    relative_width = 0.6,   -- 60% of screen
+                    relative_height = 0.6,  -- 60% of screen
+                    use_relative = true,    -- toggle mode
+                    position = "center",    -- or top-left, bottom-right, etc.
+                },
+            },
+            storage = {
+                path = vim.fn.stdpath("data") .. "/doit/notes",
+                mode = "project", -- or "global"
+            },
+            -- More notes settings...
+        },
+    },
 })
 ```
+
+### Key Configuration Points
+
+- **Core settings** (top level): Framework-wide configurations like `development_mode`, `lualine`, and `project` detection
+- **Module settings** (`modules.todos` and `modules.notes`): Specific to each module, organized into logical groups like `ui`, `storage`, `formatting`, etc.
+- **Backward compatibility**: The plugin maintains support for the legacy flat configuration structure
+
+For a complete list of all configuration options with detailed descriptions, see [`lua/doit/config.lua`](./lua/doit/config.lua).
+
+Also see `:help doit-configuration` in Neovim for interactive documentation.
 
 ## Lualine Integration
 

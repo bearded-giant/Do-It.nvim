@@ -28,13 +28,15 @@ function M.setup(state, parent_module)
     
     -- Get storage path based on mode
     function M.get_storage_path(is_global)
-        local base_path = config.storage_path or vim.fn.stdpath("data") .. "/doit/notes"
+        -- Support both new and legacy config paths
+        local storage_config = config.storage or config
+        local base_path = storage_config.path or storage_config.storage_path or vim.fn.stdpath("data") .. "/doit/notes"
         
         -- Create the directory if it doesn't exist
         local mkdir_cmd = vim.fn.has("win32") == 1 and "mkdir" or "mkdir -p"
         vim.fn.system(mkdir_cmd .. " " .. vim.fn.shellescape(base_path))
         
-        if not is_global and config.mode == "project" then
+        if not is_global and (storage_config.mode or config.mode) == "project" then
             local project_id = M.get_project_identifier()
             if project_id then
                 local hash = vim.fn.sha256(project_id)

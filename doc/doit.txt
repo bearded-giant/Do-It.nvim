@@ -75,129 +75,118 @@ Then run `:Lazy sync` to install and sync the plugin, or relaunch Neovim.
 
 CONFIGURATION                                            *doit-configuration*
 
-The plugin can be configured by passing a table to the setup function.
-Here are the default settings:
+Do-It.nvim uses a nested configuration structure that separates core framework
+settings from module-specific options. This organization makes the configuration
+easier to navigate and understand.
+
+Configuration Structure Overview:
 >lua
     {
-        save_path = vim.fn.stdpath("data") .. "/doit_todos.json",  -- Data storage path
-        timestamp = {
-            enabled = true,         -- Show relative timestamps (e.g., @5m ago, @2h ago)
-        },
-        window = {
-            width = 55,             -- Width of the floating window
-            height = 20,            -- Height of the floating window
-            border = 'rounded',     -- Border style
-            position = 'center',    -- Window position: 'right', 'left', 'top', 'bottom', 'center',
-                                    -- 'top-right', 'top-left', 'bottom-right', 'bottom-left'
-            padding = {
-                top = 1,
-                bottom = 1,
-                left = 2,
-                right = 2,
-            },
-        },
-        list_window = {
-            width = 40,             -- Width of the active todos list window
-            height = 10,            -- Height of the active todos list window
-            position = 'bottom-right', -- Position of the active todos list window
-        },
-        lualine = {
-            enabled = true,         -- Enable lualine integration
-            max_length = 30,        -- Maximum length of the todo text in lualine
-        },
-        formatting = {              -- To-do formatting
-            pending = {
-                icon = "○",
-                format = { "icon", "notes_icon", "text", "due_date", "ect" },
-            },
-            in_progress = {
-                icon = "◐",
-                format = { "icon", "text", "due_date", "ect" },
-            },
-            done = {
-                icon = "✓",
-                format = { "icon", "notes_icon", "text", "due_date", "ect" },
-            },
-        },
-        quick_keys = true, 
+        -- Core framework settings (top level)
+        development_mode = false,
+        quick_keys = true,
+        timestamp = { enabled = true },
+        lualine = { enabled = true, max_length = 30 },
         project = {
             enabled = true,
             detection = {
-                use_git = true,                -- Use Git repository for project detection
-                fallback_to_cwd = true,        -- Fallback to working directory if no Git repo
-            },
-            storage = {
-                path = vim.fn.stdpath("data") .. "/doit/projects",
+                use_git = true,
+                fallback_to_cwd = true,
             },
         },
-        notes = {
-            enabled = true,                    -- Enable notes functionality
-            icon = "📓",                       -- Icon used in to-do lists
-            storage_path = vim.fn.stdpath("data") .. "/doit/notes",
-            mode = "project",                  -- Default mode: "global" or "project"
-            window = {
-                width = 0.6,                   -- Width as percentage of screen
-                height = 0.6,                  -- Height as percentage of screen
-                border = "rounded",            -- Border style
-                title = " Notes ",             -- Window title
-                title_pos = "center",          -- Title position
+        
+        -- Module configurations
+        modules = {
+            todos = {
+                enabled = true,
+                ui = {
+                    window = {
+                        width = 55,
+                        height = 20,
+                        border = "rounded",
+                        position = "center",
+                    },
+                    -- list_window, calendar, scratchpad...
+                },
+                formatting = {
+                    pending = { icon = "○" },
+                    in_progress = { icon = "◐" },
+                    done = { icon = "✓" },
+                },
+                priorities = {
+                    { name = "critical", weight = 16 },
+                    { name = "urgent", weight = 8 },
+                    { name = "important", weight = 4 },
+                },
+                storage = {
+                    save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
+                    import_export_path = vim.fn.expand("~/todos.json"),
+                },
+                keymaps = {
+                    toggle_window = "<leader>td",
+                    new_todo = "i",
+                    -- ... all todo keymaps
+                },
             },
-            keymaps = {
-                toggle = "<leader>dn",         -- Toggle notes window
-                close = "q",                   -- Close notes window
-                switch_mode = "m",             -- Switch between global/project mode
+            notes = {
+                enabled = true,
+                ui = {
+                    window = {
+                        -- Absolute sizing (in columns/lines)
+                        width = 80,
+                        height = 30,
+                        -- Or relative sizing (percentage)
+                        relative_width = 0.6,
+                        relative_height = 0.6,
+                        use_relative = true,  -- Toggle between modes
+                        position = "center",  -- center, top-left, etc.
+                        border = "rounded",
+                        title = " Notes ",
+                        title_pos = "center",
+                    },
+                    icons = {
+                        note = "📓",
+                        linked = "🔗",
+                    },
+                },
+                storage = {
+                    path = vim.fn.stdpath("data") .. "/doit/notes",
+                    mode = "project",  -- "global" or "project"
+                },
+                keymaps = {
+                    toggle = "<leader>dn",
+                    close = "q",
+                    switch_mode = "m",
+                },
             },
         },
-        scratchpad = {
-            syntax_highlight = "markdown",
-        },
-        keymaps = {
-            toggle_window = "<leader>td",
-            new_todo = "i",
-            toggle_todo = "x",
-            delete_todo = "d",
-            delete_completed = "D",
-            delete_confirmation = "<Y>",
-            close_window = "q",
-            undo_delete = "u",
-            add_due_date = "H",
-            remove_due_date = "r",
-            toggle_help = "?",
-            toggle_tags = "t",
-            toggle_priority = "<Space>",
-            clear_filter = "c",
-            edit_todo = "e",
-            edit_tag = "e",
-            edit_priorities = "p",
-            delete_tag = "d",
-            search_todos = "/",
-            add_time_estimation = "T",
-            remove_time_estimation = "R",
-            import_todos = "I",
-            export_todos = "E",
-            remove_duplicates = "<leader>D",
-            open_todo_scratchpad = "<leader>p",
-        },
-        calendar = {
-            language = "en",
-            icon = "",
-            keymaps = {
-                previous_day = "h",
-                next_day = "l",
-                previous_week = "k",
-                next_week = "j",
-                previous_month = "H",
-                next_month = "L",
-                select_day = "<CR>",
-                close_calendar = "q",
-            },
-        },
-        priorities = {
-            {
-                name = "important",
-                weight = 4,
-            },
-            {
+    }
+<
+
+Key Configuration Points:
+
+- Core settings (top level): Framework-wide configurations
+- Module settings (modules.todos and modules.notes): Module-specific options
+- UI configurations are nested under each module's `ui` table
+- Storage paths and options are under each module's `storage` table
+- Keymaps are module-specific and found in each module's `keymaps` table
+
+Notes Window Sizing:~
+
+The notes module supports flexible window sizing:
+- Absolute: Set `width` and `height` in columns/lines
+- Relative: Set `relative_width` and `relative_height` as percentages (0.0-1.0)
+- Toggle: Use `use_relative = true/false` to switch between modes
+- Position: Choose from center, top-left, top-right, bottom-left, bottom-right
+
+For a complete list of all configuration options with detailed descriptions,
+see the file `lua/doit/config.lua` in the plugin directory.
+
+Legacy Configuration:~
+
+The plugin maintains backward compatibility with the flat configuration
+structure. Legacy options at the root level will still work but are deprecated
+in favor of the nested structure.
                 name = "urgent",
                 weight = 2,
             },
