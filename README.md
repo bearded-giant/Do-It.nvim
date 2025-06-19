@@ -97,19 +97,19 @@ return {
 
 ## Keybindings
 
-| Key           | Action                      |
-|--------------|------------------------------|
-| `<leader>td` | Toggle to-do window          |
-| `<leader>dl` | Toggle active to-dos list    |
-| `<leader>dn` | Toggle project notes window  |
-| `i`          | Add new to-do                |
-| `x`          | Toggle to-do status          |
-| `d`          | Delete current to-do         |
-| `H`          | Add due date                 |
-| `t`          | Toggle tags window           |
-| `p`          | Edit priorities              |
-| `/`          | Search to-dos                |
-| `r`          | Enter reordering mode        |
+| Key          | Action                      |
+| ------------ | --------------------------- |
+| `<leader>td` | Toggle to-do window         |
+| `<leader>dl` | Toggle active to-dos list   |
+| `<leader>dn` | Toggle project notes window |
+| `i`          | Add new to-do               |
+| `x`          | Toggle to-do status         |
+| `d`          | Delete current to-do        |
+| `H`          | Add due date                |
+| `t`          | Toggle tags window          |
+| `p`          | Edit priorities             |
+| `/`          | Search to-dos               |
+| `r`          | Enter reordering mode       |
 
 See `:help doit-keybindings` for a full list of keybindings.
 
@@ -160,7 +160,7 @@ require("doit").setup({
         enabled = true,
         detection = { use_git = true, fallback_to_cwd = true },
     },
-    
+
     -- Module configurations
     modules = {
         todos = {
@@ -237,6 +237,7 @@ require("lualine").setup({
 ## Contributing
 
 See the [developer documentation](./docs/) for:
+
 - [Development setup and debugging](./docs/development/DEVELOPMENT.md)
 - [Framework architecture](./docs/development/framework.md)
 - [Module development guide](./docs/modules/)
@@ -248,14 +249,16 @@ See the [developer documentation](./docs/) for:
 - [x] Active To-do to Top
 - [x] Project Notes
 - [x] Modular Framework
+- [x] To-do Categories (with filtering)
+- [x] Cross-module Integration (todo-note linking)
+- [x] Module Registry (internal modules)
 - [ ] Named (Multiple) To-do Lists
-- [ ] To-do Categories View
-- [ ] Cross-module Integration
-- [ ] Custom Module Registry
+- [ ] Categories View Window
+- [ ] External/Custom Module Loading
 
 ## Acknowledgments
 
-Do-It.nvim is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin.
+Do-It.nvim started as fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas). Special thanks to him for creating the original plugin.
 
 The project notes feature was inspired by maple.nvim's project notes functionality.
 
