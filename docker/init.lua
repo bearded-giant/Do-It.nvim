@@ -1,4 +1,4 @@
--- Minimal init.lua for doit plugin testing
+-- Full framework init.lua for Docker interactive environment
 vim.opt.rtp:append("/plugin")
 
 vim.opt.termguicolors = true
@@ -8,7 +8,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- Set up oil.nvim
+-- Set up oil.nvim for file navigation
 require("oil").setup({
 	keymaps = {
 		["<Esc>"] = "actions.close",
@@ -16,299 +16,223 @@ require("oil").setup({
 })
 vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Open parent directory" })
 
--- Set up Neovim commands for DoIt....based on my personal preferences
-vim.api.nvim_create_user_command("DoIt", function()
-	require("doit").toggle_window()
-end, { desc = "Toggle DoIt window" })
-
--- Ensure the toggle_window function exists
-vim.api.nvim_create_autocmd("VimEnter", {
-	callback = function()
-		if not require("doit").toggle_window then
-			require("doit").toggle_window = function()
-				require("doit").ui.main_window.toggle_todo_window()
-			end
-		end
-	end,
-})
-
--- print("doit plugin initializing...")
-
-local function test_file_access()
-	local test_path = "/data/test_write.txt"
-
-	-- print("Testing file access with: " .. test_path)
-	local write_test = io.open(test_path, "w")
-	if write_test then
-		write_test:write("Test write at " .. os.date())
-		write_test:close()
-		-- print("✅ Successfully wrote test file")
-
-		local read_test = io.open(test_path, "r")
-		if read_test then
-			local content = read_test:read("*all")
-			read_test:close()
-			-- print("✅ Successfully read test file: " .. content)
-		else
-			print("❌ Failed to read test file")
-		end
-	else
-		print("❌ Failed to write test file")
-	end
-
-	-- Check/create the todos file
-	local todos_path = "/data/doit_todos.json"
-	local todos_file = io.open(todos_path, "r")
-	if todos_file then
-		local content = todos_file:read("*all")
-		todos_file:close()
-		-- print("✅ Todos file exists with content length: " .. #content)
-
-		-- Try to append to it
-		local append_test = io.open(todos_path, "a")
-		if append_test then
-			append_test:close()
-			-- print("✅ Can write to todos file")
-		else
-			print("❌ Cannot write to todos file")
-		end
-	else
-		-- print("ℹ️ Todos file not found, creating it")
-		-- Create an empty todos file with an empty array
-		local create_file = io.open(todos_path, "w")
-		if create_file then
-			create_file:write("[]")
-			create_file:close()
-			-- print("✅ Created empty todos file")
-
-			-- Verify it
-			local verify = io.open(todos_path, "r")
-			if verify then
-				local content = verify:read("*all")
-				verify:close()
-				-- print("✅ Verified todos file with content: " .. content)
-			else
-				print("❌ Could not verify todos file")
-			end
-		else
-			print("❌ Could not create todos file")
+-- Create necessary directories for data persistence
+local function ensure_directories()
+	vim.fn.mkdir("/data/doit", "p")
+	vim.fn.mkdir("/data/doit/projects", "p")
+	vim.fn.mkdir("/data/doit/notes", "p")
+	vim.fn.mkdir("/data/doit/lists", "p")
+	
+	-- Initialize default list if needed
+	local default_list_path = "/data/doit/lists/default.json"
+	if vim.fn.filereadable(default_list_path) == 0 then
+		local file = io.open(default_list_path, "w")
+		if file then
+			file:write("[]")
+			file:close()
 		end
 	end
 end
 
-test_file_access()
+ensure_directories()
 
-local doit_storage = require("doit.state.storage")
-local original_setup = doit_storage.setup
-
-doit_storage.setup = function(M, config)
-	original_setup(M, config)
-
-	-- Replace save_to_disk with our own implementation
-	M.save_to_disk = function()
-		local save_path = "/data/doit_todos.json"
-		-- print("Saving todos to: " .. save_path)
-
-		-- Ensure todos is initialized
-		if not M.todos then
-			print("WARNING: M.todos is nil, initializing empty array")
-			M.todos = {}
-		end
-
-		-- Convert todos to JSON
-		local json_content = vim.fn.json_encode(M.todos)
-		print("Encoded " .. #M.todos .. " todos to JSON (length: " .. #json_content .. ")")
-
-		-- Write to file with explicit error handling
-		local file, err = io.open(save_path, "w")
-		if not file then
-			print("ERROR: Failed to open file for writing: " .. (err or "unknown error"))
-			return false
-		end
-
-		local ok, write_err = pcall(function()
-			file:write(json_content)
-		end)
-		file:close()
-
-		if not ok then
-			print("ERROR: Failed to write to file: " .. (write_err or "unknown error"))
-			return false
-		end
-
-		-- print("✅ Successfully saved todos to " .. save_path)
-
-		-- Verify the file
-		local verify_file = io.open(save_path, "r")
-		if verify_file then
-			local content = verify_file:read("*all")
-			verify_file:close()
-			-- print("✅ Verified file after save, size: " .. #content .. " bytes")
-		else
-			print("❌ Could not verify file after save")
-		end
-
-		-- Force sync to disk
-		os.execute("sync")
-		-- print("✅ Forced sync to disk")
-
-		return true
-	end
-
-	-- Also override load from disk to be more robust
-	M.load_from_disk = function()
-		-- Use fixed path directly since config might not be fully initialized yet
-		local save_path = "/data/doit_todos.json"
-		-- print("Loading todos from: " .. save_path)
-
-		local file = io.open(save_path, "r")
-		if not file then
-			print("❌ Could not open todos file for reading")
-			return
-		end
-
-		local content = file:read("*all")
-		file:close()
-
-		-- print("Read " .. #content .. " bytes from todos file")
-
-		if content and content ~= "" then
-			local ok, result = pcall(vim.fn.json_decode, content)
-			if ok and result then
-				M.todos = result
-				-- print("✅ Successfully loaded " .. #M.todos .. " todos")
-			else
-				print("❌ Error parsing JSON: " .. (result or "unknown error"))
-			end
-		else
-			-- print("⚠️ Todos file is empty")
-			M.todos = {}
-		end
-	end
-end
-
-require("doit").setup({
-	save_path = "/data/doit_todos.json",
-
-	timestamp = {
-		enabled = false,
-	},
-
-	window = {
-		width = 140,
-		height = 40,
-		border = "rounded",
-		position = "center",
-		padding = {
-			top = 1,
-			bottom = 1,
-			left = 2,
-			right = 2,
-		},
-	},
-
-	formatting = {
-		pending = {
-			icon = "○",
-			format = { "icon", "notes_icon", "text", "due_date", "ect" },
-		},
-		in_progress = {
-			icon = "◐",
-			format = { "icon", "text", "due_date", "ect" },
-		},
-		done = {
-			icon = "✓",
-			format = { "icon", "notes_icon", "text", "due_date", "ect" },
-		},
-	},
-
+-- Load the full framework with proper configuration
+local config = {
+	-- Core framework configuration
+	development_mode = false,  -- Set to false for normal operation
 	quick_keys = true,
-
-	notes = {
-		icon = "📓",
+	timestamp = {
+		enabled = true,
 	},
-
-	scratchpad = {
-		syntax_highlight = "markdown",
+	lualine = {
+		enabled = false,  -- No lualine in Docker
+		max_length = 30,
 	},
-
+	project = {
+		enabled = true,
+		detection = {
+			use_git = false,  -- No git in container
+			fallback_to_cwd = true,
+		},
+		storage = {
+			path = "/data/doit/projects",
+		},
+	},
+	
+	-- Module configurations
+	modules = {
+		-- Todo module with lists support
+		todos = {
+			enabled = true,
+			categories = {
+				enabled = true,
+				default_categories = {
+					"Work",
+					"Personal",
+					"Projects",
+					"Ideas",
+					"Uncategorized"
+				},
+			},
+			ui = {
+				window = {
+					width = 55,
+					height = 20,
+					border = "rounded",
+					position = "center",
+				},
+				list_window = {
+					width = 40,
+					height = 10,
+					position = "bottom-right",
+				},
+				list_manager = {
+					preview_enabled = true,
+					width_ratio = 0.8,
+					height_ratio = 0.8,
+					list_panel_ratio = 0.4,
+				},
+			},
+			formatting = {
+				pending = {
+					icon = "○",
+					format = { "icon", "text", "due_date", "relative_time" },
+				},
+				in_progress = {
+					icon = "◐",
+					format = { "icon", "text", "due_date", "relative_time" },
+				},
+				done = {
+					icon = "✓",
+					format = { "icon", "text", "due_date", "relative_time" },
+				},
+			},
+			priorities = {
+				{ name = "critical", weight = 16 },
+				{ name = "urgent", weight = 8 },
+				{ name = "important", weight = 4 },
+			},
+			storage = {
+				save_path = "/data/doit/lists",  -- Lists are stored here
+				import_export_path = "/data/todos.json",
+			},
+			lists = {
+				enabled = true,
+				default_list = "default",
+				auto_create_default = true,
+				save_path = "/data/doit/lists",
+			},
+			keymaps = {
+				new_todo = "i",
+				toggle_todo = "x",
+				delete_todo = "d",
+				close_window = "q",
+				undo_delete = "u",
+				toggle_help = "?",
+				toggle_tags = "t",
+				toggle_categories = "C",
+				toggle_list_manager = "L",
+				add_due_date = "H",
+				edit_todo = "e",
+				reorder_todo = "r",
+				search_todos = "/",
+				clear_filter = "c",
+			},
+		},
+		
+		-- Notes module
+		notes = {
+			enabled = true,
+			ui = {
+				window = {
+					width = 80,
+					height = 30,
+					border = "rounded",
+					title = " Notes ",
+					title_pos = "center",
+					position = "center",
+				},
+			},
+			storage = {
+				path = "/data/doit/notes",
+				mode = "global",  -- Use global mode in container
+			},
+			keymaps = {
+				close = "q",
+				switch_mode = "m",
+			},
+		},
+	},
+	
+	-- Legacy keymaps for backward compatibility
 	keymaps = {
 		toggle_window = "<leader>do",
+		toggle_list_window = "<leader>dl",
 		new_todo = "i",
 		toggle_todo = "x",
 		delete_todo = "d",
-		delete_completed = "D",
-		delete_confirmation = "<CR>",
-		close_window = "<Esc>",
+		close_window = "q",
 		undo_delete = "u",
-		add_due_date = "H",
-		remove_due_date = "r",
 		toggle_help = "?",
 		toggle_tags = "t",
-		toggle_priority = "<Space>",
-		clear_filter = "c",
+		toggle_categories = "C",
+		add_due_date = "H",
 		edit_todo = "e",
-		edit_tag = "e",
-		edit_priorities = "p",
-		delete_tag = "d",
+		reorder_todo = "r",
 		search_todos = "/",
-		add_time_estimation = "T",
-		remove_time_estimation = "R",
-		import_todos = "I",
-		export_todos = "E",
-		remove_duplicates = "<leader>D",
-		open_todo_scratchpad = "<leader>p",
+		clear_filter = "c",
+		toggle_list_manager = "L",
 	},
+}
 
-	calendar = {
-		language = "en",
-		icon = "",
-		keymaps = {
-			previous_day = "h",
-			next_day = "l",
-			previous_week = "k",
-			next_week = "j",
-			previous_month = "H",
-			next_month = "L",
-			select_day = "<CR>",
-			close_calendar = "q",
-		},
-	},
+-- Setup the Do-It framework
+local ok, doit = pcall(require, "doit")
+if not ok then
+	print("ERROR: Failed to load Do-It framework: " .. tostring(doit))
+	return
+end
 
-	priorities = {
-		{ name = "critical", weight = 16 },
-		{
-			name = "urgent",
-			weight = 8,
-		},
-		{
-			name = "important",
-			weight = 4,
-		},
-	},
-	priority_groups = {
-		critical = {
-			members = { "critical" },
-			color = "#FF0000",
-		},
-		high = {
-			members = { "urgent" },
-			color = nil,
-			hl_group = "DiagnosticWarn",
-		},
-		medium = {
-			members = { "important" },
-			color = nil,
-			hl_group = "DiagnosticInfo",
-		},
-		low = {
-			members = {},
-			color = "#FFFFFF",
-			-- hl_group = "DiagnosticInfo",
-		},
-	},
-	hour_score_value = 1 / 8,
-})
+-- Setup with our configuration
+doit.setup(config)
 
--- For debugging
-vim.opt.verbosefile = "/tmp/nvim.log"
+-- Set up global keymaps
+vim.keymap.set("n", "<leader>do", "<cmd>DoIt<CR>", { desc = "Toggle DoIt Todos" })
+vim.keymap.set("n", "<leader>dn", "<cmd>DoItNotes<CR>", { desc = "Toggle DoIt Notes" })
+vim.keymap.set("n", "<leader>dl", "<cmd>DoItList<CR>", { desc = "Toggle DoIt List" })
+vim.keymap.set("n", "<leader>dL", "<cmd>DoItLists<CR>", { desc = "Manage DoIt Lists" })
+
+-- Welcome message function that reads from HELP.txt
+local function show_welcome()
+	print("=====================================")
+	print("Do-It.nvim Interactive Environment")
+	print("=====================================")
+	print("")
+	
+	-- Try to load help content
+	local help_file = "/plugin/docker/HELP.txt"
+	local file = io.open(help_file, "r")
+	if file then
+		-- Just show a summary from the help file
+		print("Quick Reference (use '?' in todo window for full help):")
+		print("")
+		print("COMMANDS:")
+		print("  :DoIt        - Open main todo window")
+		print("  :DoItList    - Open quick todo list")
+		print("  :DoItLists   - Manage todo lists")
+		print("  :DoItNotes   - Open notes window")
+		print("")
+		print("BASIC KEYS in todo window:")
+		print("  i - Add    x - Toggle    d - Delete    ? - Help")
+		print("  L - Lists  t - Tags      q - Close")
+		file:close()
+	else
+		-- Fallback if help file not found
+		print("Commands: :DoIt, :DoItList, :DoItLists, :DoItNotes")
+	end
+	
+	print("")
+	print("Data is saved to /data/")
+end
+
+-- Show welcome message after a short delay
+vim.defer_fn(show_welcome, 100)

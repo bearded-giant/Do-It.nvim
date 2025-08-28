@@ -85,33 +85,27 @@ return {
 }
 ```
 
-## Commands
+## Commands & Keybindings
 
-- `:Doit` - Opens the main to-do window
-- `:Doit add [text]` - Adds a new to-do
-  - `-p, --priority [name]` - Set priority (e.g., "important", "urgent")
-- `:Doit list` - Lists all to-dos with their metadata
-- `:Doit set [index] [field] [value]` - Modifies to-do properties
-- `:DoItList` - Toggle a floating window with active to-dos
-- `:DoItNotes` - Toggle the project notes window
+See [**📖 Complete Keybindings Reference**](docs/KEYBINDINGS.md) for all commands and keyboard shortcuts.
 
-## Keybindings
+### Quick Reference
 
-| Key          | Action                      |
-| ------------ | --------------------------- |
-| `<leader>td` | Toggle to-do window         |
-| `<leader>dl` | Toggle active to-dos list   |
-| `<leader>dn` | Toggle project notes window |
-| `i`          | Add new to-do               |
-| `x`          | Toggle to-do status         |
-| `d`          | Delete current to-do        |
-| `H`          | Add due date                |
-| `t`          | Toggle tags window          |
-| `p`          | Edit priorities             |
-| `/`          | Search to-dos               |
-| `r`          | Enter reordering mode       |
+**Commands:**
+- `:DoIt` - Open main todo window
+- `:DoItList` - Quick todo list (floating)
+- `:DoItLists` - Manage multiple todo lists
+- `:DoItNotes` - Open notes window
 
-See `:help doit-keybindings` for a full list of keybindings.
+**Basic Keys (in todo window):**
+- `i` - Add new todo
+- `x` - Toggle status
+- `d` - Delete todo
+- `?` - Show full help
+- `L` - List manager
+- `q` - Close window
+
+The keybindings documentation is auto-generated from a central source to ensure consistency. Run `make update-help` to regenerate after changes.
 
 ## Modules
 
@@ -252,9 +246,9 @@ See the [developer documentation](./docs/) for:
 - [x] To-do Categories (with filtering)
 - [x] Cross-module Integration (todo-note linking)
 - [x] Module Registry (internal modules)
-- [ ] Named (Multiple) To-do Lists
-- [ ] Categories View Window
-- [ ] External/Custom Module Loading
+- [x] Named (Multiple) To-do Lists
+- [x] Categories View Window
+- [x] External/Custom Module Loading
 
 ## Acknowledgments
 

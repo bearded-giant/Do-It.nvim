@@ -1,7 +1,12 @@
 local vim = vim
 
-local state = require("doit.state")
-state.load_todos()
+-- Get the todo module and use its state
+local core = require("doit.core")
+local todo_module = core.get_module("todos")
+local state = todo_module and todo_module.state or {}
+if state.load_todos then
+    state.load_todos()
+end
 
 local config = require("doit.config")
 

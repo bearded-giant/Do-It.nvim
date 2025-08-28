@@ -1,7 +1,10 @@
 local api = vim.api
 local M = {}
 local config = require("doit.config")
-local state = require("doit.state")
+-- Get the todo module and use its state
+local core = require("doit.core")
+local todo_module = core.get_module("todos")
+local state = todo_module and todo_module.state or {}
 local notes_state = require("doit.state.notes")
 
 local buf = nil

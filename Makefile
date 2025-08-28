@@ -1,13 +1,23 @@
-.PHONY: help test check-docs
+.PHONY: help test check-docs update-help docker-interactive
 
 help:
 	@echo "Available targets:"
-	@echo "  test          Run the test suite in Docker"
-	@echo "  check-docs    Check documentation for duplicate tags and invalid references"
-	@echo "  help          Show this help message"
+	@echo "  test              Run the test suite in Docker"
+	@echo "  check-docs        Check documentation for duplicate tags and invalid references"
+	@echo "  update-help       Update HELP.txt from central help module"
+	@echo "  docker-interactive Run interactive Docker environment"
+	@echo "  help              Show this help message"
 
 test:
 	docker/run-tests.sh
+
+update-help:
+	@echo "Updating docker/HELP.txt from lua/doit/help.lua..."
+	@cd docker && lua generate-help.lua
+	@echo "HELP.txt updated successfully"
+
+docker-interactive:
+	docker/run-interactive.sh
 
 check-docs:
 	@echo "Checking for duplicate help tags..."

@@ -16,10 +16,75 @@ if not core.ui then
     core.ui = require("doit.core.ui").setup()
 end
 
-local todo_module = core.get_module("todos")
+-- Lazy loading of todo module and state
+local todo_module = nil
+local state = nil
 
-local state = require("doit.state")
-state.load_todos()
+-- Function to get or load the todo module
+local function get_todo_module()
+    if not todo_module then
+        -- Try multiple ways to get the module
+        todo_module = core.get_module("todos")
+        
+        if not todo_module then
+            local ok, doit = pcall(require, "doit")
+            if ok then
+                todo_module = doit.todos or (doit.modules and doit.modules.todos)
+            end
+        end
+    end
+    return todo_module
+end
+
+-- Function to ensure state is loaded
+local function ensure_state_loaded()
+    if not state then
+        local module = get_todo_module()
+        if module and module.state then
+            state = module.state
+        else
+            -- Use compatibility shim as fallback
+            local ok, compat_state = pcall(require, "doit.state")
+            if ok then
+                state = compat_state
+            else
+                -- Initialize empty state as last resort
+                state = {
+                    todos = {},
+                    active_filter = nil,
+                    active_category = nil,
+                    deleted_todos = {},
+                    reordering_todo_index = nil,
+                    todo_lists = { active = "default" }
+                }
+                
+                -- Add stub functions
+                state.load_todos = state.load_todos or function() end
+                state.save_todos = state.save_todos or function() end
+                state.add_todo = state.add_todo or function(text) 
+                    table.insert(state.todos, { text = text, done = false, created_at = os.time() })
+                end
+                state.sort_todos = state.sort_todos or function() end
+                state.set_filter = state.set_filter or function(f) state.active_filter = f end
+                state.clear_category_filter = state.clear_category_filter or function() state.active_category = nil end
+                state.undo_delete = state.undo_delete or function() return false end
+                state.get_priority_score = state.get_priority_score or function() return 0 end
+            end
+        end
+        
+        -- Try to load todos if the function exists
+        if state and state.load_todos then
+            state.load_todos()
+        end
+    end
+    return state
+end
+
+-- Don't load immediately - will load on first use
+local function ensure_module_loaded()
+    ensure_state_loaded()
+    get_todo_module()
+end
 
 local M = {}
 
@@ -137,6 +202,10 @@ function M.render_todos()
 	if not buf_id or not vim.api.nvim_buf_is_valid(buf_id) then
 		return
 	end
+	
+	-- Ensure state is loaded
+	state = ensure_state_loaded()
+	
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
 	local ns_id = highlights.get_namespace_id()
@@ -154,9 +223,10 @@ function M.render_todos()
 		table.insert(lines, "")
 		
 		local category_name = state.active_category
-		if todo_module and todo_module.state and todo_module.state.categories_by_id 
-			and todo_module.state.categories_by_id[state.active_category] then
-			category_name = todo_module.state.categories_by_id[state.active_category].name
+		local module = get_todo_module()
+		if module and module.state and module.state.categories_by_id 
+			and module.state.categories_by_id[state.active_category] then
+			category_name = module.state.categories_by_id[state.active_category].name
 		end
 		
 		table.insert(lines, "  Filtered by category: " .. category_name)
@@ -167,8 +237,9 @@ function M.render_todos()
 		local show_by_category = true
 		
 		if state.active_category then
-			if todo_module and todo_module.state and todo_module.state.get_todo_category then
-				local todo_category_id = todo_module.state.get_todo_category(todo.id)
+			local module = get_todo_module()
+			if module and module.state and module.state.get_todo_category then
+				local todo_category_id = module.state.get_todo_category(todo.id)
 				show_by_category = (todo_category_id == state.active_category) or
 								  (state.active_category == "uncategorized" and 
 								   (todo_category_id == "uncategorized" or not todo_category_id))
@@ -433,7 +504,14 @@ function M.calculate_line_offset()
 end
 
 local function create_window()
+	-- Ensure state is loaded before creating window
+	state = ensure_state_loaded()
+	
 	local ui = vim.api.nvim_list_uis()[1]
+	if not ui then
+		-- In headless mode or when no UI is available, use defaults
+		ui = { width = 80, height = 24 }
+	end
 	
 	-- Set default window options if they're missing
 	if not config.options then
@@ -542,12 +620,57 @@ local function create_window()
 	vim.api.nvim_win_set_option(win_id, "showbreak", " ")
 
 	local function setup_keymap(key_option, fn)
-		-- Make sure config.options and config.options.keymaps exist
-		if not config.options or not config.options.keymaps then
-			return -- Skip if keymaps aren't available
+		-- Default keymaps
+		local default_keymaps = {
+			new_todo = "i",
+			toggle_todo = "x",
+			delete_todo = "d",
+			delete_completed = "D",
+			close_window = "q",
+			undo_delete = "u",
+			toggle_help = "?",
+			toggle_tags = "t",
+			toggle_categories = "C",
+			clear_filter = "c",
+			edit_todo = "e",
+			edit_priorities = "p",
+			add_due_date = "H",
+			remove_due_date = "r",
+			add_time_estimation = "T",
+			remove_time_estimation = "R",
+			reorder_todo = "r",
+			open_linked_note = "o",
+			open_todo_scratchpad = "<leader>p",
+			toggle_list_manager = "L",
+			import_todos = "I",
+			export_todos = "E",
+			search_todos = "/",
+			move_todo_up = "k",
+			move_todo_down = "j",
+		}
+		
+		-- Try to get key from config, fall back to default
+		local key = nil
+		
+		-- First try: config.options.keymaps
+		if config.options and config.options.keymaps then
+			key = config.options.keymaps[key_option]
 		end
 		
-		local key = config.options.keymaps[key_option]
+		-- Second try: Look for module config
+		if not key then
+			local module = get_todo_module()
+			if module and module.config and module.config.keymaps then
+				key = module.config.keymaps[key_option]
+			end
+		end
+		
+		-- Third try: Use default
+		if not key then
+			key = default_keymaps[key_option]
+		end
+		
+		-- Set the keymap if we found a key
 		if key then
 			vim.keymap.set("n", key, fn, { buffer = buf_id, nowait = true })
 		end
@@ -598,8 +721,9 @@ local function create_window()
 	end)
 	
 	setup_keymap("toggle_categories", function()
-		if todo_module and todo_module.ui and todo_module.ui.category_window then
-			todo_module.ui.category_window.toggle_window()
+		local module = get_todo_module()
+		if module and module.ui and module.ui.category_window then
+			module.ui.category_window.toggle_window()
 		else
 			category_window.create_category_window(win_id)
 		end
@@ -672,8 +796,9 @@ local function create_window()
 	end)
 	
 	setup_keymap("toggle_list_manager", function()
-		if todo_module and todo_module.ui and todo_module.ui.list_manager_window then
-			todo_module.ui.list_manager_window.toggle_window()
+		local module = get_todo_module()
+		if module and module.ui and module.ui.list_manager_window then
+			module.ui.list_manager_window.toggle_window()
 		else
 			vim.notify("List manager window not available", vim.log.levels.WARN)
 		end
@@ -784,6 +909,9 @@ function M.open_linked_note()
 end
 
 function M.toggle_todo_window()
+	-- Ensure state is loaded before toggle
+	state = ensure_state_loaded()
+	
 	if win_id and vim.api.nvim_win_is_valid(win_id) then
 		M.close_window()
 	else

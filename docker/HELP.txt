@@ -1,0 +1,67 @@
+COMMANDS:
+  :DoIt          - Open main todo window
+  :DoItList      - Open quick todo list (floating)
+  :DoItLists     - Manage multiple todo lists
+  :DoItNotes     - Open notes window
+
+GLOBAL KEYMAPS:
+  <leader>do     - Toggle main todo window
+  <leader>dn     - Toggle notes window
+  <leader>dl     - Toggle quick todo list
+  <leader>dL     - Open list manager
+
+TODO WINDOW KEYMAPS:
+  Basic:
+    i            - Add new todo
+    x            - Toggle todo status (pending/done)
+    d            - Delete current todo
+    D            - Delete all completed todos
+    u            - Undo last delete
+    e            - Edit current todo
+    q            - Close window
+    ?            - Show help (with ALL keybindings)
+
+  Organization:
+    t            - Toggle tags window (filter by #tag)
+    C            - Toggle categories window
+    L            - Open list manager (switch/create lists)
+    c            - Clear active filter
+    /            - Search todos
+
+  Advanced:
+    H            - Add/edit due date (calendar)
+    r            - Reorder current todo (use j/k to move)
+    p            - Edit priorities
+    T            - Add time estimation
+    R            - Remove time estimation
+    o            - Open linked note
+    <leader>p    - Open scratchpad for todo
+
+  Import/Export:
+    I            - Import todos from file
+    E            - Export todos to file
+
+LIST MANAGER KEYMAPS:
+  1-9, 0         - Quick select list by number
+  j/k            - Navigate up/down
+  Enter/Space    - Switch to selected list
+  n              - Create new list
+  d              - Delete selected list
+  r              - Rename selected list
+  i              - Import list from file
+  e              - Export selected list
+  q/Esc          - Close manager
+
+NOTES WINDOW KEYMAPS:
+  m              - Switch between global/project mode
+  q              - Close window
+
+FEATURES:
+  • Multiple named todo lists with persistence
+  • Categories for organization
+  • Tag-based filtering with #hashtags
+  • Due dates with calendar integration
+  • Priority system with weights
+  • Time estimation tracking
+  • Project-specific or global notes
+  • Import/export for backup and sharing

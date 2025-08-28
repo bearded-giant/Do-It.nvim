@@ -32,7 +32,20 @@ function storage.setup(M)
     
     -- Ensure lists directory exists
     if not config.lists_dir then
-        config.lists_dir = vim.fn.stdpath("data") .. "/doit/lists"
+        -- Check if lists configuration exists
+        if config.lists and config.lists.save_path then
+            config.lists_dir = config.lists.save_path
+        elseif config.storage and config.storage.save_path then
+            -- Use storage.save_path as base for lists
+            local base_path = config.storage.save_path
+            if base_path:match("%.json$") then
+                -- Remove filename if it's a json file path
+                base_path = vim.fn.fnamemodify(base_path, ":h")
+            end
+            config.lists_dir = base_path .. "/lists"
+        else
+            config.lists_dir = vim.fn.stdpath("data") .. "/doit/lists"
+        end
     end
     
     -- Create directory if it doesn't exist
