@@ -74,7 +74,23 @@ function M.setup(state)
     
     function M.toggle_todo(index)
         if state.todos[index] then
-            state.todos[index].done = not state.todos[index].done
+            local todo = state.todos[index]
+            
+            -- Cycle through states: pending -> in_progress -> done -> pending
+            if not todo.in_progress and not todo.done then
+                -- Pending -> In Progress
+                todo.in_progress = true
+                todo.done = false
+            elseif todo.in_progress and not todo.done then
+                -- In Progress -> Done
+                todo.in_progress = false
+                todo.done = true
+            else
+                -- Done -> Pending (reset both)
+                todo.in_progress = false
+                todo.done = false
+            end
+            
             state.save_todos()
         end
     end

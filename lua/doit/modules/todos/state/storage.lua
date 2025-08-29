@@ -90,12 +90,20 @@ function storage.setup(M)
                     
                     if content and content ~= "" then
                         local metadata = {}
+                        local todo_count = 0
                         pcall(function()
                             local data = vim.fn.json_decode(content)
                             if data._metadata then
                                 metadata = data._metadata
                             end
+                            -- Count todos in the list
+                            if data.todos then
+                                todo_count = #data.todos
+                            end
                         end)
+                        
+                        -- Add todo count to metadata
+                        metadata.todo_count = todo_count
                         
                         table.insert(lists, {
                             name = name,
@@ -164,6 +172,11 @@ function storage.setup(M)
         
         local list_path = get_list_path(list_name)
         
+        -- Debug logging
+        if config.development_mode then
+            vim.notify(string.format("Loading list '%s' from path: %s", list_name, list_path), vim.log.levels.DEBUG)
+        end
+        
         -- Check if file exists, if not create a default list
         if vim.fn.filereadable(list_path) == 0 then
             storage.create_list(list_name, {})
@@ -231,6 +244,10 @@ function storage.setup(M)
                     -- Update active list
                     M.todo_lists.active = list_name
                     config.active_list = list_name
+                    
+                    -- Save session for persistence
+                    local session = require("doit.modules.todos.state.session")
+                    session.save_session(list_name)
                     
                     return true, "Loaded list '" .. list_name .. "'"
                 end
@@ -306,6 +323,10 @@ function storage.setup(M)
         if M.todo_lists.active == old_name then
             M.todo_lists.active = new_name
             config.active_list = new_name
+            
+            -- Update session with new name
+            local session = require("doit.modules.todos.state.session")
+            session.save_session(new_name)
         end
         
         return true, "Renamed list '" .. old_name .. "' to '" .. new_name .. "'"
@@ -331,6 +352,18 @@ function storage.setup(M)
                         })
                     end
                 end
+            end
+        end
+        
+        -- Try to restore last session's list
+        local session = require("doit.modules.todos.state.session")
+        local last_list = session.load_session()
+        
+        if last_list then
+            -- Verify the list still exists
+            local list_path = get_list_path(last_list)
+            if vim.fn.filereadable(list_path) == 1 then
+                config.active_list = last_list
             end
         end
         

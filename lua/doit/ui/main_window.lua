@@ -36,13 +36,16 @@ local function get_todo_module()
     return todo_module
 end
 
--- Function to ensure state is loaded
+-- Function to ensure state is loaded - always get fresh reference for list switching
 local function ensure_state_loaded()
-    if not state then
-        local module = get_todo_module()
-        if module and module.state then
-            state = module.state
-        else
+    local module = get_todo_module()
+    if module and module.state then
+        -- Always update reference to get current list state
+        state = module.state
+        return state
+    else
+        -- Fallback only if module not available
+        if not state then
             -- Use compatibility shim as fallback
             local ok, compat_state = pcall(require, "doit.state")
             if ok then
@@ -70,14 +73,14 @@ local function ensure_state_loaded()
                 state.undo_delete = state.undo_delete or function() return false end
                 state.get_priority_score = state.get_priority_score or function() return 0 end
             end
+            
+            -- Try to load todos if the function exists
+            if state and state.load_todos then
+                state.load_todos()
+            end
         end
-        
-        -- Try to load todos if the function exists
-        if state and state.load_todos then
-            state.load_todos()
-        end
+        return state
     end
-    return state
 end
 
 -- Don't load immediately - will load on first use
@@ -205,6 +208,18 @@ function M.render_todos()
 	
 	-- Ensure state is loaded
 	state = ensure_state_loaded()
+	
+	-- Update window title with current list name
+	if win_id and vim.api.nvim_win_is_valid(win_id) then
+		local list_name = "default"
+		if state and state.todo_lists and state.todo_lists.active then
+			list_name = state.todo_lists.active
+		end
+		vim.api.nvim_win_set_config(win_id, {
+			title = string.format(" to-dos [%s] ", list_name),
+			title_pos = "center",
+		})
+	end
 	
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
@@ -507,6 +522,12 @@ local function create_window()
 	-- Ensure state is loaded before creating window
 	state = ensure_state_loaded()
 	
+	-- Get the active list name for the window title
+	local list_name = "default"
+	if state and state.todo_lists and state.todo_lists.active then
+		list_name = state.todo_lists.active
+	end
+	
 	local ui = vim.api.nvim_list_uis()[1]
 	if not ui then
 		-- In headless mode or when no UI is available, use defaults
@@ -543,9 +564,24 @@ local function create_window()
 		}
 	end
 	
-	local width = config.options.window.width
-	local height = config.options.window.height
-	local position = config.options.window.position or "right"
+	-- Check for relative sizing first (from modules.todos.ui.window config)
+	local window_config = config.options.window
+	if config.options.modules and config.options.modules.todos and config.options.modules.todos.ui and config.options.modules.todos.ui.window then
+		window_config = config.options.modules.todos.ui.window
+	end
+	
+	local width, height
+	if window_config.use_relative then
+		-- Use relative sizing based on screen percentage
+		width = math.floor(ui.width * (window_config.relative_width or 0.5))
+		height = math.floor(ui.height * (window_config.relative_height or 0.5))
+	else
+		-- Use absolute sizing
+		width = window_config.width or 55
+		height = window_config.height or 20
+	end
+	
+	local position = window_config.position or config.options.window.position or "center"
 	local padding = 2
 
 	local col, row
@@ -589,7 +625,7 @@ local function create_window()
 		height = height,
 		style = "minimal",
 		border = "rounded",
-		title = " to-dos ",
+		title = string.format(" to-dos [%s] ", list_name),
 		title_pos = "center",
 		footer = " [?] for help ",
 		footer_pos = "center",

@@ -1,6 +1,8 @@
 #!/bin/bash
 
-cd "$(dirname "$0")"
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Build the Docker image
 echo "Building Docker image..."
@@ -27,14 +29,14 @@ echo "║            Do-It.nvim Interactive Test Environment             ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Include the help documentation from the central file
-HELP_FILE="$(dirname "$0")/HELP.txt"
-if [ -f "$HELP_FILE" ]; then
-    cat "$HELP_FILE"
-else
-    echo "WARNING: Help file not found at $HELP_FILE"
-    echo "Basic commands: :DoIt, :DoItList, :DoItLists, :DoItNotes"
-fi
+# # Include the help documentation from the central file
+# HELP_FILE="$SCRIPT_DIR/HELP.txt"
+# if [ -f "$HELP_FILE" ]; then
+#     cat "$HELP_FILE"
+# else
+#     echo "WARNING: Help file not found at $HELP_FILE"
+#     echo "Basic commands: :DoIt, :DoItList, :DoItLists, :DoItNotes"
+# fi
 
 echo ""
 echo "Data directory: $DATA_DIR"
@@ -49,3 +51,4 @@ docker run --rm -it \
 
 echo ""
 echo "Session ended. Data saved to: $DATA_DIR"
+

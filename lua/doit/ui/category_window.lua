@@ -1,11 +1,56 @@
 local vim = vim
 
 local config = require("doit.config")
--- Get the todo module and use its state
-local core = require("doit.core")
-local todo_module = core.get_module("todos")
-local state = todo_module and todo_module.state or {}
 local highlights = require("doit.ui.highlights")
+
+-- Lazy loading of todo module and state
+local todo_module = nil
+local state = nil
+
+local function get_todo_module()
+    if not todo_module then
+        local core = require("doit.core")
+        todo_module = core.get_module("todos")
+        
+        -- If not loaded, try to load it
+        if not todo_module then
+            local doit = require("doit")
+            if doit.load_module then
+                todo_module = doit.load_module("todos", {})
+            end
+        end
+    end
+    return todo_module
+end
+
+-- Function to ensure state is loaded - always get fresh reference
+local function ensure_state_loaded()
+    local module = get_todo_module()
+    if module and module.state then
+        -- Always update reference to get current list state
+        state = module.state
+        return state
+    else
+        -- Fallback only if module not available
+        if not state then
+            -- Use compatibility shim as fallback
+            local ok, compat_state = pcall(require, "doit.state")
+            if ok then
+                state = compat_state
+            else
+                -- Initialize empty state as last resort
+                state = {
+                    todos = {},
+                    active_filter = nil,
+                    deleted_todos = {},
+                    sort_todos = function() end,
+                    apply_filter = function(self) return self.todos end,
+                }
+            end
+        end
+        return state
+    end
+end
 
 local M = {}
 
@@ -26,18 +71,23 @@ function M.create_category_window(caller_win_id)
     M.close_category_window()
 
     parent_win_id = caller_win_id
+    
+    -- Ensure state is loaded
+    local loaded_state = ensure_state_loaded()
 
     local categories = {}
     local category_counts = {}
 
     -- Extract categories from todos
-    for _, todo in ipairs(state.todos) do
+    if loaded_state and loaded_state.todos then
+        for _, todo in ipairs(loaded_state.todos) do
         local cat = todo.category or "Uncategorized"
         if not category_counts[cat] then
             category_counts[cat] = 0
             table.insert(categories, cat)
         end
-        category_counts[cat] = category_counts[cat] + 1
+            category_counts[cat] = category_counts[cat] + 1
+        end
     end
 
     -- Sort categories alphabetically

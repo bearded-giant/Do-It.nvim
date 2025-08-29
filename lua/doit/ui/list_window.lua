@@ -1,10 +1,6 @@
 local vim = vim
 
 local config = require("doit.config")
--- Get the todo module and use its state
-local core = require("doit.core")
-local todo_module = core.get_module("todos")
-local state = todo_module and todo_module.state or {}
 local highlights = require("doit.ui.highlights")
 local main_window = require("doit.ui.main_window")
 
@@ -15,12 +11,64 @@ local buf_id = nil
 local timer = nil
 local REFRESH_INTERVAL = 5000  -- Refresh every 5 seconds
 
+-- Lazy loading of todo module and state
+local todo_module = nil
+local state = nil
+
+local function get_todo_module()
+    if not todo_module then
+        local core = require("doit.core")
+        todo_module = core.get_module("todos")
+        
+        -- If not loaded, try to load it
+        if not todo_module then
+            local doit = require("doit")
+            if doit.load_module then
+                todo_module = doit.load_module("todos", {})
+            end
+        end
+    end
+    return todo_module
+end
+
+-- Function to ensure state is loaded - always get fresh reference
+local function ensure_state_loaded()
+    local module = get_todo_module()
+    if module and module.state then
+        -- Always update reference to get current list state
+        state = module.state
+        return state
+    else
+        -- Fallback only if module not available
+        if not state then
+            -- Use compatibility shim as fallback
+            local ok, compat_state = pcall(require, "doit.state")
+            if ok then
+                state = compat_state
+            else
+                -- Initialize empty state as last resort
+                state = {
+                    todos = {},
+                    active_filter = nil,
+                    deleted_todos = {},
+                    sort_todos = function() end,
+                    apply_filter = function(self) return self.todos end,
+                }
+            end
+        end
+        return state
+    end
+end
+
 -- Get active todos
 local function get_active_todos()
     local active_todos = {}
-    for _, todo in ipairs(state.todos) do
-        if todo.in_progress and not todo.done then
-            table.insert(active_todos, todo)
+    local loaded_state = ensure_state_loaded()
+    if loaded_state and loaded_state.todos then
+        for _, todo in ipairs(loaded_state.todos) do
+            if todo.in_progress and not todo.done then
+                table.insert(active_todos, todo)
+            end
         end
     end
     return active_todos
@@ -29,6 +77,19 @@ end
 function M.render_list()
     if not buf_id or not vim.api.nvim_buf_is_valid(buf_id) then
         return
+    end
+    
+    -- Update window title with current list name
+    if win_id and vim.api.nvim_win_is_valid(win_id) then
+        local loaded_state = ensure_state_loaded()
+        local list_name = "default"
+        if loaded_state and loaded_state.todo_lists and loaded_state.todo_lists.active then
+            list_name = loaded_state.todo_lists.active
+        end
+        vim.api.nvim_win_set_config(win_id, {
+            title = string.format(" active to-dos [%s] ", list_name),
+            title_pos = "center",
+        })
     end
     
     vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
@@ -95,6 +156,13 @@ function M.render_list()
 end
 
 local function create_list_window()
+    -- Get the active list name for the window title
+    local loaded_state = ensure_state_loaded()
+    local list_name = "default"
+    if loaded_state and loaded_state.todo_lists and loaded_state.todo_lists.active then
+        list_name = loaded_state.todo_lists.active
+    end
+    
     local ui = vim.api.nvim_list_uis()[1]
     local width = config.options.list_window and config.options.list_window.width or 40
     local height = config.options.list_window and config.options.list_window.height or 10
@@ -143,7 +211,7 @@ local function create_list_window()
         height = height,
         style = "minimal",
         border = "rounded",
-        title = " active to-dos ",
+        title = string.format(" active to-dos [%s] ", list_name),
         title_pos = "center",
         footer = " [q] to close ",
         footer_pos = "center",
@@ -185,6 +253,9 @@ local function create_list_window()
 end
 
 function M.toggle_list_window()
+    -- Ensure state is loaded before toggle
+    ensure_state_loaded()
+    
     if win_id and vim.api.nvim_win_is_valid(win_id) then
         M.close_list_window()
     else

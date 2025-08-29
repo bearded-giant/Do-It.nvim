@@ -215,18 +215,29 @@ Also see `:help doit-configuration` in Neovim for interactive documentation.
 
 ## Lualine Integration
 
-Add your active to-do to Lualine:
+Do-It.nvim provides several lualine components to display todo information in your statusline:
 
 ```lua
 require("lualine").setup({
   sections = {
     lualine_c = {
-      -- Other components...
+      -- Show current list and todo count
+      { require("doit").lualine.current_list },
+      
+      -- Show todo statistics (done/in-progress/pending)
+      { require("doit").lualine.todo_stats },
+      
+      -- Show active (in-progress) todo
       { require("doit").lualine.active_todo }
     }
   }
 })
 ```
+
+Available components:
+- `current_list` - Shows current list name and todo count: `📋 work (5)`
+- `todo_stats` - Shows todo statistics: `✓3 ◐1 ○2` (done/in-progress/pending)
+- `active_todo` - Shows the current in-progress todo (if any)
 
 ## Contributing
 

@@ -1,11 +1,52 @@
 local vim = vim
 
--- Get the todo module and use its state
-local core = require("doit.core")
-local todo_module = core.get_module("todos")
-local state = todo_module and todo_module.state or {}
 local config = require("doit.config")
 local calendar = require("doit.calendar")
+
+-- Lazy loading of todo module and state
+local todo_module = nil
+local state = nil
+
+local function get_todo_module()
+    if not todo_module then
+        local core = require("doit.core")
+        todo_module = core.get_module("todos")
+        
+        -- If not loaded, try to load it
+        if not todo_module then
+            local doit = require("doit")
+            if doit.load_module then
+                todo_module = doit.load_module("todos", {})
+            end
+        end
+    end
+    return todo_module
+end
+
+-- Function to ensure state is loaded - always get fresh reference
+local function ensure_state_loaded()
+    local module = get_todo_module()
+    if module and module.state then
+        -- Always update reference to get current list state
+        state = module.state
+        return state
+    else
+        -- Fallback only if module not available
+        if not state then
+            -- Initialize empty state as last resort
+            state = {
+                todos = {},
+                active_filter = nil,
+                deleted_todos = {},
+                add_todo = function() end,
+                save_to_disk = function() end,
+                sort_todos = function() end,
+                apply_filter = function(self) return self.todos end,
+            }
+        end
+        return state
+    end
+end
 
 local M = {}
 
@@ -17,6 +58,7 @@ local function get_todo_icon_pattern()
 end
 
 local function get_real_todo_index(line_num, filter)
+	ensure_state_loaded()  -- Ensure state is loaded
 	if not filter then
 		return line_num - 1
 	end
@@ -169,7 +211,11 @@ local function setup_priority_close_buttons(select_buf, select_win, keymaps)
 end
 
 function M.new_todo(on_render)
+	ensure_state_loaded()  -- Ensure state is loaded before use
 	vim.ui.input({ prompt = "New to-do: " }, function(input)
+		-- Clear the command line after input
+		vim.cmd("echo ''")
+		
 		if input then
 			input = input:gsub("\n", " ")
 			if input ~= "" then
@@ -208,6 +254,7 @@ function M.new_todo(on_render)
 end
 
 function M.toggle_todo(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
@@ -287,6 +334,7 @@ function M.toggle_todo(win_id, on_render)
 end
 
 function M.delete_todo(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
@@ -324,9 +372,11 @@ function M.delete_todo(win_id, on_render)
 end
 
 function M.delete_completed(on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local win_id = vim.api.nvim_get_current_win()
 
-	state.delete_completed_with_confirmation(win_id, calendar, function()
+	if state.delete_completed_with_confirmation then
+		state.delete_completed_with_confirmation(win_id, calendar, function()
 		maybe_render(on_render)
 
 		-- Find the currently active window
@@ -348,10 +398,12 @@ function M.delete_completed(on_render)
 			vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
 		end
 	end)
+	end
 end
 
 -- Link a todo to a note (UI for note selection)
 function M.link_to_note(win_id, on_render)
+    ensure_state_loaded()  -- Ensure state is loaded
     local cursor = vim.api.nvim_win_get_cursor(win_id)
     local line_num = cursor[1]
 
@@ -407,6 +459,8 @@ function M.link_to_note(win_id, on_render)
                 if choice.data.custom then
                     -- Ask for link text
                     vim.ui.input({ prompt = "Enter note title for [[title]] link:" }, function(title)
+                        -- Clear the command line after input
+                        vim.cmd("echo ''")
                         if title and title ~= "" then
                             -- Append to the todo text
                             local todo = state.todos[todo_index]
@@ -458,12 +512,17 @@ function M.link_to_note(win_id, on_render)
 end
 
 function M.remove_duplicates(on_render)
-	local dups = state.remove_duplicates()
+	ensure_state_loaded()  -- Ensure state is loaded
+	local dups = 0
+	if state.remove_duplicates then
+		dups = state.remove_duplicates()
+	end
 	vim.notify("Removed " .. dups .. " duplicates.", vim.log.levels.INFO)
 	maybe_render(on_render)
 end
 
 function M.edit_todo(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
 
@@ -476,6 +535,8 @@ function M.edit_todo(win_id, on_render)
 			vim.ui.input(
 				{ zindex = 300, prompt = "Edit to-do: ", default = state.todos[todo_index].text },
 				function(input)
+					-- Clear the command line after input
+					vim.cmd("echo ''")
 					if input and input ~= "" then
 						state.todos[todo_index].text = input
 						state.save_to_disk()
@@ -488,6 +549,7 @@ function M.edit_todo(win_id, on_render)
 end
 
 function M.edit_priorities(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
 
@@ -568,6 +630,7 @@ function M.edit_priorities(win_id, on_render)
 end
 
 function M.add_time_estimation(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = get_real_todo_index(line_num, state.active_filter)
 
@@ -579,6 +642,8 @@ function M.add_time_estimation(win_id, on_render)
 		prompt = "Estimated completion time (e.g., 15m, 2h, 1d, 0.5w): ",
 		default = "",
 	}, function(input)
+		-- Clear the command line after input
+		vim.cmd("echo ''")
 		if input and input ~= "" then
 			local hours, err = M.parse_time_estimation(input)
 			if hours then
@@ -594,6 +659,7 @@ function M.add_time_estimation(win_id, on_render)
 end
 
 function M.remove_time_estimation(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = get_real_todo_index(line_num, state.active_filter)
 
@@ -608,6 +674,7 @@ function M.remove_time_estimation(win_id, on_render)
 end
 
 function M.add_due_date(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = get_real_todo_index(line_num, state.active_filter)
 
@@ -629,6 +696,7 @@ function M.add_due_date(win_id, on_render)
 end
 
 function M.remove_due_date(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
 	local todo_index = get_real_todo_index(line_num, state.active_filter)
 
@@ -646,6 +714,7 @@ function M.remove_due_date(win_id, on_render)
 end
 
 function M.reorder_todo(win_id, on_render)
+	ensure_state_loaded()  -- Ensure state is loaded
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end

@@ -214,65 +214,56 @@ function M.setup(parent_module)
             return
         end
         
+        -- Refresh lists to get updated active list
         local lists = todo_module.state.get_available_lists()
         local active_list = todo_module.state.todo_lists.active
         
         local lines = {}
-        local help_lines = {
-            "  Quick Select:",
-            "  ─────────────",
-            "  0-9   Select list by number",
-            "  Space Confirm selection",
-            "  Enter Switch to list immediately",
-            "",
-            "  Actions:",
-            "  ────────",
-            "  n     Create new list",
-            "  d     Delete selected list",
-            "  r     Rename selected list",
-            "  i     Import list from file",
-            "  e     Export selected list",
-            "  q/Esc Close window",
-            "",
-            "  Available Lists:",
-            "  ────────────────"
-        }
         
-        for _, line in ipairs(help_lines) do
-            table.insert(lines, line)
-        end
+        -- Start with Available Lists at the top
+        table.insert(lines, "  Todo Lists")
+        table.insert(lines, "  ══════════════════════════════════")
+        table.insert(lines, "")
         
         if #lists == 0 then
-            table.insert(lines, "")
             table.insert(lines, "  No todo lists found")
             table.insert(lines, "  Press 'n' to create your first list")
         else
-            table.insert(lines, "")
             -- Add numbered lists
             for i, list in ipairs(lists) do
                 if i <= 10 then
                     local num = i == 10 and "0" or tostring(i)
-                    local active_marker = list.name == active_list and "* " or "  "
+                    local active_marker = list.name == active_list and "[active]" or ""
                     local selection_marker = i == selected_index and "▶ " or "  "
                     
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s[%s] %s%s (%d todos)", 
-                        selection_marker, num, active_marker, list.name, todo_count))
+                    table.insert(lines, string.format("%s[%s] %s (%d todos) %s", 
+                        selection_marker, num, list.name, todo_count, active_marker))
                 else
                     -- Lists beyond 10
-                    local active_marker = list.name == active_list and "* " or "  "
+                    local active_marker = list.name == active_list and "[active]" or ""
                     local selection_marker = i == selected_index and "▶ " or "  "
                     
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s    %s%s (%d todos)", 
-                        selection_marker, active_marker, list.name, todo_count))
+                    table.insert(lines, string.format("%s    %s (%d todos) %s", 
+                        selection_marker, list.name, todo_count, active_marker))
                 end
             end
         end
+        
+        -- Add help at the bottom
+        table.insert(lines, "")
+        table.insert(lines, "  ──────────────────────────────────")
+        table.insert(lines, "  Keys:")
+        table.insert(lines, "  [1-9/0] Select   [Enter] Switch")
+        table.insert(lines, "  [n] New          [d] Delete")
+        table.insert(lines, "  [r] Rename       [e] Export")
+        table.insert(lines, "  [i] Import       [q] Close")
+        table.insert(lines, "  [?] Show full help")
         
         -- Set buffer content
         api.nvim_buf_set_option(buf_id, "modifiable", true)
@@ -283,13 +274,19 @@ function M.setup(parent_module)
         local namespace = api.nvim_create_namespace("DoitListManager")
         api.nvim_buf_clear_namespace(buf_id, namespace, 0, -1)
         
-        -- Help section headers
+        -- Title highlighting
         api.nvim_buf_add_highlight(buf_id, namespace, "Title", 0, 0, -1)
         api.nvim_buf_add_highlight(buf_id, namespace, "Comment", 1, 0, -1)
-        api.nvim_buf_add_highlight(buf_id, namespace, "Title", 6, 0, -1)
-        api.nvim_buf_add_highlight(buf_id, namespace, "Comment", 7, 0, -1)
-        api.nvim_buf_add_highlight(buf_id, namespace, "Title", 15, 0, -1)
-        api.nvim_buf_add_highlight(buf_id, namespace, "Comment", 16, 0, -1)
+        
+        -- Highlight active list markers
+        for i, line in ipairs(lines) do
+            if line:match("%[active%]") then
+                local start_idx = line:find("%[active%]")
+                if start_idx then
+                    api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticOk", i-1, start_idx-1, start_idx+7)
+                end
+            end
+        end
         
         -- Highlight keybindings
         for i = 2, 13 do
@@ -332,15 +329,34 @@ function M.setup(parent_module)
     end
     
     local function switch_to_list(list_name)
-        close_windows()
-        todo_module.state.load_list(list_name)
+        -- Load the list and get feedback
+        local success, msg = todo_module.state.load_list(list_name)
         
-        local main_window = todo_module.ui.main_window
-        if main_window and main_window.render_todos then
-            main_window.render_todos()
+        if success then
+            -- Close windows after successful switch
+            close_windows()
+            
+            -- Update the main window if it's open
+            local main_window = todo_module.ui.main_window
+            if main_window and main_window.render_todos then
+                main_window.render_todos()
+            end
+            
+            -- Update list window if it's open
+            local list_window = require("doit.ui.list_window")
+            if list_window and list_window.render_list then
+                pcall(list_window.render_list)
+            end
+            
+            -- Show confirmation with todo count
+            local todo_count = 0
+            if todo_module.state.todos then
+                todo_count = #todo_module.state.todos
+            end
+            vim.notify(string.format("Switched to list '%s' (%d todos)", list_name, todo_count), vim.log.levels.INFO)
+        else
+            vim.notify("Failed to switch list: " .. (msg or "unknown error"), vim.log.levels.ERROR)
         end
-        
-        vim.notify("Switched to todo list: " .. list_name, vim.log.levels.INFO)
     end
     
     local function set_keymaps()
