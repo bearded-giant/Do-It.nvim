@@ -115,6 +115,14 @@ function M.create_tag_window(main_win_id)
 			vim.api.nvim_set_current_win(main_win_id)
 		end
 	end, { buffer = tag_buf_id, nowait = true })
+	
+	-- Always allow Esc to close
+	vim.keymap.set("n", "<Esc>", function()
+		M.close_tag_window()
+		if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
+			vim.api.nvim_set_current_win(main_win_id)
+		end
+	end, { buffer = tag_buf_id, nowait = true })
 end
 
 return M

@@ -223,6 +223,7 @@ local function create_list_window()
     
     -- Setup close keymapping
     vim.keymap.set("n", "q", M.close_list_window, { buffer = buf_id, nowait = true })
+    vim.keymap.set("n", "<Esc>", M.close_list_window, { buffer = buf_id, nowait = true })
     
     -- Setup auto-refresh
     if timer then

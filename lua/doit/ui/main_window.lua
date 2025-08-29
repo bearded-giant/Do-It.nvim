@@ -859,6 +859,11 @@ local function create_window()
 	setup_keymap("export_todos", function()
 		prompt_io("export")
 	end)
+	
+	-- Always allow Esc to close the window, in addition to the configured close key
+	vim.keymap.set("n", "<Esc>", function()
+		M.close_window()
+	end, { buffer = buf_id, nowait = true, desc = "Close todo window" })
 end
 
 -- Open linked note for a todo
