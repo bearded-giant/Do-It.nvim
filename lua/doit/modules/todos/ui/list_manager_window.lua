@@ -401,21 +401,27 @@ function M.setup(parent_module)
             end
         end)
         
-        -- Navigation
-        set_keymap("j", function()
+        -- Navigation (vim keys and arrow keys)
+        local function move_down()
             local lists = todo_module.state.get_available_lists()
             if selected_index < #lists then
                 selected_index = selected_index + 1
                 render_lists()
             end
-        end)
+        end
         
-        set_keymap("k", function()
+        local function move_up()
             if selected_index > 1 then
                 selected_index = selected_index - 1
                 render_lists()
             end
-        end)
+        end
+        
+        set_keymap("j", move_down)
+        set_keymap("<Down>", move_down)
+        
+        set_keymap("k", move_up)
+        set_keymap("<Up>", move_up)
         
         -- Confirm selection with space
         set_keymap("<Space>", function()

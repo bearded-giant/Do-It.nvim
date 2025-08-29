@@ -3,17 +3,33 @@ local M = {}
 -- Lazy loading of todo module and state
 local todo_module = nil
 local state = nil
+local initialized = false
 
 local function get_todo_module()
     if not todo_module then
-        local core = require("doit.core")
-        todo_module = core.get_module("todos")
+        -- Try to get the module from core first
+        local ok, core = pcall(require, "doit.core")
+        if ok and core.get_module then
+            todo_module = core.get_module("todos")
+        end
         
-        -- If not loaded, try to load it
+        -- If not loaded through core, try to load it directly
         if not todo_module then
-            local doit = require("doit")
-            if doit.load_module then
+            local ok2, doit = pcall(require, "doit")
+            if ok2 and doit.load_module then
                 todo_module = doit.load_module("todos", {})
+            end
+        end
+        
+        -- Last resort: try to load the module directly
+        if not todo_module then
+            local ok3, todos = pcall(require, "doit.modules.todos")
+            if ok3 then
+                todo_module = todos
+                -- Initialize if needed
+                if todo_module.setup and not todo_module.state then
+                    todo_module.setup({})
+                end
             end
         end
     end
@@ -23,17 +39,34 @@ end
 -- Function to ensure state is loaded
 local function ensure_state_loaded()
     local module = get_todo_module()
+    
     if module and module.state then
         state = module.state
+        
+        -- Initialize state if needed
+        if not initialized then
+            if state.load_from_disk and type(state.load_from_disk) == "function" then
+                pcall(state.load_from_disk)
+            end
+            initialized = true
+        end
+        
         return state
-    else
-        -- Fallback to compatibility shim
+    end
+    
+    -- Fallback to compatibility shim
+    if not state then
         local ok, compat_state = pcall(require, "doit.state")
         if ok then
             state = compat_state
+            if not initialized and state and state.load_from_disk then
+                pcall(state.load_from_disk)
+                initialized = true
+            end
             return state
         end
     end
+    
     return nil
 end
 
@@ -52,21 +85,41 @@ local function get_active_todo()
 end
 
 function M.active_todo()
-    local active = get_active_todo()
+    local loaded_state = ensure_state_loaded()
+    
+    if not loaded_state or not loaded_state.todos or #loaded_state.todos == 0 then
+        return ""
+    end
+    
+    -- Find active todo
+    local active = nil
+    for _, todo in ipairs(loaded_state.todos) do
+        if todo.in_progress and not todo.done then
+            active = todo
+            break
+        end
+    end
+    
     if not active then
         return ""
     end
     
     -- Get config
-    local config = require("doit.config")
+    local ok, config = pcall(require, "doit.config")
+    local icon = "◐"
+    local max_length = 30
     
-    -- Get icon from config
-    local icon = config.options.formatting.in_progress.icon or "◐"
+    if ok and config.options then
+        if config.options.formatting and config.options.formatting.in_progress then
+            icon = config.options.formatting.in_progress.icon or "◐"
+        end
+        if config.options.lualine and config.options.lualine.max_length then
+            max_length = config.options.lualine.max_length
+        end
+    end
     
     -- Format the text - truncate if needed
     local text = active.text:gsub("\n", " ")
-    local max_length = config.options.lualine and config.options.lualine.max_length or 30
-    
     if #text > max_length then
         text = text:sub(1, max_length) .. "..."
     end

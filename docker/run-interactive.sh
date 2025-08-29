@@ -41,6 +41,7 @@ echo ""
 echo ""
 echo "Data directory: $DATA_DIR"
 echo ""
+/var/folders/qk/b7p_vz1d4q1drgrgz6k18nkm0000gp/T/TemporaryItems/NSIRD_screencaptureui_8h3vkd/Screenshot\ 2025-08-29\ at\ 9.38.08 AM.png
 echo "Press Enter to start Neovim..."
 read
 
@@ -51,4 +52,3 @@ docker run --rm -it \
 
 echo ""
 echo "Session ended. Data saved to: $DATA_DIR"
-
