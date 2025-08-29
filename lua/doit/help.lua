@@ -13,12 +13,13 @@ M.keymaps = {
 	todo_window = {
 		basic = {
 			{ key = "i", desc = "Add new todo" },
-			{ key = "x", desc = "Toggle todo status (pending/done)" },
+			{ key = "<Space>", desc = "Toggle todo status (pending→in-progress→done)" },
+			{ key = "p", desc = "Set/change priority (critical/urgent/important)" },
 			{ key = "d", desc = "Delete current todo" },
 			{ key = "D", desc = "Delete all completed todos" },
 			{ key = "u", desc = "Undo last delete" },
 			{ key = "e", desc = "Edit current todo" },
-			{ key = "q", desc = "Close window" },
+			{ key = "q/<Esc>", desc = "Close window" },
 			{ key = "?", desc = "Show help (with ALL keybindings)" },
 		},
 		organization = {
@@ -31,7 +32,6 @@ M.keymaps = {
 		advanced = {
 			{ key = "H", desc = "Add/edit due date (calendar)" },
 			{ key = "r", desc = "Reorder current todo (use j/k to move)" },
-			{ key = "p", desc = "Edit priorities" },
 			{ key = "T", desc = "Add time estimation" },
 			{ key = "R", desc = "Remove time estimation" },
 			{ key = "o", desc = "Open linked note" },

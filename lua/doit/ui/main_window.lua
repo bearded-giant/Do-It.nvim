@@ -565,9 +565,21 @@ local function create_window()
 	end
 	
 	-- Check for relative sizing first (from modules.todos.ui.window config)
-	local window_config = config.options.window
+	local window_config = nil
+	
+	-- First try to get from the modular config structure
 	if config.options.modules and config.options.modules.todos and config.options.modules.todos.ui and config.options.modules.todos.ui.window then
 		window_config = config.options.modules.todos.ui.window
+	elseif config.options.window then
+		-- Fallback to legacy config structure
+		window_config = config.options.window
+	else
+		-- Last resort defaults
+		window_config = {
+			width = 55,
+			height = 20,
+			use_relative = false
+		}
 	end
 	
 	local width, height
@@ -581,7 +593,7 @@ local function create_window()
 		height = window_config.height or 20
 	end
 	
-	local position = window_config.position or config.options.window.position or "center"
+	local position = window_config.position or "center"
 	local padding = 2
 
 	local col, row
