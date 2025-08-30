@@ -203,7 +203,7 @@ local function create_list_window()
     highlights.setup_highlights() -- initialize highlight groups
     
     buf_id = vim.api.nvim_create_buf(false, true)
-    win_id = vim.api.nvim_open_win(buf_id, false, {
+    win_id = vim.api.nvim_open_win(buf_id, true, {  -- Changed to true to give focus
         relative = "editor",
         row = row,
         col = col,
@@ -213,7 +213,7 @@ local function create_list_window()
         border = "rounded",
         title = string.format(" active to-dos [%s] ", list_name),
         title_pos = "center",
-        footer = " [q] to close ",
+        footer = " [q] or [Esc] to close ",
         footer_pos = "center",
     })
     
@@ -221,9 +221,9 @@ local function create_list_window()
     vim.api.nvim_win_set_option(win_id, "linebreak", true)
     vim.api.nvim_win_set_option(win_id, "breakindent", true)
     
-    -- Setup close keymapping
-    vim.keymap.set("n", "q", M.close_list_window, { buffer = buf_id, nowait = true })
-    vim.keymap.set("n", "<Esc>", M.close_list_window, { buffer = buf_id, nowait = true })
+    -- Setup close keymapping with proper closure
+    vim.keymap.set("n", "q", function() M.close_list_window() end, { buffer = buf_id, nowait = true, desc = "Close list window" })
+    vim.keymap.set("n", "<Esc>", function() M.close_list_window() end, { buffer = buf_id, nowait = true, desc = "Close list window" })
     
     -- Setup auto-refresh
     if timer then
@@ -239,18 +239,8 @@ local function create_list_window()
         end
     end))
     
-    -- Setup auto-close when focus lost
-    vim.api.nvim_create_autocmd("WinLeave", {
-        buffer = buf_id,
-        callback = function()
-            -- Don't close if moving to the main todo window
-            local cur_win = vim.api.nvim_get_current_win()
-            if cur_win ~= main_window.get_window_id() then
-                M.close_list_window()
-            end
-            return true
-        end,
-    })
+    -- Remove auto-close on focus lost - it interferes with keybindings
+    -- Users should explicitly close with q or Esc
 end
 
 function M.toggle_list_window()
