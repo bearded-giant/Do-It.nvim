@@ -10,6 +10,11 @@ M.defaults = {
         enabled = true,
     },
     window = {
+        -- Default to 50% of screen
+        use_relative = true,
+        relative_width = 0.5,
+        relative_height = 0.5,
+        -- Fallback absolute values
         width = 55,
         height = 20,
         border = "rounded",
@@ -132,6 +137,12 @@ M.options = {}
 function M.setup(opts)
     -- Merge defaults with user options
     M.options = vim.tbl_deep_extend("force", M.defaults, opts or {})
+    
+    -- Check if ui config exists in opts and merge it properly
+    if opts and opts.ui and opts.ui.window then
+        M.options.window = vim.tbl_deep_extend("force", M.options.window or {}, opts.ui.window)
+    end
+    
     return M.options
 end
 

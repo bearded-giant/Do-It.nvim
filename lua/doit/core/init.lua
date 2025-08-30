@@ -77,7 +77,13 @@ function M.register_module(name, module)
     
     if module.commands then
         for cmd_name, cmd_def in pairs(module.commands) do
-            vim.api.nvim_create_user_command(cmd_name, cmd_def.callback, cmd_def.opts or {})
+            -- Check if command already exists before creating
+            local commands = vim.api.nvim_get_commands({})
+            local exists = commands[cmd_name] ~= nil
+            
+            if not exists then
+                vim.api.nvim_create_user_command(cmd_name, cmd_def.callback, cmd_def.opts or {})
+            end
         end
     end
     

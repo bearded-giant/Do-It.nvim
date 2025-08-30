@@ -9,6 +9,9 @@ function M.setup(opts)
 		opts.modules = {}
 	end
 
+	-- Setup the global config with the full options
+	require("doit.config").setup(opts)
+
 	M.core = require("doit.core").setup(opts)
 
 	if M.core and not M.core.ui then
@@ -182,8 +185,13 @@ function M.setup(opts)
 end
 
 function M.register_module_commands()
-	local commands = {
-		DoIt = {
+	-- Note: Module commands are now registered by core.register_module()
+	-- This function only registers fallback commands if modules aren't loaded
+	local commands = {}
+	
+	-- Only register DoIt if todos module hasn't registered it
+	if not (M.todos and M.todos.commands and M.todos.commands.DoIt) then
+		commands.DoIt = {
 			callback = function()
 				if M.todos and M.todos.ui and M.todos.ui.main_window then
 					M.todos.ui.main_window.toggle_todo_window()
@@ -196,8 +204,14 @@ function M.register_module_commands()
 			opts = {
 				desc = "Toggle todo window",
 			},
-		},
-		DoItList = {
+		}
+	end
+	
+	-- Note: Keeping this structure to check for other commands
+	
+	-- Only register DoItList if todos module hasn't registered it
+	if not (M.todos and M.todos.commands and M.todos.commands.DoItList) then
+		commands.DoItList = {
 			callback = function()
 				if M.todos and M.todos.ui and M.todos.ui.list_window then
 					M.todos.ui.list_window.toggle_list_window()
@@ -210,8 +224,12 @@ function M.register_module_commands()
 			opts = {
 				desc = "Toggle todo list window",
 			},
-		},
-		DoItNotes = {
+		}
+	end
+	
+	-- Only register DoItNotes if notes module hasn't registered it
+	if not (M.notes and M.notes.commands and M.notes.commands.DoItNotes) then
+		commands.DoItNotes = {
 			callback = function()
 				if M.notes and M.notes.ui and M.notes.ui.notes_window then
 					M.notes.ui.notes_window.toggle_notes_window()
@@ -224,8 +242,12 @@ function M.register_module_commands()
 			opts = {
 				desc = "Toggle notes window",
 			},
-		},
-		DoItLists = {
+		}
+	end
+	
+	-- Only register DoItLists if todos module hasn't registered it  
+	if not (M.todos and M.todos.commands and M.todos.commands.DoItLists) then
+		commands.DoItLists = {
 			callback = function()
 				if M.todos and M.todos.ui and M.todos.ui.list_manager_window then
 					M.todos.ui.list_manager_window.toggle_window()
@@ -236,14 +258,12 @@ function M.register_module_commands()
 			opts = {
 				desc = "Manage todo lists",
 			},
-		},
-	}
+		}
+	end
 
 	for name, cmd in pairs(commands) do
-		local exists = pcall(function()
-			vim.api.nvim_get_commands({})
-			return vim.api.nvim_get_commands({})[name] ~= nil
-		end)
+		local cmd_list = vim.api.nvim_get_commands({})
+		local exists = cmd_list[name] ~= nil
 
 		if not exists then
 			pcall(vim.api.nvim_create_user_command, name, cmd.callback, cmd.opts or {})

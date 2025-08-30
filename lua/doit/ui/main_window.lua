@@ -105,7 +105,8 @@ local function create_small_keys_window(main_win_pos)
 
 	local keys = config.options.keymaps
 	local small_buf = vim.api.nvim_create_buf(false, true)
-	local width = config.options.window.width
+	-- Use the actual width from the main window position
+	local width = main_win_pos.width
 
 	local lines_1 = {
 		"",
@@ -564,31 +565,52 @@ local function create_window()
 		}
 	end
 	
-	-- Check for relative sizing first (from modules.todos.ui.window config)
+	-- Get window config - check multiple locations
 	local window_config = nil
 	
-	-- First try to get from the modular config structure
+	-- First check if we have module-specific config  
 	if config.options.modules and config.options.modules.todos and config.options.modules.todos.ui and config.options.modules.todos.ui.window then
 		window_config = config.options.modules.todos.ui.window
+	-- Then check for legacy ui.window
+	elseif config.options.ui and config.options.ui.window then
+		window_config = config.options.ui.window
+	-- Then fallback to direct window config
 	elseif config.options.window then
-		-- Fallback to legacy config structure
 		window_config = config.options.window
 	else
-		-- Last resort defaults
+		-- Last resort defaults (now 50% by default)
 		window_config = {
+			use_relative = true,
+			relative_width = 0.5,
+			relative_height = 0.5,
 			width = 55,
-			height = 20,
-			use_relative = false
+			height = 20
 		}
 	end
 	
 	local width, height
-	if window_config.use_relative then
-		-- Use relative sizing based on screen percentage
+	
+	-- Calculate Quick Keys window height if enabled
+	local quick_keys_height = 0
+	if config.options.quick_keys then
+		quick_keys_height = 7 + 2  -- 7 lines + 2 for borders
+	end
+	
+	-- Check if relative sizing is enabled (default to true now)
+	if window_config.use_relative ~= false and (window_config.relative_width or window_config.relative_height) then
+		-- Use relative sizing (default 50%)
 		width = math.floor(ui.width * (window_config.relative_width or 0.5))
-		height = math.floor(ui.height * (window_config.relative_height or 0.5))
+		local total_height = math.floor(ui.height * (window_config.relative_height or 0.5))
+		
+		-- If quick keys are enabled, distribute the height between main window and quick keys
+		if config.options.quick_keys then
+			-- Subtract quick keys height and spacing from total to get main window height
+			height = total_height - quick_keys_height - 1  -- -1 for spacing between windows
+		else
+			height = total_height
+		end
 	else
-		-- Use absolute sizing
+		-- Fallback to absolute values only if explicitly disabled
 		width = window_config.width or 55
 		height = window_config.height or 20
 	end
@@ -596,19 +618,25 @@ local function create_window()
 	local position = window_config.position or "center"
 	local padding = 2
 
+	-- Calculate total height including quick keys window if enabled
+	local total_window_height = height
+	if config.options.quick_keys then
+		total_window_height = height + quick_keys_height + 1  -- +1 for spacing
+	end
+
 	local col, row
 	if position == "right" then
 		col = ui.width - width - padding
-		row = math.floor((ui.height - height) / 2)
+		row = math.floor((ui.height - total_window_height) / 2)
 	elseif position == "left" then
 		col = padding
-		row = math.floor((ui.height - height) / 2)
+		row = math.floor((ui.height - total_window_height) / 2)
 	elseif position == "top" then
 		col = math.floor((ui.width - width) / 2)
 		row = padding
 	elseif position == "bottom" then
 		col = math.floor((ui.width - width) / 2)
-		row = ui.height - height - padding
+		row = ui.height - total_window_height - padding
 	elseif position == "top-right" then
 		col = ui.width - width - padding
 		row = padding
@@ -617,13 +645,13 @@ local function create_window()
 		row = padding
 	elseif position == "bottom-right" then
 		col = ui.width - width - padding
-		row = ui.height - height - padding
+		row = ui.height - total_window_height - padding
 	elseif position == "bottom-left" then
 		col = padding
-		row = ui.height - height - padding
+		row = ui.height - total_window_height - padding
 	else
 		col = math.floor((ui.width - width) / 2)
-		row = math.floor((ui.height - height) / 2)
+		row = math.floor((ui.height - total_window_height) / 2)
 	end
 
 	highlights.setup_highlights() -- initialize highlight groups
@@ -700,12 +728,17 @@ local function create_window()
 		-- Try to get key from config, fall back to default
 		local key = nil
 		
-		-- First try: config.options.keymaps
-		if config.options and config.options.keymaps then
+		-- First try: Check module-specific keymaps
+		if config.options and config.options.modules and config.options.modules.todos and config.options.modules.todos.keymaps then
+			key = config.options.modules.todos.keymaps[key_option]
+		end
+		
+		-- Second try: config.options.keymaps (legacy)
+		if not key and config.options and config.options.keymaps then
 			key = config.options.keymaps[key_option]
 		end
 		
-		-- Second try: Look for module config
+		-- Third try: Look for module config
 		if not key then
 			local module = get_todo_module()
 			if module and module.config and module.config.keymaps then
@@ -713,7 +746,7 @@ local function create_window()
 			end
 		end
 		
-		-- Third try: Use default
+		-- Fourth try: Use default
 		if not key then
 			key = default_keymaps[key_option]
 		end
