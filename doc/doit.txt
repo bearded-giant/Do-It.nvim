@@ -12,7 +12,8 @@ Table of Contents                                          *doit-contents*
   - Commands                                                  |doit-commands|
   - Keybindings                                            |doit-keybindings|
 2. Advanced                                                    |doit-advanced|
-  - Calendar                                                 |doit-calendar|
+  - Calendar Due Date Picker                                |doit-calendar|
+  - Calendar Module (icalbuddy)                      |doit-calendar-module|
   - Priority System                                         |doit-priorities|
   - Import/Export                                             |doit-import|
   - Project Notes                                              |doit-notes|
@@ -329,6 +330,38 @@ Configure the calendar: >lua
         },
     }
 <
+
+CALENDAR MODULE (ICALBUDDY)                         *doit-calendar-module*
+
+The Calendar Module provides a full calendar view with icalbuddy integration
+for viewing your actual calendar events within Neovim.
+
+Key Features:
+• Integration with macOS icalbuddy for real calendar data
+• Multiple views: day, 3-day, and week
+• Mock data support for Docker/demos
+• Navigation with vim-style keybindings
+
+Quick Start: >lua
+    -- In your doit setup:
+    modules = {
+        calendar = {
+            enabled = true,
+            default_view = "day",
+            keymaps = {
+                toggle_window = "<leader>dC"
+            }
+        }
+    }
+<
+
+Commands:
+    :DoItCalendar         Toggle calendar window
+    :DoItCalendarDay      Open in day view
+    :DoItCalendar3Day     Open in 3-day view
+    :DoItCalendarWeek     Open in week view
+
+For full documentation, see |doit_calendar.txt|
 
 PRIORITY SYSTEM                                             *doit-priorities*
 

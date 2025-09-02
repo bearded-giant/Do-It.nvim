@@ -6,6 +6,17 @@ config.setup({})
 
 describe("notes", function()
     before_each(function()
+        -- Reinitialize the todos module for each test
+        package.loaded["doit.state"] = nil  -- Clear cached state
+        package.loaded["doit.state.notes"] = nil  -- Clear cached notes state
+        local doit = require("doit")
+        doit.setup({
+            modules = {
+                todos = { enabled = true }
+            }
+        })
+        notes_module = require("doit.state.notes")  -- Re-require after setup
+        
         -- Reset notes state before each test
         notes_module.notes = {
             global = { content = "" },

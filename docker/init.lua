@@ -140,6 +140,33 @@ local config = {
 			},
 		},
 		
+		-- Calendar module (with mock data in Docker)
+		calendar = {
+			enabled = true,
+			default_view = "day",
+			hours = {
+				start = 8,
+				["end"] = 20
+			},
+			window = {
+				width = 80,
+				height = 30,
+				position = "center",
+				border = "rounded"
+			},
+			keymaps = {
+				toggle_window = "<leader>dC",
+				switch_view_day = "d",
+				switch_view_3day = "3",
+				switch_view_week = "w",
+				next_period = "l",
+				prev_period = "h",
+				today = "t",
+				close = "q",
+				refresh = "r"
+			}
+		},
+		
 		-- Notes module
 		notes = {
 			enabled = true,
@@ -200,6 +227,7 @@ vim.keymap.set("n", "<leader>do", "<cmd>DoIt<CR>", { desc = "Toggle DoIt Todos" 
 vim.keymap.set("n", "<leader>dn", "<cmd>DoItNotes<CR>", { desc = "Toggle DoIt Notes" })
 vim.keymap.set("n", "<leader>dl", "<cmd>DoItList<CR>", { desc = "Toggle DoIt List" })
 vim.keymap.set("n", "<leader>dL", "<cmd>DoItLists<CR>", { desc = "Manage DoIt Lists" })
+vim.keymap.set("n", "<leader>dC", "<cmd>DoItCalendar<CR>", { desc = "Toggle DoIt Calendar" })
 
 -- Welcome message function that reads from HELP.txt
 local function show_welcome()
@@ -220,6 +248,7 @@ local function show_welcome()
 		print("  :DoItList    - Open quick todo list")
 		print("  :DoItLists   - Manage todo lists")
 		print("  :DoItNotes   - Open notes window")
+		print("  :DoItCalendar - Open calendar view")
 		print("")
 		print("BASIC KEYS in todo window:")
 		print("  i - Add    x - Toggle    d - Delete    ? - Help")

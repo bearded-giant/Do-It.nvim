@@ -21,6 +21,16 @@ local mock_file = {
 
 describe("storage", function()
 	before_each(function()
+		-- Reinitialize the todos module for each test
+		package.loaded["doit.state"] = nil  -- Clear cached state
+		local doit = require("doit")
+		doit.setup({
+			modules = {
+				todos = { enabled = true }
+			}
+		})
+		doit_state = require("doit.state")  -- Re-require after setup
+		
 		_G.io.open = function(path, mode)
 			if mode == "r" and not mock_file.content then
 				return nil -- Simulate file not found for reading
@@ -65,6 +75,9 @@ describe("storage", function()
 
 		doit_state.load_from_disk()
 
+		assert.is_not_nil(doit_state.todos, "todos should not be nil")
+		assert.are.equal("table", type(doit_state.todos), "todos should be a table")
+		assert.are.equal(1, #doit_state.todos, "Should have loaded 1 todo")
 		assert.are.equal("Loaded todo", doit_state.todos[1].text)
 		assert.are.equal(false, doit_state.todos[1].done)
 

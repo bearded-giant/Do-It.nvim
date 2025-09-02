@@ -1,0 +1,213 @@
+*doit_calendar.txt*  Calendar module for do-it.nvim
+
+==============================================================================
+CONTENTS                                              *doit-calendar-contents*
+
+  1. Introduction .......................... |doit-calendar-intro|
+  2. Features .............................. |doit-calendar-features|
+  3. Requirements .......................... |doit-calendar-requirements|
+  4. Configuration ......................... |doit-calendar-configuration|
+  5. Commands .............................. |doit-calendar-commands|
+  6. Keymaps ............................... |doit-calendar-keymaps|
+  7. Views ................................. |doit-calendar-views|
+  8. icalbuddy Integration ................. |doit-calendar-icalbuddy|
+  9. Docker Support ........................ |doit-calendar-docker|
+
+==============================================================================
+INTRODUCTION                                             *doit-calendar-intro*
+
+The DoIt Calendar module provides a TUI calendar interface within Neovim,
+allowing you to view your calendar events without leaving your editor.
+
+Key features:
+• Integration with macOS icalbuddy for real calendar data
+• Multiple view modes (day, 3-day, week)
+• Configurable time ranges
+• Mock data support for demos and Docker environments
+• Read-only event display (no modifications)
+
+==============================================================================
+FEATURES                                             *doit-calendar-features*
+
+• Native macOS Integration: Uses icalbuddy to fetch real calendar events
+  from your macOS Calendar app
+• Multiple Views: Day, 3-day, and week views for different perspectives
+• Smart Navigation: Use vim-style h/l keys to move between time periods
+• Configurable Hours: Set your working hours (default 8am-8pm)
+• Performance: Event caching with 60-second TTL to reduce icalbuddy calls
+• Docker Support: Automatic mock data generation when running in containers
+
+==============================================================================
+REQUIREMENTS                                     *doit-calendar-requirements*
+
+For macOS (Real Calendar Data):
+• icalbuddy must be installed: `brew install icalbuddy`
+• Access to macOS Calendar app events
+
+For Docker/Linux (Mock Data):
+• No additional requirements - uses generated mock data automatically
+
+==============================================================================
+CONFIGURATION                                   *doit-calendar-configuration*
+
+Add to your do-it.nvim setup:
+
+>lua
+  require("doit").setup({
+    modules = {
+      calendar = {
+        enabled = true,
+        default_view = "day",  -- "day", "3day", or "week"
+        hours = {
+          start = 8,   -- Start hour (8am)
+          ["end"] = 20 -- End hour (8pm)
+        },
+        window = {
+          width = 80,
+          height = 30,
+          position = "center",
+          border = "rounded"
+        },
+        keymaps = {
+          toggle_window = "<leader>dC",
+          switch_view_day = "d",
+          switch_view_3day = "3",
+          switch_view_week = "w",
+          next_period = "l",
+          prev_period = "h",
+          today = "t",
+          close = "q",
+          refresh = "r"
+        },
+        icalbuddy = {
+          path = "icalbuddy",      -- Path to icalbuddy binary
+          cache_ttl = 60,          -- Cache TTL in seconds
+          format_options = "-nc -nrd" -- No calendar names, no relative dates
+        }
+      }
+    }
+  })
+<
+
+==============================================================================
+COMMANDS                                           *doit-calendar-commands*
+
+*:DoItCalendar* [action]
+    Main calendar command. Actions:
+    • toggle (default) - Toggle calendar window
+    • show - Show calendar window
+    • hide - Hide calendar window
+    • today - Jump to today
+    • next - Navigate to next period
+    • prev - Navigate to previous period
+    • view {type} - Switch to day/3day/week view
+    • refresh - Clear cache and refresh
+
+*:DoItCalendarDay*
+    Open calendar in day view
+
+*:DoItCalendar3Day*
+    Open calendar in 3-day view
+
+*:DoItCalendarWeek*
+    Open calendar in week view
+
+==============================================================================
+KEYMAPS                                             *doit-calendar-keymaps*
+
+Global keymaps:
+• `<leader>dC` - Toggle calendar window
+
+Within calendar window:
+• `d` - Switch to day view
+• `3` - Switch to 3-day view
+• `w` - Switch to week view
+• `h` - Previous period (day/3 days/week)
+• `l` - Next period (day/3 days/week)
+• `t` - Jump to today
+• `r` - Refresh (clears cache)
+• `q` - Close calendar
+
+==============================================================================
+VIEWS                                                 *doit-calendar-views*
+
+Day View
+Shows a single day with hourly slots from your configured start to end time.
+Events are displayed with their time and title. All-day events appear at
+the top.
+
+Example:
+>
+  Monday, September 2, 2024
+  ────────────────────────────
+  
+  All Day Events:
+    • Labor Day
+  
+   8:00 ┃ 
+   9:00 ┃ Team Standup (30m)
+  10:00 ┃ 
+  11:00 ┃ Product Review (1h)
+  12:00 ┃ Lunch Break (1h)
+   1:00 ┃ 
+   2:00 ┃ 1:1 with Manager (30m)
+<
+
+3-Day View
+Shows three consecutive days with a condensed event list for each day.
+
+Week View
+Shows Monday through Sunday with up to 2 events per day visible, plus
+an indicator if there are more events.
+
+==============================================================================
+ICALBUDDY INTEGRATION                             *doit-calendar-icalbuddy*
+
+The calendar module uses icalbuddy to fetch events from your macOS Calendar.
+
+How it works:
+1. Executes icalbuddy commands to fetch events for date ranges
+2. Parses the output to extract event details (title, time, location)
+3. Caches results for 60 seconds to improve performance
+4. Displays events in the selected view format
+
+icalbuddy Command Example:
+>bash
+  icalbuddy -nc -nrd eventsFrom:today to:today+7
+<
+
+This fetches events from today to 7 days ahead without calendar names (-nc)
+and without relative dates (-nrd).
+
+Troubleshooting icalbuddy:
+• Ensure icalbuddy is installed: `which icalbuddy`
+• Test manually: `icalbuddy eventsToday`
+• Check Calendar app permissions in System Settings > Privacy & Security
+
+==============================================================================
+DOCKER SUPPORT                                       *doit-calendar-docker*
+
+When running in Docker containers (detected via /.dockerenv file), the
+module automatically switches to mock data mode.
+
+Mock Data Features:
+• Generates realistic meeting patterns
+• Includes daily standups on weekdays
+• Random meetings throughout the day
+• Weekend events occasionally
+• Consistent data based on date seed
+
+This allows the calendar module to work in:
+• Docker test environments
+• CI/CD pipelines
+• Demo scenarios
+• Linux systems without icalbuddy
+
+Example Mock Events:
+• Team Standup (9:00-9:30 weekdays)
+• Product Review, Engineering Sync, etc. (random times)
+• Lunch Break (12:00-13:00)
+• Weekend Project Time (occasional weekends)
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
