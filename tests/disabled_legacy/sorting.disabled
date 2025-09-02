@@ -1,19 +1,31 @@
-local doit_state = require("doit.state")
-local sorting = require("doit.state.sorting")
-local config = require("doit.config")
+local doit_state, config
 
 describe("sorting", function()
 	before_each(function()
-		doit_state.get_priority_score = function(todo)
-			if todo.priorities then
-				return #todo.priorities
-			end
-			return 0
+		-- Reinitialize the todos module for each test
+		package.loaded["doit.state"] = nil  -- Clear cached state
+		package.loaded["doit.state.sorting"] = nil  -- Clear sorting module too
+		package.loaded["doit.state.priorities"] = nil  -- Clear priorities module
+		package.loaded["doit.config"] = nil  -- Clear config too
+		
+		local doit = require("doit")
+		doit.setup({
+			modules = {
+				todos = { enabled = true }
+			},
+			priorities = {
+				{ name = "p1", weight = 3 },
+				{ name = "p2", weight = 2 },
+				{ name = "p3", weight = 1 }
+			}
+		})
+		doit_state = require("doit.state")  -- Re-require after setup
+		config = require("doit.config")  -- Re-require config after setup
+		
+		-- Make sure priority weights are initialized
+		if doit_state.update_priority_weights then
+			doit_state.update_priority_weights()
 		end
-
-		config.options = {
-			priorities = { "p1", "p2", "p3" },
-		}
 	end)
 
 	it("should sort by completion status first", function()
@@ -42,8 +54,8 @@ describe("sorting", function()
 
 	it("should sort in-progress todos by priority", function()
 		doit_state.todos = {
-			{ text = "In-progress low priority", done = false, in_progress = true, created_at = os.time(), priorities = { "p3" } },
-			{ text = "In-progress high priority", done = false, in_progress = true, created_at = os.time(), priorities = { "p1", "p2" } },
+			{ text = "In-progress low priority", done = false, in_progress = true, created_at = os.time(), priorities = "p3" },
+			{ text = "In-progress high priority", done = false, in_progress = true, created_at = os.time(), priorities = "p1" },
 		}
 
 		doit_state.sort_todos()
@@ -54,8 +66,8 @@ describe("sorting", function()
 
 	it("should sort by priority score second", function()
 		doit_state.todos = {
-			{ text = "Low priority", done = false, created_at = os.time(), priorities = { "p3" } },
-			{ text = "High priority", done = false, created_at = os.time(), priorities = { "p1", "p2" } },
+			{ text = "Low priority", done = false, created_at = os.time(), priorities = "p3" },
+			{ text = "High priority", done = false, created_at = os.time(), priorities = "p1" },
 		}
 
 		doit_state.sort_todos()
@@ -70,8 +82,8 @@ describe("sorting", function()
 		local nextWeek = now + 604800 -- 7 days
 
 		doit_state.todos = {
-			{ text = "Due next week", done = false, created_at = now, priorities = {}, due_at = nextWeek },
-			{ text = "Due tomorrow", done = false, created_at = now, priorities = {}, due_at = tomorrow },
+			{ text = "Due next week", done = false, created_at = now, priorities = nil, due_at = nextWeek },
+			{ text = "Due tomorrow", done = false, created_at = now, priorities = nil, due_at = tomorrow },
 		}
 
 		doit_state.sort_todos()
@@ -85,8 +97,8 @@ describe("sorting", function()
 		local tomorrow = now + 86400 -- 24 hours
 
 		doit_state.todos = {
-			{ text = "No due date", done = false, created_at = now, priorities = {} },
-			{ text = "Has due date", done = false, created_at = now, priorities = {}, due_at = tomorrow },
+			{ text = "No due date", done = false, created_at = now, priorities = nil },
+			{ text = "Has due date", done = false, created_at = now, priorities = nil, due_at = tomorrow },
 		}
 
 		doit_state.sort_todos()
@@ -96,14 +108,18 @@ describe("sorting", function()
 	end)
 
 	it("should sort by creation time last", function()
-		local earlier = os.time() - 86400 -- 24 hours ago
-		local later = os.time()
+		local earlier = 1000
+		local later = 2000
 
 		doit_state.todos = {
-			{ text = "Newer todo", done = false, created_at = later, priorities = {} },
-			{ text = "Older todo", done = false, created_at = earlier, priorities = {} },
+			{ text = "Newer todo", done = false, created_at = later },
+			{ text = "Older todo", done = false, created_at = earlier },
 		}
 
+		-- Debug: check values before sort
+		assert.are.equal(2000, doit_state.todos[1].created_at, "First should have created_at 2000")
+		assert.are.equal(1000, doit_state.todos[2].created_at, "Second should have created_at 1000")
+		
 		doit_state.sort_todos()
 
 		assert.are.equal("Older todo", doit_state.todos[1].text)
@@ -116,12 +132,12 @@ describe("sorting", function()
 		local tomorrow = now + 86400
 
 		doit_state.todos = {
-			{ text = "Done, high priority", done = true, created_at = yesterday, priorities = { "p1", "p2" } },
+			{ text = "Done, high priority", done = true, created_at = yesterday, priorities = "p1" },
 			{
 				text = "Pending, high priority, due tomorrow",
 				done = false,
 				created_at = now,
-				priorities = { "p1", "p2" },
+				priorities = "p1",
 				due_at = tomorrow,
 			},
 			{
@@ -129,15 +145,15 @@ describe("sorting", function()
 				done = false,
 				in_progress = true,
 				created_at = yesterday,
-				priorities = { "p3" },
+				priorities = "p3",
 			},
 			{
 				text = "Pending, high priority, no due date",
 				done = false,
 				created_at = now,
-				priorities = { "p1", "p2" },
+				priorities = "p1",
 			},
-			{ text = "Done, low priority", done = true, created_at = now, priorities = { "p3" } },
+			{ text = "Done, low priority", done = true, created_at = now, priorities = "p3" },
 		}
 
 		doit_state.sort_todos()

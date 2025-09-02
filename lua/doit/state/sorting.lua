@@ -13,7 +13,7 @@ function Sorting.setup(M, config)
 			-- If both are not done, prioritize in_progress items to the top
 			if not a.done and not b.done then
 				if a.in_progress ~= b.in_progress then
-					return a.in_progress
+					return a.in_progress and not b.in_progress
 				end
 				
 				-- If both are in_progress, sort by priority score
@@ -35,16 +35,7 @@ function Sorting.setup(M, config)
 				end
 			end
 
-			-- 3) Sort by order_index if both have it (for manual ordering)
-			if a.order_index and b.order_index then
-				return a.order_index < b.order_index
-			elseif a.order_index then
-				return true
-			elseif b.order_index then
-				return false
-			end
-
-			-- 4) Sort by due date
+			-- 3) Sort by due date
 			if a.due_at and b.due_at then
 				if a.due_at ~= b.due_at then
 					return a.due_at < b.due_at
@@ -55,7 +46,7 @@ function Sorting.setup(M, config)
 				return false
 			end
 
-			-- 5) Sort by creation time
+			-- 4) Sort by creation time
 			return a.created_at < b.created_at
 		end)
 	end
