@@ -722,8 +722,17 @@ function M.reorder_todo(win_id, on_render)
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
 
+	-- Calculate offset based on filters (consistent with move_todo)
+	local line_offset = 1 -- default offset for blank line at top
+	if state.active_filter then
+		line_offset = line_offset + 2 -- add 2 for filter header
+	end
+	if state.active_category then
+		line_offset = line_offset + 2 -- add 2 for category header
+	end
+
 	-- Get the current todo index
-	local todo_index = line_num - (state.active_filter and 3 or 1)
+	local todo_index = line_num - line_offset
 	if todo_index < 1 or todo_index > #state.todos then
 		return
 	end
@@ -734,10 +743,27 @@ function M.reorder_todo(win_id, on_render)
 
 	-- Determine the actual index in todos array if using filter
 	local real_index
-	if state.active_filter then
+	if state.active_filter or state.active_category then
 		local visible_count = 0
 		for i, todo in ipairs(state.todos) do
-			if todo.text:match("#" .. state.active_filter) then
+			local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+			local show_by_category = true
+			
+			if state.active_category then
+				local module = get_todo_module()
+				if module and module.state and module.state.get_todo_category then
+					local todo_category_id = module.state.get_todo_category(todo.id)
+					show_by_category = (todo_category_id == state.active_category) or
+									  (state.active_category == "uncategorized" and 
+									   (todo_category_id == "uncategorized" or not todo_category_id))
+				else
+					show_by_category = (todo.category == state.active_category) or
+									  (state.active_category == "Uncategorized" and 
+									   (not todo.category or todo.category == ""))
+				end
+			end
+			
+			if show_by_tag and show_by_category then
 				visible_count = visible_count + 1
 				if visible_count == todo_index then
 					real_index = i
@@ -775,6 +801,8 @@ function M.reorder_todo(win_id, on_render)
 
 		safe_del_keymap("<Down>")
 		safe_del_keymap("<Up>")
+		safe_del_keymap("j")
+		safe_del_keymap("k")
 		safe_del_keymap(reorder_key)
 		safe_del_keymap("<Esc>")
 
@@ -801,7 +829,16 @@ function M.reorder_todo(win_id, on_render)
 	local function move_todo(buf_id, win_id, line_num, ns_id, direction, on_render)
 		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
-		local current_index = line_num - (state.active_filter and 3 or 1)
+		-- Calculate offset based on filters
+		local line_offset = 1 -- default offset for blank line at top
+		if state.active_filter then
+			line_offset = line_offset + 2 -- add 2 for filter header
+		end
+		if state.active_category then
+			line_offset = line_offset + 2 -- add 2 for category header
+		end
+
+		local current_index = line_num - line_offset
 
 		if direction == "up" and current_index <= 1 then
 			return
@@ -809,10 +846,27 @@ function M.reorder_todo(win_id, on_render)
 
 		-- Get the real index in state.todos
 		local real_index
-		if state.active_filter then
+		if state.active_filter or state.active_category then
 			local visible_count = 0
 			for i, todo in ipairs(state.todos) do
-				if todo.text:match("#" .. state.active_filter) then
+				local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+				local show_by_category = true
+				
+				if state.active_category then
+					local module = get_todo_module()
+					if module and module.state and module.state.get_todo_category then
+						local todo_category_id = module.state.get_todo_category(todo.id)
+						show_by_category = (todo_category_id == state.active_category) or
+										  (state.active_category == "uncategorized" and 
+										   (todo_category_id == "uncategorized" or not todo_category_id))
+					else
+						show_by_category = (todo.category == state.active_category) or
+										  (state.active_category == "Uncategorized" and 
+										   (not todo.category or todo.category == ""))
+					end
+				end
+				
+				if show_by_tag and show_by_category then
 					visible_count = visible_count + 1
 					if visible_count == current_index then
 						real_index = i
@@ -842,7 +896,24 @@ function M.reorder_todo(win_id, on_render)
 		local target_index
 		if direction == "down" then
 			for i = real_index + 1, #state.todos do
-				if not state.active_filter or state.todos[i].text:match("#" .. state.active_filter) then
+				local show_by_tag = not state.active_filter or state.todos[i].text:match("#" .. state.active_filter)
+				local show_by_category = true
+				
+				if state.active_category then
+					local module = get_todo_module()
+					if module and module.state and module.state.get_todo_category then
+						local todo_category_id = module.state.get_todo_category(state.todos[i].id)
+						show_by_category = (todo_category_id == state.active_category) or
+										  (state.active_category == "uncategorized" and 
+										   (todo_category_id == "uncategorized" or not todo_category_id))
+					else
+						show_by_category = (state.todos[i].category == state.active_category) or
+										  (state.active_category == "Uncategorized" and 
+										   (not state.todos[i].category or state.todos[i].category == ""))
+					end
+				end
+				
+				if show_by_tag and show_by_category then
 					target_index = i
 					break
 				end
@@ -853,7 +924,24 @@ function M.reorder_todo(win_id, on_render)
 			end
 		else -- up
 			for i = real_index - 1, 1, -1 do
-				if not state.active_filter or state.todos[i].text:match("#" .. state.active_filter) then
+				local show_by_tag = not state.active_filter or state.todos[i].text:match("#" .. state.active_filter)
+				local show_by_category = true
+				
+				if state.active_category then
+					local module = get_todo_module()
+					if module and module.state and module.state.get_todo_category then
+						local todo_category_id = module.state.get_todo_category(state.todos[i].id)
+						show_by_category = (todo_category_id == state.active_category) or
+										  (state.active_category == "uncategorized" and 
+										   (todo_category_id == "uncategorized" or not todo_category_id))
+					else
+						show_by_category = (state.todos[i].category == state.active_category) or
+										  (state.active_category == "Uncategorized" and 
+										   (not state.todos[i].category or state.todos[i].category == ""))
+					end
+				end
+				
+				if show_by_tag and show_by_category then
 					target_index = i
 					break
 				end
@@ -865,8 +953,8 @@ function M.reorder_todo(win_id, on_render)
 		end
 
 		-- Swap order indices for reordering
-		local current_order = state.todos[real_index].order_index
-		local target_order = state.todos[target_index].order_index
+		local current_order = state.todos[real_index].order_index or real_index
+		local target_order = state.todos[target_index].order_index or target_index
 
 		-- Swap the order indices
 		state.todos[real_index].order_index = target_order
@@ -896,21 +984,38 @@ function M.reorder_todo(win_id, on_render)
 		-- Update cursor position to follow the moved todo
 		local new_line_num = 0
 
-		if state.active_filter then
+		if state.active_filter or state.active_category then
 			-- Recalculate the cursor position when filtered
 			local visible_count = 0
 			for i, todo in ipairs(state.todos) do
-				if todo.text:match("#" .. state.active_filter) then
+				local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+				local show_by_category = true
+				
+				if state.active_category then
+					local module = get_todo_module()
+					if module and module.state and module.state.get_todo_category then
+						local todo_category_id = module.state.get_todo_category(todo.id)
+						show_by_category = (todo_category_id == state.active_category) or
+										  (state.active_category == "uncategorized" and 
+										   (todo_category_id == "uncategorized" or not todo_category_id))
+					else
+						show_by_category = (todo.category == state.active_category) or
+										  (state.active_category == "Uncategorized" and 
+										   (not todo.category or todo.category == ""))
+					end
+				end
+				
+				if show_by_tag and show_by_category then
 					visible_count = visible_count + 1
 					if i == new_position then
-						new_line_num = visible_count + (state.active_filter and 3 or 1)
+						new_line_num = visible_count + line_offset
 						break
 					end
 				end
 			end
 		else
 			-- Unfiltered view is simpler
-			new_line_num = new_position + 1
+			new_line_num = new_position + line_offset
 		end
 
 		if new_line_num > 0 then
@@ -920,11 +1025,21 @@ function M.reorder_todo(win_id, on_render)
 		end
 	end
 
+	-- Arrow keys for movement
 	vim.keymap.set("n", "<Down>", function()
 		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "down", on_render)
 	end, { buffer = buf_id, nowait = true })
 
 	vim.keymap.set("n", "<Up>", function()
+		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "up", on_render)
+	end, { buffer = buf_id, nowait = true })
+
+	-- Also support j/k vim keys for movement
+	vim.keymap.set("n", "j", function()
+		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "down", on_render)
+	end, { buffer = buf_id, nowait = true })
+
+	vim.keymap.set("n", "k", function()
 		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "up", on_render)
 	end, { buffer = buf_id, nowait = true })
 
