@@ -4,6 +4,16 @@ local config = require("doit.config")
 
 describe("search_window", function()
 	before_each(function()
+		-- Reinitialize the todos module for each test
+		package.loaded["doit.state"] = nil  -- Clear cached state
+		local doit = require("doit")
+		doit.setup({
+			modules = {
+				todos = { enabled = true }
+			}
+		})
+		doit_state = require("doit.state")  -- Re-require after setup
+		
 		_G._original_vim_api_nvim_create_buf = vim.api.nvim_create_buf
 		_G._original_vim_api_nvim_open_win = vim.api.nvim_open_win
 		_G._original_vim_api_nvim_buf_set_lines = vim.api.nvim_buf_set_lines

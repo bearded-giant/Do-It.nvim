@@ -50,6 +50,9 @@ function M.setup(opts)
 	if not M.notes and (not opts.modules or (opts.modules.notes and opts.modules.notes.enabled ~= false)) then
 		M.load_module("notes", (opts.modules and opts.modules.notes) or {})
 	end
+	if not M.calendar and (not opts.modules or (opts.modules.calendar and opts.modules.calendar.enabled ~= false)) then
+		M.load_module("calendar", (opts.modules and opts.modules.calendar) or {})
+	end
 
 	-- Backwards compatibility: expose module APIs at root level
 	M.state = M.todos and M.todos.state or {}
@@ -148,6 +151,82 @@ function M.setup(opts)
 			end
 		end
 
+		-- Add upcoming meetings if calendar module is available
+		if M.calendar then
+			table.insert(content, "")
+			table.insert(content, "  Upcoming Events:")
+			
+			-- Get today's date and next 7 days
+			local today = os.date("%Y-%m-%d")
+			local end_date = os.date("%Y-%m-%d", os.time() + (7 * 86400))
+			
+			-- Fetch events using icalbuddy module (with error handling)
+			local ok, icalbuddy = pcall(require, "doit.modules.calendar.icalbuddy")
+			local events = {}
+			if ok then
+				local success, result = pcall(icalbuddy.get_events, today, end_date, M.calendar.config and M.calendar.config.icalbuddy or {})
+				if success then
+					events = result or {}
+				end
+			end
+			
+			-- Filter and sort events
+			local upcoming = {}
+			for _, event in ipairs(events) do
+				if not event.all_day and event.start_time then
+					table.insert(upcoming, event)
+				end
+			end
+			
+			-- Sort by date and time
+			table.sort(upcoming, function(a, b)
+				if a.date == b.date then
+					return (a.start_time or "") < (b.start_time or "")
+				end
+				return a.date < b.date
+			end)
+			
+			-- Show next 5 meetings
+			local count = 0
+			for _, event in ipairs(upcoming) do
+				if count >= 5 then break end
+				
+				local date_str = ""
+				if event.date == today then
+					date_str = "Today"
+				elseif event.date == os.date("%Y-%m-%d", os.time() + 86400) then
+					date_str = "Tomorrow"
+				else
+					-- Format as day of week
+					local year, month, day = event.date:match("(%d+)-(%d+)-(%d+)")
+					if year then
+						local time = os.time({ year = tonumber(year), month = tonumber(month), day = tonumber(day) })
+						date_str = os.date("%a", time)
+					else
+						date_str = event.date
+					end
+				end
+				
+				local time_str = event.start_time or ""
+				if event.end_time then
+					time_str = time_str .. "-" .. event.end_time
+				end
+				
+				local event_line = string.format("  • %s %s: %s", date_str, time_str, event.title)
+				-- Truncate long titles
+				if #event_line > 60 then
+					event_line = event_line:sub(1, 57) .. "..."
+				end
+				
+				table.insert(content, event_line)
+				count = count + 1
+			end
+			
+			if count == 0 then
+				table.insert(content, "  • No upcoming meetings")
+			end
+		end
+		
 		table.insert(content, "")
 		table.insert(content, "  Available Commands:")
 		table.insert(content, "  • :DoIt - Open main todo window")
@@ -159,6 +238,10 @@ function M.setup(opts)
 
 		if M.notes then
 			table.insert(content, "  • :DoItNotes - Open notes interface")
+		end
+		
+		if M.calendar then
+			table.insert(content, "  • :DoItCalendar - Open calendar view")
 		end
 
 		if M.core and M.core.registry then
