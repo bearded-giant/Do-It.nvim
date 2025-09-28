@@ -350,6 +350,11 @@ function M.render_todos()
 end
 
 function M.format_todo_line(todo)
+	-- Ensure state is loaded when called from other modules
+	if not state then
+		state = ensure_state_loaded()
+	end
+	
 	-- Create default formatting if missing
 	if not config.options.formatting then
 		config.options.formatting = {
@@ -398,7 +403,7 @@ function M.format_todo_line(todo)
 
 	-- Visual indicator if this todo is being reordered
 	local is_reordering = false
-	if state.reordering_todo_index then
+	if state and state.reordering_todo_index then
 		for i, t in ipairs(state.todos) do
 			if i == state.reordering_todo_index and t == todo then
 				is_reordering = true
