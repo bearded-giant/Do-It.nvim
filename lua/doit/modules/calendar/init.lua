@@ -2,7 +2,7 @@
 local M = {}
 
 -- Module version
-M.version = "1.0.0"
+M.version = "2.0.0"
 
 -- Module metadata for registry
 M.metadata = {
@@ -94,6 +94,9 @@ end
 function M.switch_view(view)
     if M.state and M.ui then
         M.state.set_view(view)
+        -- Clear cache when switching views as date range changes
+        local icalbuddy = require("doit.modules.calendar.icalbuddy")
+        icalbuddy.clear_cache()
         M.ui.refresh()
     end
 end

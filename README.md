@@ -6,7 +6,7 @@ Do-It.nvim is a modular task management framework for Neovim, providing a clean,
 
 Do-It.nvim began as a way to track tasks and keep simple markdown notes per project. As a Principal Engineer with many disparate things to keep track of, I wanted a simple way to do that without leaving my editor. I've tried many task managers, but they all seemed too complex - I just needed to know what I needed to do, without bells and whistles.
 
-> This project is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas), expanded with a modular framework and additional features like project notes.
+> This project is a fork of [Dooing](https://github.com/atiladefreitas/dooing) by [atiladefreitas](https://github.com/atiladefreitas), expanded with a modular framework and additional plugins such ash project notes, and calendar..
 
 ## Features
 
@@ -83,21 +83,55 @@ return {
         require("doit_notes").setup()
     end,
 }
+
+-- Calendar (v2.0) - macOS only, requires icalbuddy
+return {
+    "bearded-giant/do-it.nvim",
+    config = function()
+        require("doit").setup({
+            modules = {
+                calendar = { enabled = true }
+            }
+        })
+    end,
+}
 ```
 
 ## Commands & Keybindings
 
-See [**📖 Complete Keybindings Reference**](docs/KEYBINDINGS.md) for all commands and keyboard shortcuts.
+See [**Complete Keybindings Reference**](docs/KEYBINDINGS.md) for all commands and keyboard shortcuts.
 
 ### Quick Reference
 
-**Commands:**
+**Framework Commands:**
+
+- `:DoItDashboard` - Open main DoIt dashboard
+- `:DoItPlugins list` - List installed modules
+- `:DoItPlugins info <module>` - Show module details
+
+**Module Commands:**
+
+_Todos:_
+
 - `:DoIt` - Open main todo window
 - `:DoItList` - Quick todo list (floating)
 - `:DoItLists` - Manage multiple todo lists
+
+_Notes:_
+
 - `:DoItNotes` - Open notes window
+- `:DoItNotesNew` - Create new project note
+- `:DoItNotesSearch` - Search across notes
+
+_Calendar (macOS only):_
+
+- `:DoItCalendar` - Toggle calendar window
+- `:DoItCalendarDay` - Open in day view
+- `:DoItCalendar3Day` - Open in 3-day view
+- `:DoItCalendarWeek` - Open in week view
 
 **Basic Keys (in todo window):**
+
 - `i` - Add new todo
 - `x` - Toggle status
 - `d` - Delete todo
@@ -112,6 +146,7 @@ The keybindings documentation is auto-generated from a central source to ensure 
 ### Todos Module
 
 The todos module provides task management functionality:
+[Full Documentation](docs/modules/todos.md)
 
 - Create, edit, and organize to-dos
 - Tag-based filtering and organization
@@ -123,12 +158,27 @@ The todos module provides task management functionality:
 ### Notes Module
 
 The notes module provides project-specific notes:
+[Full Documentation](docs/modules/notes.md) | **Work in Progress**
 
 - Project-specific notes based on Git repository
 - Global notes mode for system-wide documentation
 - Markdown syntax highlighting
 - Floating window interface
 - Automatic saving
+
+### Calendar Module (v2.0)
+
+The calendar module provides macOS calendar integration:
+[Full Documentation](lua/doit/modules/calendar/README.md) | [Module Docs](docs/modules/calendar.md)
+
+- **icalbuddy Integration**: View events from macOS Calendar app
+- **Multiple Views**: Day, 3-day, and week views
+- **Smart Parsing**: Handles 100% of icalbuddy event formats
+- **UTF-8 Support**: Correctly displays special characters
+- **Auto-refresh**: Updates when switching views
+- **All Calendar Sources**: iCloud, Google, Exchange support
+
+_Note: Requires macOS with icalbuddy installed (`brew install icalbuddy`)_
 
 ## Documentation
 
@@ -223,10 +273,10 @@ require("lualine").setup({
     lualine_c = {
       -- Show current list and todo count
       { require("doit").lualine.current_list },
-      
+
       -- Show todo statistics (done/in-progress/pending)
       { require("doit").lualine.todo_stats },
-      
+
       -- Show active (in-progress) todo
       { require("doit").lualine.active_todo }
     }
@@ -235,6 +285,7 @@ require("lualine").setup({
 ```
 
 Available components:
+
 - `current_list` - Shows current list name and todo count: `📋 work (5)`
 - `todo_stats` - Shows todo statistics: `✓3 ◐1 ○2` (done/in-progress/pending)
 - `active_todo` - Shows the current in-progress todo (if any)

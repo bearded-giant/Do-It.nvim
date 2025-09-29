@@ -6,11 +6,13 @@ This directory contains detailed documentation for Do-It.nvim developers and con
 
 ### [Development](./development/)
 - [Development Guide](./development/DEVELOPMENT.md) - Setting up development environment, debugging tools, and testing
+- [Plugin Development Guide](./development/PLUGIN_DEVELOPMENT.md) - Complete guide for creating new DoIt modules/plugins
 - [Framework Architecture](./development/framework.md) - Framework design and module development
 
 ### [Modules](./modules/)
 - [Todos Module](./modules/todos.md) - Task management module documentation
 - [Notes Module](./modules/notes.md) - Note-taking module documentation
+- [Calendar Module](./modules/calendar.md) - Calendar integration with icalbuddy (v2.0)
 - [Note Linking](./modules/NOTE_LINKING.md) - Documentation for the note linking feature
 
 ### [Implementation Details](./implementation/)

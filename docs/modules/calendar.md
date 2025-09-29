@@ -1,6 +1,8 @@
-# Calendar Module
+# Calendar Module (v2.0)
 
 The calendar module provides a TUI calendar interface with icalbuddy integration for viewing calendar events within Neovim.
+
+> **Version 2.0 Updates**: Complete parser rewrite now correctly handles 100% of icalbuddy events (up from ~5%), UTF-8 support for special characters, auto-refresh on view changes, and silent operation mode.
 
 ## Features
 

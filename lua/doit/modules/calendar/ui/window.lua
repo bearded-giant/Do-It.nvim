@@ -5,6 +5,7 @@ local M = {}
 local calendar_module = nil
 local win_id = nil
 local buf_id = nil
+local actual_width = nil  -- Store the actual window width
 
 -- Setup window module
 function M.setup(module)
@@ -16,7 +17,7 @@ end
 function M.create()
     -- Close existing window if any
     M.close()
-    
+
     -- Create buffer
     buf_id = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_option(buf_id, "buftype", "nofile")
@@ -24,16 +25,39 @@ function M.create()
     vim.api.nvim_buf_set_option(buf_id, "swapfile", false)
     vim.api.nvim_buf_set_option(buf_id, "filetype", "doit-calendar")
     vim.api.nvim_buf_set_option(buf_id, "modifiable", false)
-    
+
     -- Get window configuration
     local config = calendar_module.config.window
-    local width = config.width or 80
-    local height = config.height or 30
-    
-    -- Calculate position
     local ui = vim.api.nvim_list_uis()[1]
+    if not ui then
+        -- Fallback for headless mode
+        ui = { width = 120, height = 40 }
+    end
+
+    local width, height
+
+    -- Check if relative sizing is enabled (default to true)
+    if config.use_relative ~= false and (config.relative_width or config.relative_height) then
+        -- Use relative sizing
+        width = math.floor(ui.width * (config.relative_width or 0.8))
+        height = math.floor(ui.height * (config.relative_height or 0.7))
+    else
+        -- Use absolute sizing
+        width = config.width or 80
+        height = config.height or 30
+    end
+
+    -- Ensure minimum sizes
+    width = math.max(width, 60)   -- Minimum width for column layouts
+    height = math.max(height, 15)  -- Minimum height
+
+    -- Store the actual width for renderers to use
+    actual_width = width
+    calendar_module.config.window.actual_width = width
+
+    -- Calculate position
     local col, row
-    
+
     if config.position == "center" then
         col = math.floor((ui.width - width) / 2)
         row = math.floor((ui.height - height) / 2)
@@ -43,12 +67,30 @@ function M.create()
     elseif config.position == "bottom-right" then
         col = ui.width - width - 2
         row = ui.height - height - 2
+    elseif config.position == "top-left" then
+        col = 2
+        row = 2
+    elseif config.position == "bottom-left" then
+        col = 2
+        row = ui.height - height - 2
+    elseif config.position == "top" then
+        col = math.floor((ui.width - width) / 2)
+        row = 2
+    elseif config.position == "bottom" then
+        col = math.floor((ui.width - width) / 2)
+        row = ui.height - height - 2
+    elseif config.position == "left" then
+        col = 2
+        row = math.floor((ui.height - height) / 2)
+    elseif config.position == "right" then
+        col = ui.width - width - 2
+        row = math.floor((ui.height - height) / 2)
     else
         -- Default to center
         col = math.floor((ui.width - width) / 2)
         row = math.floor((ui.height - height) / 2)
     end
-    
+
     -- Create window
     local win_opts = {
         relative = "editor",
@@ -61,7 +103,7 @@ function M.create()
         title = config.title or " Calendar ",
         title_pos = config.title_pos or "center"
     }
-    
+
     win_id = vim.api.nvim_open_win(buf_id, true, win_opts)
     
     -- Set window options
@@ -107,6 +149,11 @@ end
 -- Get window ID
 function M.get_window()
     return win_id
+end
+
+-- Get actual window width
+function M.get_width()
+    return actual_width or 80
 end
 
 -- Apply highlight groups
