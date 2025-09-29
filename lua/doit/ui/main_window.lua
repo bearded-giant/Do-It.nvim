@@ -1002,10 +1002,17 @@ end
 function M.toggle_todo_window()
 	-- Ensure state is loaded before toggle
 	state = ensure_state_loaded()
-	
+
 	if win_id and vim.api.nvim_win_is_valid(win_id) then
 		M.close_window()
 	else
+		-- Force reload from disk when opening window to get latest changes
+		-- This handles git worktree switches and external file changes
+		if state and state.load_list and state.todo_lists then
+			local active_list = state.todo_lists.active or "default"
+			state.load_list(active_list)
+		end
+
 		create_window()
 		M.render_todos()
 	end

@@ -10,8 +10,15 @@ local defaults = {
         ["end"] = 20    -- 8pm
     },
     window = {
+        -- Relative sizing (percentage of screen)
+        use_relative = true,
+        relative_width = 0.8,  -- 80% of screen width
+        relative_height = 0.7, -- 70% of screen height
+
+        -- Absolute sizing (fallback if relative is disabled)
         width = 80,
         height = 30,
+
         position = "center",
         border = "rounded",
         title = " Calendar ",
@@ -39,7 +46,8 @@ local defaults = {
         format_options = "-nc -nrd", -- no calendar names, no relative dates
         date_format = "%Y-%m-%d",
         time_format = "%H:%M",
-        cache_ttl = 60 -- cache for 60 seconds
+        cache_ttl = 60, -- cache for 60 seconds
+        debug = true -- set to true to see raw icalbuddy output
     },
     colors = {
         border = "Normal",

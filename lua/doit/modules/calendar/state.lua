@@ -55,18 +55,17 @@ end
 function M.get_date_range()
     local start_date = state.current_date
     local end_date = start_date
-    
+
     if state.current_view == "3day" then
-        -- 3-day view: current day + 2 more days
+        -- 3-day view: always today + 2 more days
+        start_date = os.date("%Y-%m-%d")
         end_date = M.add_days(start_date, 2)
     elseif state.current_view == "week" then
-        -- Week view: get Monday of current week and add 6 days
-        local weekday = M.get_weekday(start_date)
-        local monday = M.add_days(start_date, -(weekday - 1))
-        start_date = monday
-        end_date = M.add_days(monday, 6)
+        -- Week view: today + 6 more days (7 days total)
+        start_date = os.date("%Y-%m-%d")
+        end_date = M.add_days(start_date, 6)
     end
-    
+
     return start_date, end_date
 end
 
@@ -115,26 +114,21 @@ function M.add_days(date_str, days)
     return os.date("%Y-%m-%d", time)
 end
 
--- Get weekday for a date (1=Monday, 7=Sunday)
+-- Get weekday for a date (0=Sunday, 6=Saturday)
 function M.get_weekday(date_str)
     local year, month, day = date_str:match("(%d+)-(%d+)-(%d+)")
     if not year then
-        return 1
+        return 0
     end
-    
+
     local time = os.time({
         year = tonumber(year),
         month = tonumber(month),
         day = tonumber(day)
     })
-    
-    local weekday = tonumber(os.date("%w", time))
-    -- Convert from 0=Sunday to 1=Monday
-    if weekday == 0 then
-        return 7
-    else
-        return weekday
-    end
+
+    -- Return 0=Sunday, 1=Monday, ..., 6=Saturday
+    return tonumber(os.date("%w", time))
 end
 
 -- Format date for display

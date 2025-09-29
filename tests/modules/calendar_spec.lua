@@ -73,6 +73,36 @@ Sep 8, 2025 at 10:00 AM - 12:00 PM
             end
         end)
         
+        it("should detect tentative events with attendees", function()
+            -- Test output with attendees info
+            local test_output = [[
+today
+    Stay at Grand attendees: b..
+    All Day Meeting attendees: john@example.com
+today at 9:00 AM - 10:00 AM
+    Team Standup attendees: team@example.com
+tomorrow at 2:00 PM - 3:00 PM
+    Product Review
+]]
+            local events = icalbuddy.parse_output(test_output)
+
+            assert.equals(4, #events)
+
+            -- Events with attendees should be marked tentative
+            assert.is_true(events[1].tentative, "Stay at Grand should be tentative")
+            assert.equals("Stay at Grand", events[1].title) -- Title should not include attendees
+
+            assert.is_true(events[2].tentative, "All Day Meeting should be tentative")
+            assert.equals("All Day Meeting", events[2].title)
+
+            assert.is_true(events[3].tentative, "Team Standup should be tentative")
+            assert.equals("Team Standup", events[3].title)
+
+            -- Event without attendees should not be tentative
+            assert.is_not_true(events[4].tentative, "Product Review should not be tentative")
+            assert.equals("Product Review", events[4].title)
+        end)
+
         it("should parse different date formats correctly", function()
             -- Test with specific date headers
             local test_output = [[
@@ -154,25 +184,27 @@ Sep 15, 2025 at 2:00 PM - 3:00 PM
         end)
         
         it("should calculate date ranges for different views", function()
+            -- Mock today's date for consistent testing
+            local today = os.date("%Y-%m-%d")
             state.set_date("2025-09-03") -- Wednesday
-            
-            -- Day view
+
+            -- Day view - uses current_date
             state.set_view("day")
             local start, end_date = state.get_date_range()
             assert.equals("2025-09-03", start)
             assert.equals("2025-09-03", end_date)
-            
-            -- 3-day view
+
+            -- 3-day view - always today + 2 days
             state.set_view("3day")
             start, end_date = state.get_date_range()
-            assert.equals("2025-09-03", start)
-            assert.equals("2025-09-05", end_date)
-            
-            -- Week view (should get Monday-Sunday)
+            assert.equals(today, start)  -- Always starts from today
+            assert.equals(state.add_days(today, 2), end_date)  -- Today + 2 days
+
+            -- Week view - always today + 6 days
             state.set_view("week")
             start, end_date = state.get_date_range()
-            assert.equals("2025-09-01", start) -- Monday
-            assert.equals("2025-09-07", end_date) -- Sunday
+            assert.equals(today, start)  -- Always starts from today
+            assert.equals(state.add_days(today, 6), end_date)  -- Today + 6 days
         end)
         
         it("should navigate periods correctly", function()
@@ -216,10 +248,12 @@ Sep 15, 2025 at 2:00 PM - 3:00 PM
     describe("view renderers", function()
         local day_view
         local week_view
-        
+        local three_day_view
+
         before_each(function()
             day_view = require("doit.modules.calendar.ui.day_view")
             week_view = require("doit.modules.calendar.ui.week_view")
+            three_day_view = require("doit.modules.calendar.ui.three_day_view")
             
             -- Setup minimal calendar module mock
             calendar = {

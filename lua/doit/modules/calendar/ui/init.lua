@@ -78,6 +78,19 @@ function M.refresh()
     -- Fetch events
     local icalbuddy = require("doit.modules.calendar.icalbuddy")
     local events = icalbuddy.get_events(start_date, end_date, calendar_module.config.icalbuddy)
+
+    -- Debug: Log fetched events
+    if calendar_module.config.icalbuddy.debug then
+        -- vim.notify(string.format("UI Refresh: Fetched %d events for %s to %s", #events, start_date, end_date), vim.log.levels.DEBUG)
+        -- for i, event in ipairs(events) do
+        --     vim.notify(string.format("  [%d] %s: date=%s, title=%s",
+        --         i,
+        --         event.all_day and "all-day" or (event.start_time or "no-time"),
+        --         event.date or "NO-DATE",
+        --         event.title or "NO-TITLE"), vim.log.levels.DEBUG)
+        -- end
+    end
+
     calendar_module.state.set_events(events)
     
     -- Render the view
@@ -91,11 +104,18 @@ end
 function M.setup_keymaps()
     local buf = window.get_buffer()
     if not buf or not vim.api.nvim_buf_is_valid(buf) then
+        -- vim.notify("Calendar: Failed to setup keymaps - invalid buffer", vim.log.levels.WARN)
         return
     end
-    
+
     local keymaps = calendar_module.config.keymaps
     local opts = { buffer = buf, silent = true }
+
+    -- Debug: Show what keymaps we're setting
+    if calendar_module.config.icalbuddy.debug then
+        -- vim.notify(string.format("Calendar: Setting up keymaps on buffer %d", buf), vim.log.levels.DEBUG)
+        -- vim.notify(string.format("  today key: %s", keymaps.today or "not set"), vim.log.levels.DEBUG)
+    end
     
     -- Close window
     if keymaps.close then
@@ -119,8 +139,14 @@ function M.setup_keymaps()
     
     if keymaps.today then
         vim.keymap.set("n", keymaps.today, function()
-            calendar_module.today()
+            -- vim.notify("Calendar: 't' key pressed - jumping to today", vim.log.levels.INFO)
+            if calendar_module.state then
+                calendar_module.state.today()
+                M.refresh()
+            end
         end, opts)
+    else
+        -- vim.notify("Calendar: 'today' keymap not configured", vim.log.levels.WARN)
     end
     
     -- View switching

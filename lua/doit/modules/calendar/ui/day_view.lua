@@ -11,11 +11,14 @@ function M.render(calendar_module)
     local current_date = state.get_date()
     local events = state.get_events() or {}
     
+    -- Use actual window width if available
+    local total_width = config.window.actual_width or config.window.width
+
     -- Format header
     local date_display = state.format_date(current_date)
     local header = string.format(" %s ", date_display)
     table.insert(lines, header)
-    table.insert(lines, string.rep("─", config.window.width - 4))
+    table.insert(lines, string.rep("─", total_width - 2))
     table.insert(lines, "")
     
     -- Get hour range
@@ -54,7 +57,9 @@ function M.render(calendar_module)
     if #all_day_events > 0 then
         table.insert(lines, " All Day Events:")
         for _, event in ipairs(all_day_events) do
-            local event_line = string.format("   • %s", event.title)
+            -- Add tentative indicator (?) if event is tentative
+            local prefix = event.tentative and "?" or "•"
+            local event_line = string.format("   %s %s", prefix, event.title)
             if event.location then
                 event_line = event_line .. string.format(" (%s)", event.location)
             end
@@ -89,7 +94,9 @@ function M.render(calendar_module)
         if events_by_hour[hour] then
             local event_strs = {}
             for _, event in ipairs(events_by_hour[hour]) do
-                local event_str = event.title
+                -- Add tentative indicator (?) at start if event is tentative
+                local prefix = event.tentative and "? " or ""
+                local event_str = prefix .. event.title
                 if event.end_time then
                     local duration = M.calculate_duration(event.start_time, event.end_time)
                     if duration then
@@ -106,7 +113,7 @@ function M.render(calendar_module)
     
     -- Add footer with controls
     table.insert(lines, "")
-    table.insert(lines, string.rep("─", config.window.width - 4))
+    table.insert(lines, string.rep("─", total_width - 2))
     
     local footer_parts = {}
     table.insert(footer_parts, "[d]ay [3]day [w]eek")
