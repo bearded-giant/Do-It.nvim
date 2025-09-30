@@ -18,7 +18,8 @@ end
 
 -- Toggle calendar window
 function M.toggle()
-    if calendar_module.state.is_window_open() then
+    -- Check actual window validity instead of just state flag
+    if window and window.is_open() then
         M.hide()
     else
         M.show()
@@ -30,16 +31,23 @@ function M.show()
     if not window then
         return
     end
-    
+
+    -- Don't recreate if already open
+    if window.is_open() then
+        -- Just refresh the content
+        M.refresh()
+        return
+    end
+
     -- Create window
     window.create()
-    
+
     -- Mark as open
     calendar_module.state.set_window_open(true)
-    
+
     -- Render content
     M.refresh()
-    
+
     -- Setup keymaps
     M.setup_keymaps()
 end
@@ -56,7 +64,8 @@ end
 
 -- Refresh calendar display
 function M.refresh()
-    if not calendar_module.state.is_window_open() then
+    -- Check actual window validity
+    if not window or not window.is_open() then
         return
     end
     

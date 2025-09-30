@@ -61,9 +61,11 @@ function M.get_date_range()
         start_date = os.date("%Y-%m-%d")
         end_date = M.add_days(start_date, 2)
     elseif state.current_view == "week" then
-        -- Week view: today + 6 more days (7 days total)
-        start_date = os.date("%Y-%m-%d")
-        end_date = M.add_days(start_date, 6)
+        -- Week view: Sunday to Saturday of current week
+        local today = os.date("%Y-%m-%d")
+        local weekday = M.get_weekday(today) -- 0=Sunday, 6=Saturday
+        start_date = M.add_days(today, -weekday) -- Go back to Sunday
+        end_date = M.add_days(start_date, 6) -- Go to Saturday
     end
 
     return start_date, end_date

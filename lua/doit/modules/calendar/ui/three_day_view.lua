@@ -14,12 +14,29 @@ local function format_time(time_str)
     return string.format("%d:%s%s", hour, min, ampm)
 end
 
--- Truncate text to fit column width
-local function truncate(text, max_len)
-    if #text <= max_len then
+-- Get display width of text (accounting for Unicode)
+local function display_width(text)
+    -- Use vim.fn.strdisplaywidth if available, otherwise fallback to byte length
+    if vim and vim.fn and vim.fn.strdisplaywidth then
+        return vim.fn.strdisplaywidth(text)
+    end
+    return #text
+end
+
+-- Truncate text to fit column width (by display width)
+local function truncate(text, max_width)
+    local width = display_width(text)
+    if width <= max_width then
         return text
     end
-    return text:sub(1, max_len - 2) .. ".."
+
+    -- Binary search for the right truncation point
+    local result = text
+    while display_width(result) > max_width - 2 do
+        -- Remove one character at a time from the end
+        result = vim.fn.strcharpart(result, 0, vim.fn.strchars(result) - 1)
+    end
+    return result .. ".."
 end
 
 -- Render 3-day view in columns
@@ -32,14 +49,20 @@ function M.render(calendar_module)
     local start_date, end_date = state.get_date_range()
     local events = state.get_events() or {}
 
-    -- Use actual window width if available, otherwise fall back to config
+    -- Use actual window dimensions if available, otherwise fall back to config
     local total_width = config.window.actual_width or config.window.width
+    local total_height = config.window.actual_height or config.window.height or 30
 
     -- Calculate column width for 3 columns with separators
     -- We have 2 separators (" │ ") between 3 columns, each taking 3 chars
     local separators_total = 6  -- 2 separators × 3 chars each
     local available_for_columns = total_width - separators_total - 2  -- -2 for side padding
     local col_width = math.floor(available_for_columns / 3)
+
+    -- Calculate available height for events
+    -- Header (1) + separator (1) + day headers (1) + separator (1) + footer space (3) = 7 lines
+    local header_footer_lines = 7
+    local available_rows = total_height - header_footer_lines
 
     -- Header
     local header = string.format(" 3-Day View: %s - %s ",
@@ -124,9 +147,10 @@ function M.render(calendar_module)
     end
     table.insert(lines, sep_line)
 
-    -- Event rows
+    -- Event rows (fill available height)
     local event_lines = {}
-    for row = 1, math.max(max_events, 1) do
+    local rows_to_render = math.max(available_rows, max_events, 1)
+    for row = 1, rows_to_render do
         local line = ""
 
         for col = 1, 3 do
@@ -150,10 +174,14 @@ function M.render(calendar_module)
                 cell_text = truncate(cell_text, col_width)
             elseif row == 1 and #day.events == 0 then
                 cell_text = "No events"
+            else
+                -- Empty cell for padding
+                cell_text = ""
             end
 
-            -- Pad to column width
-            cell_text = cell_text .. string.rep(" ", math.max(0, col_width - #cell_text))
+            -- Pad to column width (using display width)
+            local padding = math.max(0, col_width - display_width(cell_text))
+            cell_text = cell_text .. string.rep(" ", padding)
             line = line .. cell_text
 
             if col < 3 then

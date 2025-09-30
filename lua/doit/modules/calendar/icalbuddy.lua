@@ -216,7 +216,25 @@ function M.parse_output(output, debug)
 
             -- Only add event if it has a date
             if event and event.title and event.date then
-                table.insert(events, event)
+                -- Handle multi-day events by duplicating for each day
+                if event.multi_day and event.end_date then
+                    -- Calculate days between start and end
+                    local current = event.date
+                    while current <= event.end_date do
+                        local day_event = vim.tbl_deep_extend("force", {}, event)
+                        day_event.date = current
+                        day_event.multi_day_indicator = true
+                        table.insert(events, day_event)
+
+                        -- Move to next day
+                        local y, m, d = current:match("(%d+)-(%d+)-(%d+)")
+                        local time = os.time({year = tonumber(y), month = tonumber(m), day = tonumber(d)})
+                        current = os.date("%Y-%m-%d", time + 86400)
+                    end
+                else
+                    -- Single day event
+                    table.insert(events, event)
+                end
                 if debug then
                     -- vim.notify(string.format("  Saved event: %s on %s (%s)",
                     --     event.title, event.date,
@@ -262,46 +280,78 @@ function M.parse_datetime_line(line, debug)
     local nbsp = string.char(226, 128, 175)  -- UTF-8 for U+202F
     line = line:gsub(nbsp, " ")
 
+    -- Always use actual current time for relative dates
+    -- icalbuddy always returns relative dates based on TODAY, not the query date
+    local base_time = os.time()
 
-    -- Pattern for multi-day events like "yesterday - day after tomorrow"
+    -- Pattern for multi-day events like "yesterday - tomorrow" or "day before yesterday - tomorrow"
     -- Must NOT match "today at" patterns - check for absence of "at"
-    if (line:match("^yesterday %- ") or line:match("^today %- ") or line:match("^tomorrow %- ")) and not line:match(" at ") then
-        -- For multi-day events, use the start date
-        if line:match("^yesterday") then
-            result.date = os.date("%Y-%m-%d", os.time() - 86400)
-        elseif line:match("^today") then
-            result.date = os.date("%Y-%m-%d")
-        elseif line:match("^tomorrow") then
-            result.date = os.date("%Y-%m-%d", os.time() + 86400)
+    if line:match(" %- ") and not line:match(" at ") then
+        -- Parse the start and end of the range
+        local start_part, end_part = line:match("^(.+) %- (.+)$")
+        if start_part and end_part then
+            -- Parse start date
+            local start_date = nil
+            if start_part:match("day before yesterday") then
+                start_date = os.date("%Y-%m-%d", base_time - 2 * 86400)
+            elseif start_part == "yesterday" then
+                start_date = os.date("%Y-%m-%d", base_time - 86400)
+            elseif start_part == "today" then
+                start_date = os.date("%Y-%m-%d", base_time)
+            elseif start_part == "tomorrow" then
+                start_date = os.date("%Y-%m-%d", base_time + 86400)
+            elseif start_part:match("day after tomorrow") then
+                start_date = os.date("%Y-%m-%d", base_time + 2 * 86400)
+            end
+
+            -- Parse end date
+            local end_date = nil
+            if end_part:match("day before yesterday") then
+                end_date = os.date("%Y-%m-%d", base_time - 2 * 86400)
+            elseif end_part == "yesterday" then
+                end_date = os.date("%Y-%m-%d", base_time - 86400)
+            elseif end_part == "today" then
+                end_date = os.date("%Y-%m-%d", base_time)
+            elseif end_part == "tomorrow" then
+                end_date = os.date("%Y-%m-%d", base_time + 86400)
+            elseif end_part:match("day after tomorrow") then
+                end_date = os.date("%Y-%m-%d", base_time + 2 * 86400)
+            end
+
+            if start_date and end_date then
+                result.date = start_date
+                result.end_date = end_date  -- Store the end date for multi-day events
+                result.all_day = true
+                result.multi_day = true
+                return result
+            end
         end
-        result.all_day = true
-        return result
     end
 
     -- Pattern 1: "today at 5:20 AM - 7:43 AM"
     if line:match("today at %d+:%d+ [AP]M %- %d+:%d+ [AP]M") then
-        result.date = os.date("%Y-%m-%d")
+        result.date = os.date("%Y-%m-%d", base_time)
         local start_str, end_str = line:match("today at (%d+:%d+ [AP]M) %- (%d+:%d+ [AP]M)")
         result.start_time = M.parse_time(start_str)
         result.end_time = M.parse_time(end_str)
 
-    -- Pattern 2: "tomorrow at 8:00 AM - 10:00 AM"
-    elseif line:match("tomorrow at %d+:%d+ [AP]M %- %d+:%d+ [AP]M") then
-        result.date = os.date("%Y-%m-%d", os.time() + 86400)
+    -- Pattern 2: "tomorrow at 8:00 AM - 10:00 AM" (but NOT "day after tomorrow")
+    elseif line:match("tomorrow at %d+:%d+ [AP]M %- %d+:%d+ [AP]M") and not line:match("day after tomorrow") then
+        result.date = os.date("%Y-%m-%d", base_time + 86400)
         local start_str, end_str = line:match("tomorrow at (%d+:%d+ [AP]M) %- (%d+:%d+ [AP]M)")
         result.start_time = M.parse_time(start_str)
         result.end_time = M.parse_time(end_str)
 
     -- Pattern 3: "day after tomorrow at 7:30 AM - 9:00 AM"
     elseif line:match("day after tomorrow at %d+:%d+ [AP]M %- %d+:%d+ [AP]M") then
-        result.date = os.date("%Y-%m-%d", os.time() + 2 * 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 2 * 86400)
         local start_str, end_str = line:match("day after tomorrow at (%d+:%d+ [AP]M) %- (%d+:%d+ [AP]M)")
         result.start_time = M.parse_time(start_str)
         result.end_time = M.parse_time(end_str)
 
     -- Pattern 4: "yesterday at ..."
     elseif line:match("yesterday at %d+:%d+ [AP]M %- %d+:%d+ [AP]M") then
-        result.date = os.date("%Y-%m-%d", os.time() - 86400)
+        result.date = os.date("%Y-%m-%d", base_time - 86400)
         local start_str, end_str = line:match("yesterday at (%d+:%d+ [AP]M) %- (%d+:%d+ [AP]M)")
         result.start_time = M.parse_time(start_str)
         result.end_time = M.parse_time(end_str)
@@ -315,22 +365,22 @@ function M.parse_datetime_line(line, debug)
 
     -- Pattern 6: All-day "today"
     elseif line == "today" then
-        result.date = os.date("%Y-%m-%d")
+        result.date = os.date("%Y-%m-%d", base_time)
         result.all_day = true
 
     -- Pattern 7: All-day "tomorrow"
     elseif line == "tomorrow" then
-        result.date = os.date("%Y-%m-%d", os.time() + 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 86400)
         result.all_day = true
 
     -- Pattern 8: All-day "yesterday"
     elseif line == "yesterday" then
-        result.date = os.date("%Y-%m-%d", os.time() - 86400)
+        result.date = os.date("%Y-%m-%d", base_time - 86400)
         result.all_day = true
 
     -- Pattern 9: All-day "day after tomorrow"
     elseif line == "day after tomorrow" then
-        result.date = os.date("%Y-%m-%d", os.time() + 2 * 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 2 * 86400)
         result.all_day = true
 
     -- Pattern 10: Single day all-day "Oct 3, 2025"
@@ -340,7 +390,7 @@ function M.parse_datetime_line(line, debug)
 
     -- Pattern 11: Multi-day with times "day after tomorrow at 8:30 PM - Oct 1, 2025 at 12:00 AM"
     elseif line:match("day after tomorrow at %d+:%d+.[AP]M %- %a+ %d+, %d+ at %d+:%d+.[AP]M") then
-        result.date = os.date("%Y-%m-%d", os.time() + 2 * 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 2 * 86400)
         local start_str = line:match("day after tomorrow at (%d+:%d+.[AP]M)")
         result.start_time = M.parse_time(start_str)
         -- For multi-day events, we'll just show on the start day for now
@@ -348,7 +398,7 @@ function M.parse_datetime_line(line, debug)
 
     -- Pattern 12: Multi-day with times "tomorrow at 8:30 PM - day after tomorrow at 12:00 AM"
     elseif line:match("tomorrow at %d+:%d+.[AP]M %- day after tomorrow at %d+:%d+.[AP]M") then
-        result.date = os.date("%Y-%m-%d", os.time() + 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 86400)
         local start_str = line:match("tomorrow at (%d+:%d+.[AP]M)")
         result.start_time = M.parse_time(start_str)
         -- For multi-day events ending next day, extend to end of current day
@@ -357,7 +407,7 @@ function M.parse_datetime_line(line, debug)
     -- Pattern 13: "payday" or other special keywords
     elseif line == "payday" then
         -- Try to extract from context, for now use a future date
-        result.date = os.date("%Y-%m-%d", os.time() + 5 * 86400)
+        result.date = os.date("%Y-%m-%d", base_time + 5 * 86400)
         result.all_day = true
 
     else
@@ -487,20 +537,45 @@ function M.get_events(start_date, end_date, config)
     -- Parse output
     local events = M.parse_output(output, config.debug)
 
-    -- Update cache
-    cache.data = events
+    -- Deduplicate events before caching
+    local seen = {}
+    local unique_events = {}
+    for _, event in ipairs(events) do
+        local key = string.format("%s|%s|%s",
+            event.date or "",
+            event.title or "",
+            event.start_time or "all-day")
+        if not seen[key] then
+            seen[key] = true
+            table.insert(unique_events, event)
+        end
+    end
+
+    -- Update cache with deduplicated events
+    cache.data = unique_events
     cache.timestamp = now
 
-    return events
+    return unique_events
 end
 
 -- Filter events by date range
 function M.filter_events(events, start_date, end_date)
     local filtered = {}
+    local seen = {}  -- Track unique events to prevent duplicates
 
     for _, event in ipairs(events) do
         if event.date and event.date >= start_date and event.date <= end_date then
-            table.insert(filtered, event)
+            -- Create a unique key for the event (date + title + time)
+            local key = string.format("%s|%s|%s",
+                event.date or "",
+                event.title or "",
+                event.start_time or "all-day")
+
+            -- Only add if we haven't seen this exact event
+            if not seen[key] then
+                seen[key] = true
+                table.insert(filtered, event)
+            end
         end
     end
 
@@ -522,6 +597,17 @@ end
 function M.clear_cache()
     cache.data = nil
     cache.timestamp = 0
+end
+
+-- Get cache info for debugging
+function M.get_cache_info()
+    if cache.data then
+        return {
+            events = cache.data,
+            timestamp = cache.timestamp
+        }
+    end
+    return nil
 end
 
 return M

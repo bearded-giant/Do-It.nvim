@@ -150,6 +150,33 @@ day after tomorrow at 10:00 AM - 10:30 AM - 1:1 Meeting
             if #events > 5 then
                 vim.notify(string.format("  ... and %d more events", #events - 5), vim.log.levels.INFO)
             end
+        elseif cmd == "check-cache" then
+            -- Check what's in the cache
+            local icalbuddy = require("doit.modules.calendar.icalbuddy")
+            local cache_info = icalbuddy.get_cache_info()
+            if cache_info then
+                vim.notify(string.format("Cache Info:", vim.log.levels.INFO))
+                vim.notify(string.format("  Cached at: %s", os.date("%Y-%m-%d %H:%M:%S", cache_info.timestamp)), vim.log.levels.INFO)
+                vim.notify(string.format("  Total events: %d", #cache_info.events), vim.log.levels.INFO)
+
+                -- Check for duplicates
+                local seen = {}
+                local duplicates = 0
+                for _, event in ipairs(cache_info.events) do
+                    local key = string.format("%s|%s|%s",
+                        event.date or "",
+                        event.title or "",
+                        event.start_time or "all-day")
+                    if seen[key] then
+                        duplicates = duplicates + 1
+                    else
+                        seen[key] = true
+                    end
+                end
+                vim.notify(string.format("  Duplicate events: %d", duplicates), vim.log.levels.INFO)
+            else
+                vim.notify("Cache is empty", vim.log.levels.INFO)
+            end
         elseif cmd == "diagnose" then
             -- Run diagnostic to show raw icalbuddy output
             local icalbuddy = require("doit.modules.calendar.icalbuddy")
@@ -204,7 +231,7 @@ day after tomorrow at 10:00 AM - 10:30 AM - 1:1 Meeting
                 return vim.tbl_filter(function(val)
                     return val:find(arglead, 1, true) == 1
                 end, {
-                    "toggle", "show", "hide", "today", "next", "prev", "view", "refresh", "debug", "diagnose", "test-parse", "check-state"
+                    "toggle", "show", "hide", "today", "next", "prev", "view", "refresh", "debug", "diagnose", "test-parse", "check-state", "check-cache"
                 })
             elseif #args == 3 and args[2] == "view" then
                 return vim.tbl_filter(function(val)

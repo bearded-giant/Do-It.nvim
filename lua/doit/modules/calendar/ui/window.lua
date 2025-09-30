@@ -51,9 +51,10 @@ function M.create()
     width = math.max(width, 60)   -- Minimum width for column layouts
     height = math.max(height, 15)  -- Minimum height
 
-    -- Store the actual width for renderers to use
+    -- Store the actual dimensions for renderers to use
     actual_width = width
     calendar_module.config.window.actual_width = width
+    calendar_module.config.window.actual_height = height
 
     -- Calculate position
     local col, row
@@ -105,13 +106,26 @@ function M.create()
     }
 
     win_id = vim.api.nvim_open_win(buf_id, true, win_opts)
-    
+
     -- Set window options
     vim.api.nvim_win_set_option(win_id, "wrap", false)
     vim.api.nvim_win_set_option(win_id, "cursorline", true)
     vim.api.nvim_win_set_option(win_id, "number", false)
     vim.api.nvim_win_set_option(win_id, "relativenumber", false)
-    
+
+    -- Set up autocmd to clean up state when window is closed
+    vim.api.nvim_create_autocmd("WinClosed", {
+        buffer = buf_id,
+        once = true,
+        callback = function()
+            if calendar_module and calendar_module.state then
+                calendar_module.state.set_window_open(false)
+            end
+            win_id = nil
+            buf_id = nil
+        end
+    })
+
     -- Apply colors
     M.apply_highlights()
 end
