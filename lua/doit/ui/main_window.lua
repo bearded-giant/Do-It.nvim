@@ -206,12 +206,15 @@ function M.render_todos()
 	if not buf_id or not vim.api.nvim_buf_is_valid(buf_id) then
 		return
 	end
-	
+
 	-- Ensure state is loaded
 	state = ensure_state_loaded()
-	
-	-- Update window title with current list name
+
+	-- Save cursor position before rendering
+	local saved_cursor = nil
 	if win_id and vim.api.nvim_win_is_valid(win_id) then
+		saved_cursor = vim.api.nvim_win_get_cursor(win_id)
+
 		local list_name = "default"
 		if state and state.todo_lists and state.todo_lists.active then
 			list_name = state.todo_lists.active
@@ -221,7 +224,7 @@ function M.render_todos()
 			title_pos = "center",
 		})
 	end
-	
+
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
 	local ns_id = highlights.get_namespace_id()
@@ -248,97 +251,100 @@ function M.render_todos()
 		table.insert(lines, "  Filtered by category: " .. category_name)
 	end
 
+	local todo_line_map = {}
 	for _, todo in ipairs(state.todos) do
 		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
 		local show_by_category = true
-		
+
 		if state.active_category then
 			local module = get_todo_module()
 			if module and module.state and module.state.get_todo_category then
 				local todo_category_id = module.state.get_todo_category(todo.id)
 				show_by_category = (todo_category_id == state.active_category) or
-								  (state.active_category == "uncategorized" and 
+								  (state.active_category == "uncategorized" and
 								   (todo_category_id == "uncategorized" or not todo_category_id))
 			else
 				show_by_category = (todo.category == state.active_category) or
-								  (state.active_category == "Uncategorized" and 
+								  (state.active_category == "Uncategorized" and
 								   (not todo.category or todo.category == ""))
 			end
 		end
-		
+
 		if show_by_tag and show_by_category then
-			table.insert(lines, "  " .. M.format_todo_line(todo))
+			local formatted = M.format_todo_line(todo)
+			local text_lines = vim.split(formatted, "\n", { plain = true })
+			for i, text_line in ipairs(text_lines) do
+				local line_idx = #lines + 1
+				if i == 1 then
+					table.insert(lines, "  " .. text_line)
+					todo_line_map[line_idx] = { todo = todo, is_first = true }
+				else
+					table.insert(lines, "    " .. text_line)
+					todo_line_map[line_idx] = { todo = todo, is_first = false }
+				end
+			end
 		end
 	end
 	table.insert(lines, "")
 
-	for i, line in ipairs(lines) do
-		lines[i] = line:gsub("\n", " ")
-	end
-
 	vim.api.nvim_buf_set_lines(buf_id, 0, -1, false, lines)
 
 	-- Now highlight each line
-	local done_icon = config.options.formatting.done.icon
-	local pending_icon = config.options.formatting.pending.icon
-	local in_progress_icon = config.options.formatting.in_progress.icon
-
 	for i, line in ipairs(lines) do
 		local line_nr = i - 1
-		if line:match("^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]") then
-			local todo_index = i - M.calculate_line_offset()
-			local todo = state.todos[todo_index]
-			if todo then
-				if todo.done then
-					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
-				else
-					local hl_group = highlights.get_priority_highlight(todo.priorities, config)
-					vim.api.nvim_buf_add_highlight(buf_id, ns_id, hl_group, line_nr, 0, -1)
-				end
+		local todo_info = todo_line_map[i]
 
-				-- Tag highlight
-				for tag in line:gmatch("#(%w+)") do
-					local start_idx = line:find("#" .. tag) - 1
-					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
-				end
-				
-				-- Note link highlight for [[note-title]] syntax
-				for link in line:gmatch("%[%[([^%]]+)%]%]") do
-					local link_pattern = "%[%[" .. link .. "%]%]"
-					local start_idx = line:find(link_pattern, 1, true) - 1
-					if start_idx then
-						local end_idx = start_idx + #link_pattern
-						vim.api.nvim_buf_add_highlight(
-							buf_id,
-							ns_id,
-							"DoItNoteLink",
-							line_nr,
-							start_idx,
-							end_idx
-						)
-					end
-				end
+		if todo_info then
+			local todo = todo_info.todo
+			if todo.done then
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
+			else
+				local hl_group = highlights.get_priority_highlight(todo.priorities, config)
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, hl_group, line_nr, 0, -1)
+			end
 
-				-- Overdue highlight
-				if line:match("%[OVERDUE%]") then
-					local start_idx = line:find("%[OVERDUE%]")
-					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "ErrorMsg", line_nr, start_idx - 1, start_idx + 8)
-				end
+			-- Tag highlight
+			for tag in line:gmatch("#(%w+)") do
+				local start_idx = line:find("#" .. tag) - 1
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
+			end
 
-				-- Timestamp highlight
-				if config.options.timestamp and config.options.timestamp.enabled then
-					local timestamp_pattern = "@[%w%s]+ago"
-					local start_idx = line:find(timestamp_pattern)
-					if start_idx then
-						vim.api.nvim_buf_add_highlight(
-							buf_id,
-							ns_id,
-							"DoItTimestamp",
-							line_nr,
-							start_idx - 1,
-							start_idx - 1 + #line:match(timestamp_pattern)
-						)
-					end
+			-- Note link highlight for [[note-title]] syntax
+			for link in line:gmatch("%[%[([^%]]+)%]%]") do
+				local link_pattern = "%[%[" .. link .. "%]%]"
+				local start_idx = line:find(link_pattern, 1, true) - 1
+				if start_idx then
+					local end_idx = start_idx + #link_pattern
+					vim.api.nvim_buf_add_highlight(
+						buf_id,
+						ns_id,
+						"DoItNoteLink",
+						line_nr,
+						start_idx,
+						end_idx
+					)
+				end
+			end
+
+			-- Overdue highlight
+			if line:match("%[OVERDUE%]") then
+				local start_idx = line:find("%[OVERDUE%]")
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "ErrorMsg", line_nr, start_idx - 1, start_idx + 8)
+			end
+
+			-- Timestamp highlight
+			if config.options.timestamp and config.options.timestamp.enabled then
+				local timestamp_pattern = "@[%w%s]+ago"
+				local start_idx = line:find(timestamp_pattern)
+				if start_idx then
+					vim.api.nvim_buf_add_highlight(
+						buf_id,
+						ns_id,
+						"DoItTimestamp",
+						line_nr,
+						start_idx - 1,
+						start_idx - 1 + #line:match(timestamp_pattern)
+					)
 				end
 			end
 		elseif line:match("Filtered by tag:") or line:match("Filtered by category:") then
@@ -347,6 +353,23 @@ function M.render_todos()
 	end
 
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", false)
+
+	-- Restore cursor position if it was saved and is still valid
+	if saved_cursor and win_id and vim.api.nvim_win_is_valid(win_id) then
+		local total_lines = vim.api.nvim_buf_line_count(buf_id)
+		local target_line = saved_cursor[1]
+		local target_col = saved_cursor[2]
+
+		-- Validate line is within bounds
+		if target_line > total_lines then
+			target_line = total_lines
+		elseif target_line < 1 then
+			target_line = 1
+		end
+
+		-- Restore cursor position
+		pcall(vim.api.nvim_win_set_cursor, win_id, { target_line, target_col })
+	end
 end
 
 function M.format_todo_line(todo)
@@ -476,7 +499,7 @@ function M.format_todo_line(todo)
 				table.insert(components, formatting.pending.icon)
 			end
 		elseif part == "text" then
-			table.insert(components, (todo.text:gsub("\n", " ")))
+			table.insert(components, todo.text)
 		elseif part == "notes_icon" then
 			table.insert(components, notes_icon)
 		elseif part == "relative_time" then
@@ -662,6 +685,10 @@ local function create_window()
 	highlights.setup_highlights() -- initialize highlight groups
 
 	buf_id = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_option(buf_id, "buftype", "nofile")
+	vim.api.nvim_buf_set_option(buf_id, "bufhidden", "hide")
+	vim.api.nvim_buf_set_option(buf_id, "swapfile", false)
+
 	win_id = vim.api.nvim_open_win(buf_id, true, {
 		relative = "editor",
 		row = row,
@@ -694,11 +721,34 @@ local function create_window()
 		})
 	end
 
-	vim.api.nvim_win_set_option(win_id, "wrap", true)
-	vim.api.nvim_win_set_option(win_id, "linebreak", true)
-	vim.api.nvim_win_set_option(win_id, "breakindent", true)
-	vim.api.nvim_win_set_option(win_id, "breakindentopt", "shift:2")
-	vim.api.nvim_win_set_option(win_id, "showbreak", " ")
+	vim.api.nvim_win_set_option(win_id, "wrap", false)
+	vim.api.nvim_win_set_option(win_id, "scrolloff", 1)
+	vim.api.nvim_win_set_option(win_id, "cursorline", true)
+	vim.api.nvim_win_set_option(win_id, "scrollbind", false)
+	vim.api.nvim_win_set_option(win_id, "scroll", math.floor(height / 2))
+
+	-- Restrict cursor movement to valid todo lines
+	vim.api.nvim_create_autocmd("CursorMoved", {
+		buffer = buf_id,
+		callback = function()
+			-- Use pcall to avoid errors if window becomes invalid
+			local ok, cursor = pcall(vim.api.nvim_win_get_cursor, win_id)
+			if not ok or not cursor then
+				return
+			end
+
+			local line_num = cursor[1]
+			local total_lines = vim.api.nvim_buf_line_count(buf_id)
+
+			-- Line 1 is blank, line 2 is first valid position
+			-- Last valid line is total_lines - 1 (before the trailing blank)
+			if line_num < 2 then
+				pcall(vim.api.nvim_win_set_cursor, win_id, { 2, cursor[2] })
+			elseif line_num >= total_lines then
+				pcall(vim.api.nvim_win_set_cursor, win_id, { total_lines - 1, cursor[2] })
+			end
+		end,
+	})
 
 	local function setup_keymap(key_option, fn)
 		-- Default keymaps
