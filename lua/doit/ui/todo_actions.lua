@@ -2,6 +2,7 @@ local vim = vim
 
 local config = require("doit.config")
 local calendar = require("doit.calendar")
+local multiline_input = require("doit.core.ui.multiline_input")
 
 -- Lazy loading of todo module and state
 local todo_module = nil
@@ -57,19 +58,57 @@ local function get_todo_icon_pattern()
 	return "^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]"
 end
 
-local function get_real_todo_index(line_num, filter)
-	ensure_state_loaded()  -- Ensure state is loaded
-	if not filter then
-		return line_num - 1
+local function find_bullet_line_for_cursor(buf_id, line_num)
+	local icon_pattern = get_todo_icon_pattern()
+
+	local current_line = line_num
+	while current_line > 0 do
+		local line_content = vim.api.nvim_buf_get_lines(buf_id, current_line - 1, current_line, false)[1]
+		if not line_content then
+			break
+		end
+
+		if line_content:match(icon_pattern) then
+			return current_line
+		end
+
+		if line_content:match("^%s*$") then
+			break
+		end
+
+		current_line = current_line - 1
 	end
 
-	local visible_index = 0
+	return nil
+end
+
+local function get_real_todo_index(line_num, filter)
+	ensure_state_loaded()
+
+	-- Calculate header offset
+	local line_offset = 1  -- blank line at top
+	if state.active_filter then
+		line_offset = line_offset + 2  -- blank line + filter text
+	end
+	if state.active_category then
+		line_offset = line_offset + 2  -- blank line + category text
+	end
+
+	-- First todo starts at line_offset + 1 (after all headers)
+	local current_line = line_offset + 1
+
 	for i, todo in ipairs(state.todos) do
-		if todo.text:match("#" .. filter) then
-			visible_index = visible_index + 1
-			if visible_index == line_num - 2 then
+		local show_by_tag = not filter or todo.text:match("#" .. filter)
+		if show_by_tag then
+			local text_lines = vim.split(todo.text, "\n", { plain = true })
+			local num_lines = #text_lines
+
+			-- Check if line_num falls within this todo's line range
+			if line_num >= current_line and line_num < current_line + num_lines then
 				return i
 			end
+
+			current_line = current_line + num_lines
 		end
 	end
 	return nil
@@ -108,19 +147,23 @@ local function cleanup_priority_selection(select_buf, select_win, keymaps)
 	for _, keymap in ipairs(keymaps) do
 		pcall(vim.keymap.del, "n", keymap, { buffer = select_buf })
 	end
-	if select_win and vim.api.nvim_win_is_valid(select_win) then
-		vim.api.nvim_win_close(select_win, true)
-	end
-	if select_buf and vim.api.nvim_buf_is_valid(select_buf) then
-		vim.api.nvim_buf_delete(select_buf, { force = true })
-	end
+	pcall(vim.keymap.del, "n", "<CR>", { buffer = select_buf })
+
+	-- Defer window/buffer cleanup to avoid treesitter race condition
+	vim.schedule(function()
+		if select_win and vim.api.nvim_win_is_valid(select_win) then
+			pcall(vim.api.nvim_win_close, select_win, true)
+		end
+		if select_buf and vim.api.nvim_buf_is_valid(select_buf) then
+			pcall(vim.api.nvim_buf_delete, select_buf, { force = true })
+		end
+	end)
 end
 
 local function create_priority_selection_window(priorities, selected_priority, title)
 	local priority_options = {}
 	local keymaps = {
 		config.options.keymaps.toggle_priority,
-		"<CR>",
 		"q",
 		"<Esc>",
 	}
@@ -153,6 +196,7 @@ local function create_priority_selection_window(priorities, selected_priority, t
 
 	vim.api.nvim_buf_set_lines(select_buf, 0, -1, false, priority_options)
 	vim.api.nvim_buf_set_option(select_buf, "modifiable", false)
+	vim.api.nvim_buf_set_option(select_buf, "buftype", "nofile")
 
 	vim.api.nvim_create_autocmd("BufLeave", {
 		buffer = select_buf,
@@ -162,6 +206,9 @@ local function create_priority_selection_window(priorities, selected_priority, t
 		end,
 		once = true,
 	})
+
+	vim.cmd("startinsert!")
+	vim.cmd("stopinsert")
 
 	return select_buf, select_win, keymaps, priority_options
 end
@@ -211,50 +258,52 @@ local function setup_priority_close_buttons(select_buf, select_win, keymaps)
 end
 
 function M.new_todo(on_render)
-	ensure_state_loaded()  -- Ensure state is loaded before use
-	vim.ui.input({ prompt = "New to-do: " }, function(input)
-		-- Clear the command line after input
-		vim.cmd("echo ''")
-		
-		if input then
-			input = input:gsub("\n", " ")
-			if input ~= "" then
-				-- If user has priority config, ask for priority
+	ensure_state_loaded()
+
+	multiline_input.create({
+		prompt = "New to-do",
+		on_submit = function(input)
+			vim.cmd("echo ''")
+
+			if input and input ~= "" then
 				if config.options.priorities and #config.options.priorities > 0 then
-					local priorities = config.options.priorities
-					local selected_priority = { value = nil }
+					vim.schedule(function()
+						local priorities = config.options.priorities
+						local selected_priority = { value = nil }
 
-					local select_buf, select_win, keymaps, priority_options =
-						create_priority_selection_window(priorities, selected_priority.value, "Select Priority")
+						local select_buf, select_win, keymaps, priority_options =
+							create_priority_selection_window(priorities, selected_priority.value, "Select Priority")
 
-					setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
+						setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
 
-					-- Setup confirmation handling
-					setup_priority_confirm(
-						select_buf,
-						select_win,
-						keymaps,
-						priorities,
-						selected_priority,
-						function(selected_priority_name)
-							state.add_todo(input, selected_priority_name)
-							maybe_render(on_render)
-						end
-					)
+						setup_priority_confirm(
+							select_buf,
+							select_win,
+							keymaps,
+							priorities,
+							selected_priority,
+							function(selected_priority_name)
+								state.add_todo(input, selected_priority_name)
+								maybe_render(on_render)
+							end
+						)
 
-					setup_priority_close_buttons(select_buf, select_win, keymaps)
+						setup_priority_close_buttons(select_buf, select_win, keymaps)
+					end)
 				else
-					-- No priorities configured so just add the todo
 					state.add_todo(input)
 					maybe_render(on_render)
 				end
 			end
+		end,
+		on_cancel = function()
+			vim.cmd("echo ''")
 		end
-	end)
+	})
 end
 
 function M.toggle_todo(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
@@ -263,68 +312,90 @@ function M.toggle_todo(win_id, on_render)
 	local line_num = cursor[1]
 
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-	local line_content = vim.api.nvim_buf_get_lines(buf_id, line_num - 1, line_num, false)[1]
 
-	if line_content and line_content:match(get_todo_icon_pattern()) then
-		local todo_index = get_real_todo_index(line_num, state.active_filter)
-		if todo_index then
-			-- Store the current status of the todo
-			local was_done = state.todos[todo_index].done
-			local will_be_done = state.todos[todo_index].in_progress -- if in_progress, it will become done
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
 
-			state.toggle_todo(todo_index)
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		-- Store the current status of the todo
+		local was_done = state.todos[todo_index].done
+		local will_be_done = state.todos[todo_index].in_progress -- if in_progress, it will become done
 
-			maybe_render(on_render)
+		state.toggle_todo(todo_index)
 
-			if was_done == false and will_be_done == true then
-				-- Move cursor to first incomplete item
-				local first_line = state.active_filter and 3 or 1
+		maybe_render(on_render)
 
-				-- Find the first non-empty line with a todo
-				local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
-				for i, line in ipairs(buf_lines) do
-					if line:match(get_todo_icon_pattern()) then
-						first_line = i
-						break
-					end
+		if was_done == false and will_be_done == true then
+			-- Move cursor to first incomplete item
+			local first_line = state.active_filter and 3 or 1
+
+			-- Find the first non-empty line with a todo
+			local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
+			for i, line in ipairs(buf_lines) do
+				if line:match(get_todo_icon_pattern()) then
+					first_line = i
+					break
+				end
+			end
+
+			local total_lines = vim.api.nvim_buf_line_count(buf_id)
+			if first_line > total_lines then
+				first_line = total_lines
+			end
+
+			if vim.api.nvim_win_is_valid(win_id) then
+				vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
+			end
+		else
+			-- For other status changes (pending → in_progress), keep tracking the item
+			local todo_ref = state.todos[todo_index]
+
+			-- Find the new position of the todo after sorting
+			local new_position
+			for i, todo in ipairs(state.todos) do
+				if todo == todo_ref then
+					new_position = i
+					break
+				end
+			end
+
+			if new_position then
+				-- Calculate the new line number accounting for multiline todos
+				local new_line_num
+				local line_offset = 1
+				if state.active_filter then
+					line_offset = line_offset + 2
+				end
+				if state.active_category then
+					line_offset = line_offset + 2
 				end
 
-				if vim.api.nvim_win_is_valid(win_id) then
-					vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
-				end
-			else
-				-- For other status changes (pending → in_progress), keep tracking the item
-				local todo_ref = state.todos[todo_index]
-
-				-- Find the new position of the todo after sorting
-				local new_position
+				local current_line = line_offset
 				for i, todo in ipairs(state.todos) do
-					if todo == todo_ref then
-						new_position = i
+					if i == new_position then
+						new_line_num = current_line
 						break
+					end
+					local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+					if show_by_tag then
+						local text_lines = vim.split(todo.text, "\n", { plain = true })
+						current_line = current_line + #text_lines
 					end
 				end
 
-				if new_position then
-					-- Calculate the new line number based on filtering
-					local new_line_num
-					if state.active_filter then
-						local visible_count = 0
-						for i, todo in ipairs(state.todos) do
-							if todo.text:match("#" .. state.active_filter) then
-								visible_count = visible_count + 1
-								if i == new_position then
-									new_line_num = visible_count + 2 -- 2 extra lines for filter header
-									break
-								end
-							end
-						end
-					else
-						new_line_num = new_position + 1 -- +1 for the empty line at the top
+				-- Validate cursor position
+				if new_line_num then
+					local total_lines = vim.api.nvim_buf_line_count(buf_id)
+					if new_line_num > total_lines then
+						new_line_num = total_lines
+					elseif new_line_num < 1 then
+						new_line_num = 1
 					end
 
-					-- Update cursor position to the new location
-					if new_line_num and vim.api.nvim_win_is_valid(win_id) then
+					if vim.api.nvim_win_is_valid(win_id) then
 						vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
 					end
 				end
@@ -334,7 +405,7 @@ function M.toggle_todo(win_id, on_render)
 end
 
 function M.delete_todo(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
@@ -343,30 +414,63 @@ function M.delete_todo(win_id, on_render)
 	local line_num = cursor[1]
 
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-	local line_content = vim.api.nvim_buf_get_lines(buf_id, line_num - 1, line_num, false)[1]
 
-	if line_content and line_content:match(get_todo_icon_pattern()) then
-		local todo_index = get_real_todo_index(line_num, state.active_filter)
-		if todo_index then
-			state.delete_todo_with_confirmation(todo_index, win_id, calendar, function()
-				maybe_render(on_render)
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
 
-				-- Move cursor to first item in the list
-				local first_line = state.active_filter and 3 or 1
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		-- Check if confirmation is needed (for todos with calendar events)
+		local todo = state.todos[todo_index]
+		local needs_confirmation = todo and todo.calendar_event_id
 
-				-- Find the first non-empty line with a todo
-				local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
-				for i, line in ipairs(buf_lines) do
-					if line:match(get_todo_icon_pattern()) then
-						first_line = i
-						break
-					end
+		local function do_delete()
+			state.delete_todo(todo_index)
+			maybe_render(on_render)
+
+			-- Move cursor to first item in the list
+			local first_line = state.active_filter and 3 or 1
+
+			-- Find the first non-empty line with a todo
+			local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
+			for i, line in ipairs(buf_lines) do
+				if line:match(get_todo_icon_pattern()) then
+					first_line = i
+					break
 				end
+			end
 
-				if vim.api.nvim_win_is_valid(win_id) then
-					vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
+			-- Validate cursor position
+			local total_lines = vim.api.nvim_buf_line_count(buf_id)
+			if first_line > total_lines then
+				first_line = total_lines
+			elseif first_line < 1 then
+				first_line = 1
+			end
+
+			if vim.api.nvim_win_is_valid(win_id) then
+				vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
+			end
+		end
+
+		-- If confirmation is needed, show a prompt
+		if needs_confirmation then
+			vim.ui.select({ "Yes", "No" }, {
+				prompt = "Delete todo with calendar event?"
+			}, function(choice)
+				if choice == "Yes" then
+					-- Also delete calendar event if module is available
+					if calendar and calendar.delete_event then
+						pcall(calendar.delete_event, todo.calendar_event_id)
+					end
+					do_delete()
 				end
 			end)
+		else
+			-- No confirmation needed, delete directly
+			do_delete()
 		end
 	end
 end
@@ -395,6 +499,14 @@ function M.delete_completed(on_render)
 				end
 			end
 
+			-- Validate cursor position
+			local total_lines = vim.api.nvim_buf_line_count(buf_id)
+			if first_line > total_lines then
+				first_line = total_lines
+			elseif first_line < 1 then
+				first_line = 1
+			end
+
 			vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
 		end
 	end)
@@ -403,16 +515,23 @@ end
 
 -- Link a todo to a note (UI for note selection)
 function M.link_to_note(win_id, on_render)
-    ensure_state_loaded()  -- Ensure state is loaded
+    ensure_state_loaded()
+    if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+        return
+    end
+
     local cursor = vim.api.nvim_win_get_cursor(win_id)
     local line_num = cursor[1]
 
     local buf_id = vim.api.nvim_win_get_buf(win_id)
-    local line_content = vim.api.nvim_buf_get_lines(buf_id, line_num - 1, line_num, false)[1]
 
-    if line_content:match(get_todo_icon_pattern()) then
-        local todo_index = get_real_todo_index(line_num, state.active_filter)
-        if todo_index then
+    local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+    if not bullet_line then
+        return
+    end
+
+    local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+    if todo_index then
             -- Try to get a reference to the notes module
             local core = package.loaded["doit.core"]
             local notes_module = core and core.get_module and core.get_module("notes")
@@ -507,7 +626,6 @@ function M.link_to_note(win_id, on_render)
                     end
                 end
             end)
-        end
     end
 end
 
@@ -522,44 +640,60 @@ function M.remove_duplicates(on_render)
 end
 
 function M.edit_todo(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
 
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-	local line_content = vim.api.nvim_buf_get_lines(buf_id, line_num - 1, line_num, false)[1]
 
-	if line_content:match(get_todo_icon_pattern()) then
-		local todo_index = get_real_todo_index(line_num, state.active_filter)
-		if todo_index then
-			vim.ui.input(
-				{ zindex = 300, prompt = "Edit to-do: ", default = state.todos[todo_index].text },
-				function(input)
-					-- Clear the command line after input
-					vim.cmd("echo ''")
-					if input and input ~= "" then
-						state.todos[todo_index].text = input
-						state.save_to_disk()
-						maybe_render(on_render)
-					end
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		multiline_input.create({
+			prompt = "Edit to-do",
+			default = state.todos[todo_index].text,
+			on_submit = function(input)
+				vim.cmd("echo ''")
+				if input and input ~= "" then
+					state.todos[todo_index].text = input
+					state.save_to_disk()
+					maybe_render(on_render)
 				end
-			)
-		end
+			end,
+			on_cancel = function()
+				vim.cmd("echo ''")
+			end
+		})
 	end
 end
 
 function M.edit_priorities(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
 
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-	local line_content = vim.api.nvim_buf_get_lines(buf_id, line_num - 1, line_num, false)[1]
 
-	if line_content:match(get_todo_icon_pattern()) then
-		local todo_index = get_real_todo_index(line_num, state.active_filter)
-		if todo_index then
-			if config.options.priorities and #config.options.priorities > 0 then
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		if config.options.priorities and #config.options.priorities > 0 then
 				local priorities = config.options.priorities
 				local current_todo = state.todos[todo_index]
 				local selected_priority = { value = current_todo.priorities }
@@ -624,15 +758,25 @@ function M.edit_priorities(win_id, on_render)
 				)
 
 				setup_priority_close_buttons(select_buf, select_win, keymaps)
-			end
 		end
 	end
 end
 
 function M.add_time_estimation(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
-	local todo_index = get_real_todo_index(line_num, state.active_filter)
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
 
 	if not todo_index then
 		return
@@ -659,9 +803,20 @@ function M.add_time_estimation(win_id, on_render)
 end
 
 function M.remove_time_estimation(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
-	local todo_index = get_real_todo_index(line_num, state.active_filter)
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
 
 	if todo_index and state.todos[todo_index] then
 		state.todos[todo_index].estimated_hours = nil
@@ -674,9 +829,20 @@ function M.remove_time_estimation(win_id, on_render)
 end
 
 function M.add_due_date(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
-	local todo_index = get_real_todo_index(line_num, state.active_filter)
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
 
 	if not todo_index then
 		return
@@ -696,9 +862,20 @@ function M.add_due_date(win_id, on_render)
 end
 
 function M.remove_due_date(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
 	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
-	local todo_index = get_real_todo_index(line_num, state.active_filter)
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
 
 	if todo_index then
 		local success = state.remove_due_date(todo_index)
@@ -714,13 +891,23 @@ function M.remove_due_date(win_id, on_render)
 end
 
 function M.reorder_todo(win_id, on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
+	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
 
 	local cursor = vim.api.nvim_win_get_cursor(win_id)
 	local line_num = cursor[1]
+
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	-- Now use bullet_line instead of line_num for the rest
+	line_num = bullet_line
 
 	-- Calculate offset based on filters (consistent with move_todo)
 	local line_offset = 1 -- default offset for blank line at top
@@ -736,8 +923,6 @@ function M.reorder_todo(win_id, on_render)
 	if todo_index < 1 or todo_index > #state.todos then
 		return
 	end
-
-	local buf_id = vim.api.nvim_win_get_buf(win_id)
 
 	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
 
