@@ -119,9 +119,9 @@ function M.setup(opts)
     M.api = require("doit.core.api").setup(M)
     
     vim.api.nvim_create_user_command("DoItDashboard", function()
-        require("doit").show_dashboard()
+        require("doit").show_modal_dashboard()
     end, {
-        desc = "Show DoIt dashboard with installed modules"
+        desc = "Show DoIt modal dashboard with installed modules"
     })
     
     vim.api.nvim_create_user_command("DoItPlugins", function(opts)

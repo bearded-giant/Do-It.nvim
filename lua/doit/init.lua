@@ -75,10 +75,15 @@ function M.setup(opts)
 	end
 
 	M.lualine = require("doit.lualine")
+	M.dashboard = require("doit.dashboard")
 
 	M.register_module_commands()
 
 	function M.show_dashboard()
+		M.dashboard.open()
+	end
+
+	function M.show_modal_dashboard()
 		local dashboard_buf = vim.api.nvim_create_buf(false, true)
 		local width = 70
 		local height = 40
