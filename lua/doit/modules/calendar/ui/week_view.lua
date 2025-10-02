@@ -214,7 +214,7 @@ function M.render(calendar_module)
     -- Footer
     table.insert(lines, "")
     table.insert(lines, string.rep("─", total_width - 2))  -- -2 for padding
-    local footer = " [d]ay [3]day [w]eek │ [h/l] prev/next │ [t]oday │ [q]uit "
+    local footer = " [d]ay [3]day [w]eek │ [1-7] day details │ [h/l] prev/next │ [t]oday │ [q]uit "
     table.insert(lines, footer)
 
     return lines

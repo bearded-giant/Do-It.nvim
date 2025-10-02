@@ -93,12 +93,14 @@ function M.validate(config)
 		config.hours["end"] = 20
 	end
 
-	-- Validate window dimensions
-	if config.window.width < 40 then
-		config.window.width = 40
-	end
-	if config.window.height < 10 then
-		config.window.height = 10
+	-- Validate window dimensions (only if not using relative sizing)
+	if not config.window.use_relative then
+		if config.window.width and config.window.width < 40 then
+			config.window.width = 40
+		end
+		if config.window.height and config.window.height < 10 then
+			config.window.height = 10
+		end
 	end
 end
 

@@ -8,12 +8,24 @@ function M.is_open()
 end
 
 function M.close()
+	-- Check if we can safely close the window
+	local win_count = #vim.api.nvim_list_wins()
+
 	if M.win and vim.api.nvim_win_is_valid(M.win) then
-		vim.api.nvim_win_close(M.win, true)
+		if win_count > 1 then
+			-- Safe to close the window
+			vim.api.nvim_win_close(M.win, true)
+		else
+			-- This is the last window, switch to a scratch buffer instead
+			local scratch = vim.api.nvim_create_buf(false, true)
+			vim.api.nvim_win_set_buf(M.win, scratch)
+		end
 	end
+
 	if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
 		vim.api.nvim_buf_delete(M.buf, { force = true })
 	end
+
 	M.win = nil
 	M.buf = nil
 end
@@ -54,7 +66,13 @@ function M.open()
 		buffer = M.buf,
 		callback = function()
 			vim.defer_fn(function()
-				M.close()
+				-- Only close if the dashboard buffer is no longer displayed in any window
+				if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
+					local wins = vim.fn.win_findbuf(M.buf)
+					if #wins == 0 then
+						M.close()
+					end
+				end
 			end, 0)
 		end,
 	})

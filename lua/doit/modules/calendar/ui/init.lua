@@ -9,10 +9,13 @@ local current_renderer = nil
 -- Setup UI
 function M.setup(module)
     calendar_module = module
-    
+
     -- Initialize window module
     window = require("doit.modules.calendar.ui.window").setup(module)
-    
+
+    -- Initialize day detail modal
+    require("doit.modules.calendar.ui.day_detail_modal").setup(module)
+
     return M
 end
 
@@ -68,10 +71,10 @@ function M.refresh()
     if not window or not window.is_open() then
         return
     end
-    
+
     -- Get current view
     local view = calendar_module.state.get_view()
-    
+
     -- Load appropriate renderer
     if view == "day" then
         current_renderer = require("doit.modules.calendar.ui.day_view")
@@ -80,10 +83,10 @@ function M.refresh()
     elseif view == "week" then
         current_renderer = require("doit.modules.calendar.ui.week_view")
     end
-    
+
     -- Get date range
     local start_date, end_date = calendar_module.state.get_date_range()
-    
+
     -- Fetch events
     local icalbuddy = require("doit.modules.calendar.icalbuddy")
     local events = icalbuddy.get_events(start_date, end_date, calendar_module.config.icalbuddy)
@@ -101,12 +104,15 @@ function M.refresh()
     end
 
     calendar_module.state.set_events(events)
-    
+
     -- Render the view
     if current_renderer then
         local lines = current_renderer.render(calendar_module)
         window.set_content(lines)
     end
+
+    -- Re-setup keymaps when view changes (for number keys)
+    M.setup_keymaps()
 end
 
 -- Setup keymaps for the calendar window
@@ -184,6 +190,19 @@ function M.setup_keymaps()
             icalbuddy.clear_cache()
             M.refresh()
         end, opts)
+    end
+
+    -- Number keys for day details in 3-day and week views
+    local view = calendar_module.state.get_view()
+    if view == "3day" or view == "week" then
+        local day_detail_modal = require("doit.modules.calendar.ui.day_detail_modal")
+        local max_days = view == "3day" and 3 or 7
+
+        for i = 1, max_days do
+            vim.keymap.set("n", tostring(i), function()
+                day_detail_modal.show_day(i, buf)
+            end, opts)
+        end
     end
 end
 
