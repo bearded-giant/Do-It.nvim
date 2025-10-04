@@ -6,7 +6,6 @@ Integration module that bridges DoIt.nvim todos with Obsidian.nvim markdown note
 
 - **Import todos from Obsidian notes** - Extract checkbox items from markdown files
 - **Sync completion status** - When marking todos complete in DoIt, updates Obsidian checkboxes
-- **Navigation** - Jump between DoIt todos and their source in Obsidian
 - **Smart list assignment** - Automatically assigns todos to lists based on file location or tags
 - **Non-invasive markers** - Uses HTML comments to track references
 
@@ -26,6 +25,10 @@ require("doit").setup({
                 daily = "daily",
                 inbox = "inbox",
                 projects = "projects"
+            },
+            keymaps = {
+                import_buffer = "<leader>ti",  -- Import todos from buffer
+                send_current = "<leader>tt"    -- Send current line todo
             }
         }
     }
@@ -36,24 +39,19 @@ require("doit").setup({
 
 - `:DoItImportBuffer` - Import todos from current Obsidian buffer
 - `:DoItImportToday` - Import todos from today's daily note
-- `:DoItGotoSource` - Jump to Obsidian source of current todo
 - `:DoItSyncStatus` - Show sync status information
 
 ## Keymaps
 
 In Obsidian buffers:
-- `<leader>di` - Import todos to DoIt
-- `<leader>dt` - Send current line todo to DoIt
-
-In DoIt window:
-- `gO` - Go to Obsidian source (when available)
+- `<leader>ti` - Import todos to DoIt
+- `<leader>tt` - Send current line todo to DoIt
 
 ## How It Works
 
 1. **Import**: Scans markdown for checkbox lines (`- [ ] Task text`)
 2. **Track**: Adds HTML comment markers (`<!-- doit:id -->`) to track references
-3. **Sync**: When toggling in DoIt, updates checkbox state in Obsidian
-4. **Navigate**: Jump between systems using stored buffer/line references
+3. **Sync**: When marking complete in DoIt, updates checkbox state in Obsidian
 
 ## Daily Workflow
 
@@ -67,5 +65,6 @@ In DoIt window:
 
 - References are session-based (not persisted between Neovim restarts)
 - Only unchecked items are imported
-- Completed items sync back to source files
+- Only fully completed todos (not in_progress) sync back as [x] in Obsidian
 - Works with any Obsidian vault structure
+- Leading dash format `- [ ] - text` is handled automatically

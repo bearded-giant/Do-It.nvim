@@ -19,7 +19,8 @@ M.metadata = {
         auto_import_on_open = { type = "boolean", default = false },
         sync_completions = { type = "boolean", default = true },
         default_list = { type = "string", default = "obsidian" },
-        list_mapping = { type = "table" }
+        list_mapping = { type = "table" },
+        keymaps = { type = "table" }
     }
 }
 
@@ -42,6 +43,10 @@ function M.setup(opts)
             daily = "daily",
             inbox = "inbox",
             projects = "projects"
+        },
+        keymaps = {
+            import_buffer = "<leader>ti",
+            send_current = "<leader>tt"
         }
     }, opts or {})
 
@@ -130,12 +135,45 @@ function M.setup_functions()
                 local existing_id = text:match("<!%-%- doit:(%S+) %-%->")
 
                 if not existing_id and checkbox == " " then
-                    -- New unchecked item - import it
+                    -- Clean up the text
                     local clean_text = text:gsub(" <!%-%- doit:%S+ %-%->", "")
+
+                    -- Handle format: "- [ ] - actual text" by removing leading "- "
+                    clean_text = clean_text:gsub("^%-%s*", "")
+
+                    -- Skip empty todos (just placeholders)
+                    if clean_text == "" or clean_text == "-" then
+                        -- Don't import empty placeholders
+                        goto continue
+                    end
+
                     local list = M.determine_list(file, clean_text)
 
-                    -- Create todo in DoIt
-                    local new_todo = todos_module.state.add_todo(clean_text, list)
+                    -- Ensure the list exists
+                    local lists = todos_module.state.get_available_lists()
+                    local list_exists = false
+                    for _, l in ipairs(lists) do
+                        if l.name == list then
+                            list_exists = true
+                            break
+                        end
+                    end
+
+                    -- Create list if it doesn't exist
+                    if not list_exists then
+                        todos_module.state.create_list(list, {})
+                    end
+
+                    -- Switch to the target list if different from current
+                    local current_list = todos_module.state.todo_lists.active
+                    if current_list ~= list then
+                        -- Save current list for later restore
+                        M.original_list = current_list
+                        todos_module.state.load_list(list)
+                    end
+
+                    -- Create todo in the target list (don't pass list as second param)
+                    local new_todo = todos_module.state.add_todo(clean_text)
 
                     -- Track reference
                     M.refs[new_todo.id] = {
@@ -164,6 +202,7 @@ function M.setup_functions()
                 end
             end
 
+            ::continue::
             table.insert(updated_lines, line)
         end
 
@@ -172,15 +211,22 @@ function M.setup_functions()
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, updated_lines)
         end
 
+        -- Restore original list if we switched
+        if M.original_list and M.original_list ~= todos_module.state.todo_lists.active then
+            todos_module.state.load_list(M.original_list)
+            M.original_list = nil
+        end
+
         return imported
     end
 
     -- Sync completion status back to Obsidian
-    function M.sync_completion(todo_id, is_done)
+    function M.sync_completion(todo_id, todo_state)
         local ref = M.refs[todo_id]
         if not ref then return false end
 
-        local checkbox = is_done and "[x]" or "[ ]"
+        -- Only mark checkbox as done when todo is completed (not in_progress)
+        local checkbox = (todo_state.done and not todo_state.in_progress) and "[x]" or "[ ]"
 
         -- Try buffer first (more efficient if open)
         if vim.api.nvim_buf_is_valid(ref.bufnr) then
@@ -201,28 +247,6 @@ function M.setup_functions()
         end
 
         return false
-    end
-
-    -- Navigate to source in Obsidian
-    function M.goto_source(todo_id)
-        local ref = M.refs[todo_id]
-        if not ref then
-            vim.notify("No source reference found", vim.log.levels.WARN)
-            return
-        end
-
-        -- Check if source buffer is already open
-        for _, win in ipairs(vim.api.nvim_list_wins()) do
-            if vim.api.nvim_win_get_buf(win) == ref.bufnr and vim.api.nvim_buf_is_valid(ref.bufnr) then
-                vim.api.nvim_set_current_win(win)
-                vim.api.nvim_win_set_cursor(win, {ref.lnum, 0})
-                return
-            end
-        end
-
-        -- Open in split
-        vim.cmd("vsplit " .. ref.file)
-        vim.api.nvim_win_set_cursor(0, {ref.lnum, 0})
     end
 
     -- Refresh references for a buffer
@@ -304,23 +328,6 @@ function M.create_commands()
         end
     end, { desc = "Import todos from today's daily note" })
 
-    -- Jump to source from DoIt
-    vim.api.nvim_create_user_command("DoItGotoSource", function()
-        local win_id = vim.api.nvim_get_current_win()
-        local todo_index = M.get_current_todo_index(win_id)
-
-        if todo_index then
-            local core = require("doit.core")
-            local todos_module = core.get_module("todos")
-            if todos_module and todos_module.state then
-                local todo = todos_module.state.todos[todo_index]
-                if todo then
-                    M.goto_source(todo.id)
-                end
-            end
-        end
-    end, { desc = "Jump to Obsidian source of current todo" })
-
     -- Show sync status
     vim.api.nvim_create_user_command("DoItSyncStatus", function()
         local ref_count = vim.tbl_count(M.refs)
@@ -373,10 +380,10 @@ function M.setup_autocmds()
         group = group,
         pattern = "**/Recharge-Notes/**/*.md",
         callback = function()
-            vim.keymap.set("n", "<leader>di", ":DoItImportBuffer<CR>",
+            vim.keymap.set("n", M.config.keymaps.import_buffer, ":DoItImportBuffer<CR>",
                 { buffer = true, desc = "Import todos to DoIt" })
 
-            vim.keymap.set("n", "<leader>dt", function()
+            vim.keymap.set("n", M.config.keymaps.send_current, function()
                 -- Send current line to DoIt
                 local line = vim.api.nvim_get_current_line()
                 local lnum = vim.fn.line(".")
@@ -427,11 +434,8 @@ function M.setup_hooks()
             local todos_module = core.get_module("todos")
 
             local todo = nil
-            local was_done = false
-
             if todos_module and todos_module.state and todo_index then
                 todo = todos_module.state.todos[todo_index]
-                was_done = todo and todo.done
             end
 
             -- Execute original toggle
@@ -440,7 +444,11 @@ function M.setup_hooks()
             -- Sync to Obsidian if we have a reference
             if todo and M.refs[todo.id] and M.config.sync_completions then
                 vim.defer_fn(function()
-                    M.sync_completion(todo.id, not was_done)
+                    -- Get the updated todo state after toggle
+                    local updated_todo = todos_module.state.todos[todo_index]
+                    if updated_todo then
+                        M.sync_completion(todo.id, updated_todo)
+                    end
                 end, 50)
             end
         end
