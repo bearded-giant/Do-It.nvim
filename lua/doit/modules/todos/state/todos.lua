@@ -147,18 +147,18 @@ function M.setup(state)
     function M.undo_delete()
         if #state.deleted_todos > 0 then
             local todo = table.remove(state.deleted_todos, 1)
-            
+
             todo.delete_time = nil
-            
+
             todo.order_index = #state.todos + 1
-            
+
             table.insert(state.todos, todo)
             state.save_todos()
-            
-            return todo
+
+            return true
         end
-        
-        return nil
+
+        return false
     end
     
     function M.parse_categories(text)

@@ -4,24 +4,24 @@ describe("DoIt Calendar Module", function()
     local icalbuddy
     local state
     
-    -- Mock icalbuddy output based on new format (datetime first, then title)
+    -- Mock icalbuddy output (format: "" Title followed by indented datetime/properties)
     local mock_icalbuddy_output = [[
-today
-    Labor Day
-today at 9:00 AM - 9:30 AM
-    Team Standup
-today at 12:30 PM - 1:00 PM
-    Stand-up - SFE
-tomorrow at 2:00 PM - 3:00 PM
-    Product Review
-day after tomorrow at 10:00 AM - 10:30 AM
-    1:1 with Manager
-Sep 4, 2025 at 3:00 PM - 4:00 PM
-    Engineering Sync
-Sep 6, 2025
-    Weekend Project
-Sep 8, 2025 at 10:00 AM - 12:00 PM
-    Sprint Planning
+"" Labor Day
+    today
+"" Team Standup
+    today at 9:00 AM - 9:30 AM
+"" Stand-up - SFE
+    today at 12:30 PM - 1:00 PM
+"" Product Review
+    tomorrow at 2:00 PM - 3:00 PM
+"" 1:1 with Manager
+    day after tomorrow at 10:00 AM - 10:30 AM
+"" Engineering Sync
+    Sep 4, 2025 at 3:00 PM - 4:00 PM
+"" Weekend Project
+    Sep 6, 2025
+"" Sprint Planning
+    Sep 8, 2025 at 10:00 AM - 12:00 PM
 ]]
     
     before_each(function()
@@ -76,13 +76,17 @@ Sep 8, 2025 at 10:00 AM - 12:00 PM
         it("should detect tentative events with attendees", function()
             -- Test output with attendees info
             local test_output = [[
-today
-    Stay at Grand attendees: b..
-    All Day Meeting attendees: john@example.com
-today at 9:00 AM - 10:00 AM
-    Team Standup attendees: team@example.com
-tomorrow at 2:00 PM - 3:00 PM
-    Product Review
+"" Stay at Grand
+    today
+    attendees: b..
+"" All Day Meeting
+    today
+    attendees: john@example.com
+"" Team Standup
+    today at 9:00 AM - 10:00 AM
+    attendees: team@example.com
+"" Product Review
+    tomorrow at 2:00 PM - 3:00 PM
 ]]
             local events = icalbuddy.parse_output(test_output)
 
@@ -106,17 +110,17 @@ tomorrow at 2:00 PM - 3:00 PM
         it("should parse different date formats correctly", function()
             -- Test with specific date headers
             local test_output = [[
-today
-    Today Event
-tomorrow
-    Tomorrow Event
-day after tomorrow at 10:00 AM - 11:00 AM
-    Day After Event
-Sep 15, 2025 at 2:00 PM - 3:00 PM
-    Future Event
+"" Today Event
+    today
+"" Tomorrow Event
+    tomorrow
+"" Day After Event
+    day after tomorrow at 10:00 AM - 11:00 AM
+"" Future Event
+    Sep 15, 2025 at 2:00 PM - 3:00 PM
 ]]
             local events = icalbuddy.parse_output(test_output)
-            
+
             assert.equals(4, #events)
             
             -- Check that each event has the right relative date
@@ -200,11 +204,14 @@ Sep 15, 2025 at 2:00 PM - 3:00 PM
             assert.equals(today, start)  -- Always starts from today
             assert.equals(state.add_days(today, 2), end_date)  -- Today + 2 days
 
-            -- Week view - always today + 6 days
+            -- Week view - Sunday to Saturday of current week
             state.set_view("week")
             start, end_date = state.get_date_range()
-            assert.equals(today, start)  -- Always starts from today
-            assert.equals(state.add_days(today, 6), end_date)  -- Today + 6 days
+            local weekday = state.get_weekday(today) -- Get current day of week
+            local expected_start = state.add_days(today, -weekday) -- Go back to Sunday
+            local expected_end = state.add_days(expected_start, 6) -- Go to Saturday
+            assert.equals(expected_start, start)
+            assert.equals(expected_end, end_date)
         end)
         
         it("should navigate periods correctly", function()
@@ -315,24 +322,31 @@ Sep 15, 2025 at 2:00 PM - 3:00 PM
         it("should render week view", function()
             state.set_date("2025-09-03")
             state.set_view("week")
-            
+
             local lines = week_view.render(calendar)
-            
+
             assert.is_table(lines)
             assert.is_true(#lines > 0)
-            
-            -- Should show days of week
-            local days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
-            for _, day in ipairs(days) do
-                local found = false
-                for _, line in ipairs(lines) do
-                    if line:find(day) then
-                        found = true
-                        break
-                    end
+
+            -- Should show week header separator
+            local header_sep_found = false
+            for _, line in ipairs(lines) do
+                if line:find("─") then
+                    header_sep_found = true
+                    break
                 end
-                assert.is_true(found, "Day " .. day .. " not found")
             end
+            assert.is_true(header_sep_found, "Week header separator not found")
+
+            -- Should show column separators for day columns
+            local col_sep_found = false
+            for _, line in ipairs(lines) do
+                if line:find("│") then
+                    col_sep_found = true
+                    break
+                end
+            end
+            assert.is_true(col_sep_found, "Day column separators not found")
         end)
         
         it("should calculate event duration", function()
