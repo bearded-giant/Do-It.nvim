@@ -32,19 +32,19 @@ Integration tests covering:
 
 ## Running Tests
 
-### All obsidian-sync tests:
+### All obsidian-sync tests with Docker:
 ```bash
-./run_tests.sh
+docker/run-tests.sh --dir tests/modules/obsidian-sync
 ```
 
-### Individual test file:
+### Run specific test pattern:
 ```bash
-nvim --headless -c "lua require('plenary.test_harness').test_file('tests/modules/obsidian-sync/obsidian_sync_spec.lua')" -c "qa!"
+docker/run-tests.sh --pattern "obsidian_sync_spec"
 ```
 
-### With Docker:
+### Simple standalone test:
 ```bash
-docker/run-tests.sh tests/modules/obsidian-sync
+nvim --headless -l tests/modules/obsidian-sync/run_simple_test.lua
 ```
 
 ## Test Coverage
