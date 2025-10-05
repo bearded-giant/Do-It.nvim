@@ -64,7 +64,9 @@ describe("obsidian-sync module", function()
 
         -- Create a test buffer
         test_bufnr = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_name(test_bufnr, "/Users/bryan/Recharge-Notes/daily/2025-10-04.md")
+        -- Use a path that will work in Docker environment
+        local vault_path = vim.fn.expand("~/Recharge-Notes")
+        vim.api.nvim_buf_set_name(test_bufnr, vault_path .. "/daily/2025-10-04.md")
     end)
 
     after_each(function()
@@ -207,32 +209,36 @@ describe("obsidian-sync module", function()
         end)
 
         it("should map daily folder to daily list", function()
+            local vault_path = vim.fn.expand("~/Recharge-Notes")
             local list = obsidian_sync.determine_list(
-                "/Users/bryan/Recharge-Notes/daily/2025-10-04.md",
+                vault_path .. "/daily/2025-10-04.md",
                 "Some task"
             )
             assert.equals("daily", list)
         end)
 
         it("should map inbox folder to inbox list", function()
+            local vault_path = vim.fn.expand("~/Recharge-Notes")
             local list = obsidian_sync.determine_list(
-                "/Users/bryan/Recharge-Notes/inbox/ideas.md",
+                vault_path .. "/inbox/ideas.md",
                 "New idea"
             )
             assert.equals("inbox", list)
         end)
 
         it("should use tag if present", function()
+            local vault_path = vim.fn.expand("~/Recharge-Notes")
             local list = obsidian_sync.determine_list(
-                "/Users/bryan/Recharge-Notes/random.md",
+                vault_path .. "/random.md",
                 "Task #projects for work"
             )
             assert.equals("projects", list)
         end)
 
         it("should use default list if no match", function()
+            local vault_path = vim.fn.expand("~/Recharge-Notes")
             local list = obsidian_sync.determine_list(
-                "/Users/bryan/Recharge-Notes/other.md",
+                vault_path .. "/other.md",
                 "Random task"
             )
             assert.equals("general", list)
@@ -250,10 +256,11 @@ describe("obsidian-sync module", function()
             })
 
             -- Add a reference
+            local vault_path = vim.fn.expand("~/Recharge-Notes")
             obsidian_sync.refs["test_1"] = {
                 bufnr = test_bufnr,
                 lnum = 1,
-                file = "/Users/bryan/Recharge-Notes/daily/test.md"
+                file = vault_path .. "/daily/test.md"
             }
         end)
 
@@ -331,11 +338,6 @@ describe("obsidian-sync module", function()
     end)
 
     describe("list management", function()
-        before_each(function()
-            obsidian_sync.setup()
-            obsidian_sync.setup_functions()
-        end)
-
         it("should create list if it doesn't exist", function()
             -- Mock that daily list doesn't exist
             mock_todos_module.state.get_available_lists = function()
@@ -347,6 +349,17 @@ describe("obsidian-sync module", function()
                 created = (name == "daily")
                 return true
             end
+
+            -- Setup after mocks are configured with list mapping
+            obsidian_sync.setup({
+                list_mapping = {
+                    daily = "daily",
+                    inbox = "inbox",
+                    projects = "projects"
+                },
+                default_list = "default"
+            })
+            obsidian_sync.setup_functions()
 
             vim.api.nvim_buf_set_lines(test_bufnr, 0, -1, false, {
                 "- [ ] Daily task"
@@ -360,10 +373,45 @@ describe("obsidian-sync module", function()
 
         it("should switch lists during import", function()
             local switched = false
+            local load_list_called = false
+            local list_name_received = nil
+
+            -- Set initial state to NOT daily
+            mock_todos_module.state.todo_lists.active = "default"
+
+            -- Mock just for this test - need daily list to exist
+            mock_todos_module.state.get_available_lists = function()
+                return {
+                    {name = "default"},
+                    {name = "daily"}  -- Daily exists so no need to create
+                }
+            end
+
             mock_todos_module.state.load_list = function(name)
+                load_list_called = true
+                list_name_received = name
                 switched = (name == "daily")
                 mock_todos_module.state.todo_lists.active = name
                 return true
+            end
+
+            -- Setup after mocks are configured with list mapping
+            obsidian_sync.setup({
+                vault_path = vim.fn.expand("~/Recharge-Notes"),
+                list_mapping = {
+                    daily = "daily",
+                    inbox = "inbox",
+                    projects = "projects"
+                },
+                default_list = "default"
+            })
+            obsidian_sync.setup_functions()
+
+            -- Make sure buffer is valid and has the right name
+            if not vim.api.nvim_buf_is_valid(test_bufnr) then
+                test_bufnr = vim.api.nvim_create_buf(false, true)
+                local vault_path = vim.fn.expand("~/Recharge-Notes")
+                vim.api.nvim_buf_set_name(test_bufnr, vault_path .. "/daily/2025-10-04.md")
             end
 
             vim.api.nvim_buf_set_lines(test_bufnr, 0, -1, false, {
@@ -371,9 +419,13 @@ describe("obsidian-sync module", function()
             })
 
             vim.api.nvim_set_current_buf(test_bufnr)
-            obsidian_sync.import_current_buffer()
 
-            assert.is_true(switched)
+            local count = obsidian_sync.import_current_buffer()
+
+            assert.equals(1, count, "Should have imported 1 task")
+            assert.is_true(load_list_called, "load_list should have been called")
+            assert.equals("daily", list_name_received, "Should have loaded 'daily' list")
+            assert.is_true(switched, "Should have switched to 'daily' list")
         end)
     end)
 end)

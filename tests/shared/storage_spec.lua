@@ -12,7 +12,8 @@ local mock_file = {
 	write = function(self, content)
 		self.content = content
 	end,
-	read = function(self)
+	read = function(self, format)
+		-- Handle the "*all" parameter that the real implementation uses
 		return self.content
 	end,
 	close = function() end,
@@ -21,33 +22,38 @@ local mock_file = {
 
 describe("storage", function()
 	before_each(function()
-		-- Clear module cache to reload with fresh config
-		package.loaded["doit.config"] = nil
-		package.loaded["doit.state"] = nil
-		package.loaded["doit.state.storage"] = nil
-		package.loaded["doit.state.todos"] = nil
-		package.loaded["doit.state.priorities"] = nil
-		package.loaded["doit.state.due_dates"] = nil
-		package.loaded["doit.state.search"] = nil
-		package.loaded["doit.state.sorting"] = nil
-		package.loaded["doit.state.tags"] = nil
-		package.loaded["doit.state.project"] = nil
-
-		-- Re-require config and set options
-		config = require("doit.config")
-		config.options = mock_config.options
-
-		-- Re-require state with new config
-		doit_state = require("doit.state")
+		-- Reset mock file content
+		mock_file.content = ""
 
 		_G.io.open = function(path, mode)
-			if mode == "r" and not mock_file.content then
+			if mode == "r" and (not mock_file.content or mock_file.content == "") then
 				return nil -- Simulate file not found for reading
 			end
 			return mock_file
 		end
 
+		-- Reinitialize the todos module for each test
+		package.loaded["doit.state"] = nil  -- Clear cached state
+		package.loaded["doit"] = nil
+		local doit = require("doit")
+		doit.setup({
+			modules = {
+				todos = { enabled = true }
+			}
+		})
+
+		-- Use the actual state from the todos module
+		local core = require("doit.core")
+		local todos_module = core.get_module("todos")
+		if todos_module and todos_module.state then
+			doit_state = todos_module.state
+		else
+			-- Fallback to requiring state directly
+			doit_state = require("doit.state")
+		end
+
 		doit_state.todos = {}
+		config.options = mock_config.options
 	end)
 
 	after_each(function()
@@ -62,22 +68,35 @@ describe("storage", function()
 
 		local original_json_encode = vim.fn.json_encode
 		vim.fn.json_encode = function(data)
+			-- Data should have _metadata and todos properties
+			if data._metadata and data.todos then
+				return '{"_metadata":{},"todos":[{"text":"Test todo","done":false}]}'
+			end
 			return '{"text":"Test todo","done":false}'
 		end
 
 		doit_state.save_to_disk()
 
-		assert.are.equal('{"text":"Test todo","done":false}', mock_file.content)
+		assert.are.equal('{"_metadata":{},"todos":[{"text":"Test todo","done":false}]}', mock_file.content)
 
 		vim.fn.json_encode = original_json_encode
 	end)
 
-	pending("should load todos from disk", function()
-		mock_file.content = '[{"text":"Loaded todo","done":false}]'
+	it("should load todos from disk", function()
+		-- Set content to match the new data structure with _metadata and todos
+		mock_file.content = '{"_metadata":{},"todos":[{"text":"Loaded todo","done":false}]}'
 
 		local original_json_decode = vim.fn.json_decode
 		vim.fn.json_decode = function(content)
-			return { { text = "Loaded todo", done = false } }
+			return {
+				_metadata = {},
+				todos = { { text = "Loaded todo", done = false } }
+			}
+		end
+
+		-- Override io.open to return the mock file with content
+		_G.io.open = function(path, mode)
+			return mock_file
 		end
 
 		doit_state.load_from_disk()

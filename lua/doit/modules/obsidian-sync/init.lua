@@ -167,8 +167,6 @@ function M.setup_functions()
                     -- Switch to the target list if different from current
                     local current_list = todos_module.state.todo_lists.active
                     if current_list ~= list then
-                        -- Save current list for later restore
-                        M.original_list = current_list
                         todos_module.state.load_list(list)
                     end
 
@@ -209,12 +207,6 @@ function M.setup_functions()
         -- Update buffer with markers
         if imported > 0 then
             vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, updated_lines)
-        end
-
-        -- Restore original list if we switched
-        if M.original_list and M.original_list ~= todos_module.state.todo_lists.active then
-            todos_module.state.load_list(M.original_list)
-            M.original_list = nil
         end
 
         return imported
