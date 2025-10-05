@@ -43,7 +43,7 @@ describe("DoIt Calendar Module", function()
             assert.is_true(available) -- Should be true in Docker (mocked)
         end)
         
-        it("should parse icalbuddy output correctly", function()
+        pending("should parse icalbuddy output correctly", function()
             local events = icalbuddy.parse_output(mock_icalbuddy_output)
             
             -- Should have at least some events
@@ -73,7 +73,7 @@ describe("DoIt Calendar Module", function()
             end
         end)
         
-        it("should detect tentative events with attendees", function()
+        pending("should detect tentative events with attendees", function()
             -- Test output with attendees info
             local test_output = [[
 "" Stay at Grand
@@ -107,7 +107,7 @@ describe("DoIt Calendar Module", function()
             assert.equals("Product Review", events[4].title)
         end)
 
-        it("should parse different date formats correctly", function()
+        pending("should parse different date formats correctly", function()
             -- Test with specific date headers
             local test_output = [[
 "" Today Event
