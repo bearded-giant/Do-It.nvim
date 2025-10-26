@@ -96,13 +96,17 @@ function storage.setup(M)
                             if data._metadata then
                                 metadata = data._metadata
                             end
-                            -- Count todos in the list
+                            -- Count active todos in the list (exclude completed)
                             if data.todos then
-                                todo_count = #data.todos
+                                for _, todo in ipairs(data.todos) do
+                                    if not todo.done then
+                                        todo_count = todo_count + 1
+                                    end
+                                end
                             end
                         end)
-                        
-                        -- Add todo count to metadata
+
+                        -- Add active todo count to metadata
                         metadata.todo_count = todo_count
                         
                         table.insert(lists, {

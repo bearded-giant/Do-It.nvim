@@ -57,12 +57,26 @@ function M.setup(state)
         local categories = {}
         
         for id, category in pairs(state.categories) do
+            -- Count only active todos in category
+            local active_count = 0
+            if category.todos then
+                for _, todo_id in ipairs(category.todos) do
+                    -- Find the todo in state
+                    for _, todo in ipairs(state.todos) do
+                        if todo.id == todo_id and not todo.done then
+                            active_count = active_count + 1
+                            break
+                        end
+                    end
+                end
+            end
+
             table.insert(categories, {
                 id = id,
                 name = category.name,
                 icon = category.icon,
                 color = category.color,
-                count = #(category.todos or {})
+                count = active_count
             })
         end
         

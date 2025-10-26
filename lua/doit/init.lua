@@ -144,7 +144,14 @@ function M.setup(opts)
 		if M.todos then
 			if M.todos.state.todo_lists then
 				local active_list = M.todos.state.todo_lists.active or "default"
-				local todo_count = #(M.todos.state.todos or {})
+				-- Count only active todos (exclude completed)
+				local todo_count = 0
+				local todos = M.todos.state.todos or {}
+				for _, todo in ipairs(todos) do
+					if not todo.done then
+						todo_count = todo_count + 1
+					end
+				end
 				local lists = M.todos.state.get_available_lists()
 				local list_count = #lists
 
@@ -152,7 +159,15 @@ function M.setup(opts)
 				table.insert(content, "  Active List: " .. active_list)
 				table.insert(content, "  Todo Count: " .. todo_count)
 			else
-				table.insert(content, "  Todo Count: " .. #(M.todos.state.todos or {}))
+				-- Count only active todos
+				local todo_count = 0
+				local todos = M.todos.state.todos or {}
+				for _, todo in ipairs(todos) do
+					if not todo.done then
+						todo_count = todo_count + 1
+					end
+				end
+				table.insert(content, "  Todo Count: " .. todo_count)
 			end
 		end
 

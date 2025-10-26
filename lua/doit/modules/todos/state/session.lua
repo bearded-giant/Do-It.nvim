@@ -1,33 +1,28 @@
 -- Session management for persistent list selection
 local M = {}
 
--- Get session file path for current project
+-- Get session file path - global across all projects
 local function get_session_file()
     -- Use stdpath for consistent cross-platform storage
-    local session_dir = vim.fn.stdpath("data") .. "/doit/sessions"
+    local session_dir = vim.fn.stdpath("data") .. "/doit"
     vim.fn.mkdir(session_dir, "p")
-    
-    -- Get current working directory as project identifier
-    local cwd = vim.fn.getcwd()
-    -- Convert path to safe filename
-    local safe_name = cwd:gsub("[/\\:]", "_"):gsub("^_+", "")
-    
-    return session_dir .. "/" .. safe_name .. ".json"
+
+    -- Global session file shared across all projects
+    return session_dir .. "/session.json"
 end
 
--- Save current list selection
+-- Save current list selection globally
 function M.save_session(list_name)
     if not list_name then
         return
     end
-    
+
     local session_file = get_session_file()
     local session_data = {
         active_list = list_name,
-        cwd = vim.fn.getcwd(),
         timestamp = os.time()
     }
-    
+
     local file = io.open(session_file, "w")
     if file then
         local json = vim.fn.json_encode(session_data)
@@ -36,7 +31,7 @@ function M.save_session(list_name)
     end
 end
 
--- Load last selected list for current project
+-- Load last selected list globally
 function M.load_session()
     local session_file = get_session_file()
     

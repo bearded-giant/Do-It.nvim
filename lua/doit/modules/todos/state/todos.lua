@@ -62,7 +62,7 @@ function M.setup(state)
     
     function M.get_todos_by_note_id(note_id)
         if not note_id then return {} end
-        
+
         local linked_todos = {}
         for _, todo in ipairs(state.todos) do
             if todo.note_id == note_id then
@@ -70,6 +70,53 @@ function M.setup(state)
             end
         end
         return linked_todos
+    end
+
+    -- Move a todo from current list to another list
+    function M.move_todo_to_list(todo_index, target_list_name)
+        if not state.todos[todo_index] then
+            return false, "Todo not found at index " .. todo_index
+        end
+
+        local current_list = state.todo_lists.active
+        if current_list == target_list_name then
+            return false, "Todo is already in list '" .. target_list_name .. "'"
+        end
+
+        -- Get the todo and create a deep copy
+        local todo = vim.deepcopy(state.todos[todo_index])
+
+        -- Remove from current list
+        table.remove(state.todos, todo_index)
+        state.save_todos()
+
+        -- Switch to target list
+        local success, msg = state.load_list(target_list_name)
+        if not success then
+            -- If target list doesn't exist, create it
+            state.create_list(target_list_name, {})
+            state.load_list(target_list_name)
+        end
+
+        -- Add to target list
+        todo.order_index = #state.todos + 1
+        table.insert(state.todos, todo)
+        state.save_todos()
+
+        -- Fire event for move operation
+        local core = require("doit.core")
+        if core and core.emit then
+            core.emit("todo:moved", {
+                todo = todo,
+                from_list = current_list,
+                to_list = target_list_name
+            })
+        end
+
+        -- Switch back to original list
+        state.load_list(current_list)
+
+        return true, "Moved todo to '" .. target_list_name .. "'"
     end
     
     function M.toggle_todo(index)

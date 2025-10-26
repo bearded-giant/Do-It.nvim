@@ -132,18 +132,22 @@ function M.current_list()
     if not loaded_state then
         return ""
     end
-    
+
     local list_name = "default"
     if loaded_state.todo_lists and loaded_state.todo_lists.active then
         list_name = loaded_state.todo_lists.active
     end
-    
-    -- Get todo count for current list
+
+    -- Get todo count for current list (exclude completed todos)
     local todo_count = 0
     if loaded_state.todos then
-        todo_count = #loaded_state.todos
+        for _, todo in ipairs(loaded_state.todos) do
+            if not todo.done then
+                todo_count = todo_count + 1
+            end
+        end
     end
-    
+
     -- Return formatted list info
     return string.format("📋 %s (%d)", list_name, todo_count)
 end

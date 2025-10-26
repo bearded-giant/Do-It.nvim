@@ -135,25 +135,26 @@ function M.setup(parent_module)
         table.insert(lines, "")
         
         -- Stats
-        local total = #todos
         local done = 0
         local in_progress = 0
         local pending = 0
-        
+
         for _, todo in ipairs(todos) do
             if todo.done then
                 done = done + 1
-            elseif todo.status == "in_progress" then
+            elseif todo.in_progress then  -- Use in_progress field consistently
                 in_progress = in_progress + 1
             else
                 pending = pending + 1
             end
         end
-        
-        table.insert(lines, string.format("  Total: %d", total))
-        table.insert(lines, string.format("  ✓ Done: %d", done))
-        table.insert(lines, string.format("  ◐ In Progress: %d", in_progress))
+
+        local active_total = pending + in_progress  -- Active todos only
+
+        table.insert(lines, string.format("  Active: %d", active_total))
         table.insert(lines, string.format("  ○ Pending: %d", pending))
+        table.insert(lines, string.format("  ◐ In Progress: %d", in_progress))
+        table.insert(lines, string.format("  ✓ Done: %d", done))
         table.insert(lines, "")
         
         -- Recent todos (show up to 10)
@@ -166,7 +167,7 @@ function M.setup(parent_module)
                 if count >= 10 then break end
                 local todo = todos[i]
                 
-                local icon = todo.done and "✓" or (todo.status == "in_progress" and "◐" or "○")
+                local icon = todo.done and "✓" or (todo.in_progress and "◐" or "○")
                 local text = todo.text
                 if #text > 40 then
                     text = text:sub(1, 37) .. "..."
@@ -348,12 +349,16 @@ function M.setup(parent_module)
                 pcall(list_window.render_list)
             end
             
-            -- Show confirmation with todo count
+            -- Show confirmation with active todo count (exclude completed)
             local todo_count = 0
             if todo_module.state.todos then
-                todo_count = #todo_module.state.todos
+                for _, todo in ipairs(todo_module.state.todos) do
+                    if not todo.done then
+                        todo_count = todo_count + 1
+                    end
+                end
             end
-            vim.notify(string.format("Switched to list '%s' (%d todos)", list_name, todo_count), vim.log.levels.INFO)
+            vim.notify(string.format("Switched to list '%s' (%d active todos)", list_name, todo_count), vim.log.levels.INFO)
         else
             vim.notify("Failed to switch list: " .. (msg or "unknown error"), vim.log.levels.ERROR)
         end

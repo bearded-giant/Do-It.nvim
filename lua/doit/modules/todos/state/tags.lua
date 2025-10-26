@@ -3,18 +3,21 @@ local M = {}
 
 -- Setup module
 function M.setup(state)
-    -- Get all unique tags
+    -- Get all unique tags (from active todos only)
     function M.get_all_tags()
         local tags = {}
         local tag_count = {}
-        
+
         for _, todo in ipairs(state.todos) do
-            for tag in todo.text:gmatch("#(%w+)") do
-                if not tags[tag] then
-                    tags[tag] = true
-                    tag_count[tag] = 1
-                else
-                    tag_count[tag] = tag_count[tag] + 1
+            -- Only count tags from active todos
+            if not todo.done then
+                for tag in todo.text:gmatch("#(%w+)") do
+                    if not tags[tag] then
+                        tags[tag] = true
+                        tag_count[tag] = 1
+                    else
+                        tag_count[tag] = tag_count[tag] + 1
+                    end
                 end
             end
         end

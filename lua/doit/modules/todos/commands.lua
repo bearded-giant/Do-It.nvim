@@ -232,6 +232,53 @@ function M.setup(module)
         }
     }
     
+    -- Move todo to another list
+    commands.DoItTodoMove = {
+        callback = function(opts)
+            local args = opts.fargs
+            if #args < 2 then
+                vim.notify("Usage: DoItTodoMove <todo_index> <target_list>", vim.log.levels.ERROR)
+                return
+            end
+
+            local todo_index = tonumber(args[1])
+            local target_list = args[2]
+
+            if not todo_index then
+                vim.notify("Invalid todo index", vim.log.levels.ERROR)
+                return
+            end
+
+            local success, msg = module.state.move_todo_to_list(todo_index, target_list)
+            vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+
+            -- Refresh UI if open
+            if success and module.ui.main_window and module.ui.main_window.render_todos then
+                module.ui.main_window.render_todos()
+            end
+        end,
+        opts = {
+            desc = "Move a todo to another list",
+            nargs = "+",
+            complete = function(arglead, cmdline, cursorpos)
+                local args = vim.split(cmdline, "%s+", { trimempty = true })
+                if #args == 2 then
+                    -- First arg: todo index (no completion needed)
+                    return {}
+                elseif #args == 3 then
+                    -- Second arg: list names
+                    local lists = module.state.get_available_lists()
+                    local list_names = {}
+                    for _, list in ipairs(lists) do
+                        table.insert(list_names, list.name)
+                    end
+                    return list_names
+                end
+                return {}
+            end
+        }
+    }
+
     -- Active Todo List command
     commands.DoItList = {
         callback = function()
@@ -324,12 +371,17 @@ function M.setup(module)
                 for _, list in ipairs(lists) do
                     local active_marker = list.name == active_list and "* " or "  "
                     local todo_count = 0
-                    
-                    -- Count todos if this is the active list
+
+                    -- Count active todos if this is the active list (exclude completed)
                     if list.name == active_list then
-                        todo_count = #(module.state.todos or {})
+                        local todos = module.state.todos or {}
+                        for _, todo in ipairs(todos) do
+                            if not todo.done then
+                                todo_count = todo_count + 1
+                            end
+                        end
                     end
-                    
+
                     local count_str = todo_count > 0 and string.format(" (%d todos)", todo_count) or ""
                     vim.notify(active_marker .. list.name .. count_str, vim.log.levels.INFO)
                 end

@@ -123,7 +123,14 @@ function M.render()
 	if doit.todos then
 		if doit.todos.state.todo_lists then
 			local active_list = doit.todos.state.todo_lists.active or "default"
-			local todo_count = #(doit.todos.state.todos or {})
+			-- Count only active todos (exclude completed)
+			local todo_count = 0
+			local todos = doit.todos.state.todos or {}
+			for _, todo in ipairs(todos) do
+				if not todo.done then
+					todo_count = todo_count + 1
+				end
+			end
 			local lists = doit.todos.state.get_available_lists()
 			local list_count = #lists
 
@@ -131,7 +138,15 @@ function M.render()
 			table.insert(left_col, "Active: " .. active_list)
 			table.insert(left_col, "Count: " .. todo_count)
 		else
-			table.insert(left_col, "Count: " .. #(doit.todos.state.todos or {}))
+			-- Count only active todos
+			local todo_count = 0
+			local todos = doit.todos.state.todos or {}
+			for _, todo in ipairs(todos) do
+				if not todo.done then
+					todo_count = todo_count + 1
+				end
+			end
+			table.insert(left_col, "Count: " .. todo_count)
 		end
 	else
 		table.insert(left_col, "No todos module")
