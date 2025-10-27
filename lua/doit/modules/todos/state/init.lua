@@ -66,7 +66,8 @@ function M.setup(parent_module)
     M.delete_list = storage.delete_list
     M.rename_list = storage.rename_list
     M.get_available_lists = storage.get_available_lists
-    
+    M.move_todo_to_list = storage.move_todo_to_list
+
     return M
 end
 

@@ -260,7 +260,7 @@ function M.setup(parent_module)
         table.insert(lines, "")
         table.insert(lines, "  ──────────────────────────────────")
         table.insert(lines, "  Keys:")
-        table.insert(lines, "  [1-9/0] Select   [Enter] Switch")
+        table.insert(lines, "  [1-9/0] Select   [Enter] Switch & Open")
         table.insert(lines, "  [n] New          [d] Delete")
         table.insert(lines, "  [r] Rename       [e] Export")
         table.insert(lines, "  [i] Import       [q] Close")
@@ -332,23 +332,38 @@ function M.setup(parent_module)
     local function switch_to_list(list_name)
         -- Load the list and get feedback
         local success, msg = todo_module.state.load_list(list_name)
-        
+
         if success then
             -- Close windows after successful switch
             close_windows()
-            
-            -- Update the main window if it's open
+
+            -- Open the main window to show the switched list
             local main_window = todo_module.ui.main_window
-            if main_window and main_window.render_todos then
-                main_window.render_todos()
+            if main_window then
+                if main_window.toggle_todo_window then
+                    -- Check if window is already open
+                    local win_id = main_window.get_window_id and main_window.get_window_id()
+                    if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+                        -- Window not open, open it
+                        main_window.toggle_todo_window()
+                    else
+                        -- Window already open, just refresh it
+                        if main_window.render_todos then
+                            main_window.render_todos()
+                        end
+                    end
+                elseif main_window.render_todos then
+                    -- Fallback: just render if window is open
+                    main_window.render_todos()
+                end
             end
-            
+
             -- Update list window if it's open
             local list_window = require("doit.ui.list_window")
             if list_window and list_window.render_list then
                 pcall(list_window.render_list)
             end
-            
+
             -- Show confirmation with active todo count (exclude completed)
             local todo_count = 0
             if todo_module.state.todos then

@@ -89,7 +89,7 @@ function M.setup_functions()
         local core = require("doit.core")
         local todos_module = core.get_module("todos")
         if not todos_module or not todos_module.state then
-            vim.notify("[ObsidianSync] Todos module not available", vim.log.levels.DEBUG)
+        --             vim.notify("[ObsidianSync] Todos module not available", vim.log.levels.DEBUG)
             return nil
         end
 
@@ -102,14 +102,14 @@ function M.setup_functions()
         -- First try current list to avoid switching
         for _, t in ipairs(state.todos or {}) do
             if t.id == todo_id then
-                vim.notify("[ObsidianSync] Found todo in current list", vim.log.levels.DEBUG)
+        --                 vim.notify("[ObsidianSync] Found todo in current list", vim.log.levels.DEBUG)
                 return t
             end
         end
 
         -- If not found and we have a target list different from current
         if target_list and target_list ~= current_list then
-            vim.notify(string.format("[ObsidianSync] Todo not in current list, checking %s", target_list), vim.log.levels.DEBUG)
+        --             vim.notify(string.format("[ObsidianSync] Todo not in current list, checking %s", target_list), vim.log.levels.DEBUG)
 
             -- Save current state
             local original_todos = state.todos
@@ -128,7 +128,7 @@ function M.setup_functions()
                 if t.id == todo_id then
                     -- Create a deep copy to preserve the state
                     found_todo = vim.deepcopy(t)
-                    vim.notify(string.format("[ObsidianSync] Found todo in list %s", target_list), vim.log.levels.DEBUG)
+        --                     vim.notify(string.format("[ObsidianSync] Found todo in list %s", target_list), vim.log.levels.DEBUG)
                     break
                 end
             end
@@ -140,7 +140,7 @@ function M.setup_functions()
         end
 
         -- If still not found, try searching all available lists
-        vim.notify("[ObsidianSync] Todo not found in expected lists, searching all lists", vim.log.levels.DEBUG)
+        --         vim.notify("[ObsidianSync] Todo not found in expected lists, searching all lists", vim.log.levels.DEBUG)
         local lists = state.get_available_lists()
         for _, list_info in ipairs(lists) do
             if list_info.name ~= current_list and list_info.name ~= target_list then
@@ -309,7 +309,7 @@ function M.setup_functions()
     function M.sync_completion(todo_id, todo_state)
         local ref = M.refs[todo_id]
         if not ref then
-            vim.notify("[ObsidianSync] No ref found for todo " .. todo_id, vim.log.levels.DEBUG)
+        --             vim.notify("[ObsidianSync] No ref found for todo " .. todo_id, vim.log.levels.DEBUG)
             return false
         end
 
@@ -330,7 +330,7 @@ function M.setup_functions()
             local lines = vim.api.nvim_buf_get_lines(ref.bufnr, ref.lnum - 1, ref.lnum, false)
             if lines and #lines > 0 then
                 local line = lines[1]
-                vim.notify("[ObsidianSync] Current buffer line: " .. line, vim.log.levels.DEBUG)
+        --                 vim.notify("[ObsidianSync] Current buffer line: " .. line, vim.log.levels.DEBUG)
 
                 -- Try multiple patterns to match different checkbox formats
                 local patterns = {
@@ -349,13 +349,13 @@ function M.setup_functions()
                     if test_line ~= line then
                         new_line = test_line
                         matched = true
-                        vim.notify("[ObsidianSync] Matched pattern: " .. p.pattern, vim.log.levels.DEBUG)
+        --                         vim.notify("[ObsidianSync] Matched pattern: " .. p.pattern, vim.log.levels.DEBUG)
                         break
                     end
                 end
 
                 if matched then
-                    vim.notify("[ObsidianSync] Updated buffer line: " .. new_line, vim.log.levels.DEBUG)
+        --                     vim.notify("[ObsidianSync] Updated buffer line: " .. new_line, vim.log.levels.DEBUG)
                     vim.api.nvim_buf_set_lines(ref.bufnr, ref.lnum - 1, ref.lnum, false, {new_line})
 
                     -- If the buffer has a file name, mark it as modified
@@ -371,7 +371,7 @@ function M.setup_functions()
                 vim.notify("[ObsidianSync] Could not get line from buffer", vim.log.levels.WARN)
             end
         else
-            vim.notify("[ObsidianSync] Buffer not valid, trying file directly", vim.log.levels.DEBUG)
+        --             vim.notify("[ObsidianSync] Buffer not valid, trying file directly", vim.log.levels.DEBUG)
         end
 
         -- Fallback to file
@@ -382,7 +382,7 @@ function M.setup_functions()
                     ref.file, ref.lnum, #lines), vim.log.levels.DEBUG)
 
                 local old_line = lines[ref.lnum]
-                vim.notify("[ObsidianSync] Current file line: " .. old_line, vim.log.levels.DEBUG)
+        --                 vim.notify("[ObsidianSync] Current file line: " .. old_line, vim.log.levels.DEBUG)
 
                 -- Try multiple patterns
                 local patterns = {
@@ -398,7 +398,7 @@ function M.setup_functions()
                     if test_line ~= old_line then
                         new_line = test_line
                         matched = true
-                        vim.notify("[ObsidianSync] Matched pattern in file: " .. p.pattern, vim.log.levels.DEBUG)
+        --                         vim.notify("[ObsidianSync] Matched pattern in file: " .. p.pattern, vim.log.levels.DEBUG)
                         break
                     end
                 end
@@ -406,7 +406,7 @@ function M.setup_functions()
                 if matched then
                     lines[ref.lnum] = new_line
                     vim.fn.writefile(lines, ref.file)
-                    vim.notify("[ObsidianSync] File updated successfully: " .. new_line, vim.log.levels.INFO)
+                    -- vim.notify("[ObsidianSync] File updated successfully: " .. new_line, vim.log.levels.INFO)
 
                     -- Reload buffer if it's open to reflect changes
                     if ref.bufnr and vim.api.nvim_buf_is_valid(ref.bufnr) then
@@ -623,7 +623,7 @@ function M.setup_autocmds()
                 vim.defer_fn(function()
                     local count = M.import_current_buffer()
                     if count > 0 then
-                        vim.notify("Auto-imported " .. count .. " todos from daily note", vim.log.levels.INFO)
+                        -- vim.notify("Auto-imported " .. count .. " todos from daily note", vim.log.levels.INFO)
                     end
                 end, 100)
             end
@@ -678,7 +678,7 @@ function M.setup_autocmds()
                             list = target_list
                         }
 
-                        vim.notify("Added to DoIt (" .. target_list .. ")", vim.log.levels.INFO)
+                        -- vim.notify("Added to DoIt (" .. target_list .. ")", vim.log.levels.INFO)
                     end
                 end
             end, { buffer = true, desc = "Send current todo to DoIt" })
@@ -750,7 +750,7 @@ function M.setup_hooks()
                         local state_str = updated_todo.done and "completed" or
                                         updated_todo.in_progress and "in progress" or
                                         "not started"
-                        vim.notify("[ObsidianSync] Successfully synced to Obsidian: " .. state_str, vim.log.levels.INFO)
+                        -- vim.notify("[ObsidianSync] Successfully synced to Obsidian: " .. state_str, vim.log.levels.INFO)
                     else
                         vim.notify("[ObsidianSync] Failed to sync to Obsidian", vim.log.levels.WARN)
                     end
@@ -758,11 +758,11 @@ function M.setup_hooks()
                     vim.notify("[ObsidianSync] Could not find updated todo after toggle", vim.log.levels.WARN)
                 end
             elseif todo_id and not M.refs[todo_id] then
-                vim.notify("[ObsidianSync] No Obsidian reference for todo: " .. todo_id, vim.log.levels.DEBUG)
+        --                 vim.notify("[ObsidianSync] No Obsidian reference for todo: " .. todo_id, vim.log.levels.DEBUG)
             end
         end
 
-        vim.notify("[ObsidianSync] Hook registered successfully", vim.log.levels.INFO)
+        -- vim.notify("[ObsidianSync] Hook registered successfully", vim.log.levels.INFO)
     end, 500)  -- Delay to ensure DoIt is fully loaded
 
     -- Hook into todo:moved event to update refs when todos move between lists
@@ -776,7 +776,7 @@ function M.setup_hooks()
                 -- Update the ref if this todo has an obsidian linkback
                 if M.refs[todo.id] then
                     M.refs[todo.id].list = to_list
-                    vim.notify("Updated Obsidian ref for moved todo", vim.log.levels.DEBUG)
+        --                     vim.notify("Updated Obsidian ref for moved todo", vim.log.levels.DEBUG)
                 end
             end)
         end

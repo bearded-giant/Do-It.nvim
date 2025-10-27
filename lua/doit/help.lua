@@ -25,7 +25,8 @@ M.keymaps = {
 		organization = {
 			{ key = "t", desc = "Toggle tags window (filter by #tag)" },
 			{ key = "C", desc = "Toggle categories window" },
-			{ key = "L", desc = "Open list manager (switch/create lists)" },
+			{ key = "L", desc = "List manager - switch lists, create new lists" },
+			{ key = "m", desc = "Move current todo to another list" },
 			{ key = "c", desc = "Clear active filter" },
 			{ key = "/", desc = "Search todos" },
 		},
