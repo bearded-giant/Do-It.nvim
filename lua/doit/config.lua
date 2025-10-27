@@ -36,6 +36,7 @@ M.defaults = {
 		-- Todo module configuration
 		todos = {
 			enabled = true,
+			default_list = "default",
 			ui = {
 				window = {
 					width = 55,
@@ -149,6 +150,7 @@ M.defaults = {
 				move_todo_up = "k",
 				move_todo_down = "j",
 				open_linked_note = "o",
+				move_todo_to_list = "m",
 			},
 		},
 		
@@ -296,6 +298,7 @@ M.defaults = {
 		move_todo_up = "k",
 		move_todo_down = "j",
 		open_linked_note = "o",
+		move_todo_to_list = "m",
 	},
 	calendar = {
 		language = "en",

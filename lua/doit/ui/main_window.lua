@@ -9,6 +9,7 @@ local tag_window = require("doit.ui.tag_window")
 local category_window = require("doit.ui.category_window")
 local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
+local list_selector = require("doit.ui.list_selector")
 
 local core = require("doit.core")
 
@@ -121,10 +122,10 @@ local function create_small_keys_window(main_win_pos)
 	local lines_2 = {
 		"",
 		string.format("  %-6s - Reorder to-do", keys.reorder_todo),
+		string.format("  %-6s - Move to list", keys.move_todo_to_list or "m"),
+		string.format("  %-6s - List manager", keys.toggle_list_manager or "L"),
 		string.format("  %-6s - Tags", keys.toggle_tags),
 		string.format("  %-6s - Search", keys.search_todos),
-		string.format("  %-6s - Import", keys.import_todos),
-		string.format("  %-6s - Export", keys.export_todos),
 		"",
 	}
 
@@ -778,8 +779,9 @@ local function create_window()
 			search_todos = "/",
 			move_todo_up = "k",
 			move_todo_down = "j",
+			move_todo_to_list = "m",
 		}
-		
+
 		-- Try to get key from config, fall back to default
 		local key = nil
 		
@@ -959,7 +961,47 @@ local function create_window()
 	setup_keymap("export_todos", function()
 		prompt_io("export")
 	end)
-	
+
+	setup_keymap("move_todo_to_list", function()
+		if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+			return
+		end
+
+		-- Ensure we have fresh state reference
+		state = ensure_state_loaded()
+
+		local todo, todo_index = todo_actions.get_todo_at_cursor(win_id)
+
+		if not todo then
+			vim.notify("No todo selected", vim.log.levels.WARN)
+			return
+		end
+
+		if not todo.id then
+			vim.notify("Todo has no ID - cannot move", vim.log.levels.ERROR)
+			return
+		end
+
+		local current_list = state.todo_lists and state.todo_lists.active or "default"
+
+		list_selector.show_list_selector(current_list, function(destination_list)
+			-- Re-ensure state is loaded before move
+			state = ensure_state_loaded()
+
+			if state.move_todo_to_list then
+				local success, message = state.move_todo_to_list(todo.id, destination_list)
+				if success then
+					vim.notify(message, vim.log.levels.INFO)
+					M.render_todos()
+				else
+					vim.notify(message, vim.log.levels.ERROR)
+				end
+			else
+				vim.notify("Move functionality not available", vim.log.levels.ERROR)
+			end
+		end)
+	end)
+
 	-- Always allow Esc to close the window, in addition to the configured close key
 	vim.keymap.set("n", "<Esc>", function()
 		M.close_window()

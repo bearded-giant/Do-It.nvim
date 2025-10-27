@@ -15,6 +15,7 @@ Table of Contents                                          *doit-contents*
   - Calendar Due Date Picker                                |doit-calendar|
   - Calendar Module (icalbuddy)                      |doit-calendar-module|
   - Priority System                                         |doit-priorities|
+  - Todo Lists                                                  |doit-lists|
   - Import/Export                                             |doit-import|
   - Project Notes                                              |doit-notes|
 3. Colors                                                      |doit-colors|
@@ -53,6 +54,7 @@ FEATURES                                                      *doit-features*
 - Quick list view of active to-dos with auto-refresh
 - Lualine integration to show your top active to-do
 - Project-specific notes for documenting your work
+- Multiple todo lists with easy switching and moving items between lists
 
 REQUIREMENTS                                              *doit-requirements*
 
@@ -100,6 +102,7 @@ Configuration Structure Overview:
         modules = {
             todos = {
                 enabled = true,
+                default_list = "default",  -- Name of the default list to load on startup
                 ui = {
                     window = {
                         width = 55,
@@ -242,6 +245,9 @@ Toggle a floating window showing active to-dos.
                                                                     *:DoitNotes*
 Toggle the project notes window.
 
+                                                                   *:DoItLists*
+Open the list manager window to create, switch, rename, or delete todo lists.
+
 Examples: >vim
     :Doit
     :Doit add My new task #work
@@ -268,6 +274,8 @@ Main Window~
     T           Add time estimation
     R           Remove time estimation
     ?           Toggle help window
+    L           Open list manager (switch lists)
+    m           Move to-do to another list
     t           Toggle tags window
     c           Clear active tag filter
     e           Edit to-do
@@ -285,6 +293,13 @@ Reordering to-dos~
     k           Move to-do up
     j           Move to-do down
     r           Save and exit reordering
+
+Moving to-dos between lists~
+    m           Open list selector
+    j/k         Navigate lists
+    <Up>/<Down> Navigate lists
+    <CR>        Move to-do to selected list
+    <Esc>       Cancel move
 
 Tags Window~
     e           Edit tag
@@ -401,6 +416,44 @@ Sorting by Priority~
 3. All other todos follow the standard sorting (priority, due date, creation time)
 
 Note: Each todo can have only one priority assigned.
+
+TODO LISTS                                                    *doit-lists*
+
+Do-It.nvim supports multiple todo lists, allowing you to organize tasks by
+project, context, or any category you prefer.
+
+Features:
+- Create multiple named lists (e.g., "work", "personal", "daily")
+- Switch between lists with the list manager (L or :DoItLists)
+- Move individual todos between lists while preserving their status
+- Configure a default list to load on startup
+- Each list maintains its own todos and metadata
+
+Managing Lists:~
+Press L in the main todo window to open the list manager where you can:
+- Create new lists
+- Switch to a different list (automatically opens that list)
+- Rename existing lists
+- Delete lists (except the active one)
+- Preview list contents and statistics
+
+Moving Todos Between Lists:~
+1. Select a todo in the main window
+2. Press m to open the list selector
+3. Use j/k or arrow keys to navigate
+4. Press <CR> to move the todo to the selected list
+5. The todo retains its status (pending/in-progress/done)
+
+Configuration:~
+Set a default list to load on startup: >lua
+    require("doit").setup({
+        modules = {
+            todos = {
+                default_list = "daily",  -- or "work", "personal", etc.
+            }
+        }
+    })
+<
 
 IMPORT/EXPORT                                                 *doit-import*
 

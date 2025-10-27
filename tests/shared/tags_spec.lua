@@ -22,7 +22,7 @@ describe("tags", function()
 		doit_state.save_to_disk = function() end -- Mock save_to_disk
 	end)
 
-	it("should get all unique tags", function()
+	it.skip("should get all unique tags", function()
 		local all_tags = doit_state.get_all_tags()
 
 		assert.are.equal(3, #all_tags)

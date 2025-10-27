@@ -99,7 +99,24 @@ local function get_real_todo_index(line_num, filter)
 
 	for i, todo in ipairs(state.todos) do
 		local show_by_tag = not filter or todo.text:match("#" .. filter)
-		if show_by_tag then
+		local show_by_category = true
+
+		-- Check category filter
+		if state.active_category then
+			local module = get_todo_module()
+			if module and module.state and module.state.get_todo_category then
+				local todo_category_id = module.state.get_todo_category(todo.id)
+				show_by_category = (todo_category_id == state.active_category) or
+								  (state.active_category == "uncategorized" and
+								   (todo_category_id == "uncategorized" or not todo_category_id))
+			else
+				show_by_category = (todo.category == state.active_category) or
+								  (state.active_category == "Uncategorized" and
+								   (not todo.category or todo.category == ""))
+			end
+		end
+
+		if show_by_tag and show_by_category then
 			local text_lines = vim.split(todo.text, "\n", { plain = true })
 			local num_lines = #text_lines
 
@@ -1244,6 +1261,30 @@ function M.reorder_todo(win_id, on_render)
 			on_render()
 		end
 	end, { buffer = buf_id, nowait = true })
+end
+
+-- Export helper functions for use in other modules
+M.get_todo_at_cursor = function(win_id)
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return nil
+	end
+
+	local cursor = vim.api.nvim_win_get_cursor(win_id)
+	local line_num = cursor[1]
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return nil
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index and state.todos[todo_index] then
+		return state.todos[todo_index], todo_index
+	end
+
+	return nil
 end
 
 return M
