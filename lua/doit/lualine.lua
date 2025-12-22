@@ -3,7 +3,50 @@ local M = {}
 -- Lazy loading of todo module and state
 local todo_module = nil
 local state = nil
-local initialized = false
+local last_mtime = 0
+local last_check = 0
+local CHECK_INTERVAL = 1 -- Check file mtime at most once per second
+
+-- Get the path to the active todo list file
+local function get_todo_file_path()
+    local ok, core = pcall(require, "doit.core")
+    if ok and core.get_module_config then
+        local config = core.get_module_config("todos")
+        if config then
+            local lists_dir = config.lists_dir or (vim.fn.stdpath("data") .. "/doit/lists")
+            local active_list = "daily" -- default
+            if state and state.todo_lists and state.todo_lists.active then
+                active_list = state.todo_lists.active
+            elseif config.active_list then
+                active_list = config.active_list
+            elseif config.default_list then
+                active_list = config.default_list
+            end
+            return lists_dir .. "/" .. active_list .. ".json"
+        end
+    end
+    return vim.fn.stdpath("data") .. "/doit/lists/daily.json"
+end
+
+-- Check if file has been modified externally
+local function file_modified()
+    local now = vim.loop.now() / 1000
+    if now - last_check < CHECK_INTERVAL then
+        return false
+    end
+    last_check = now
+
+    local path = get_todo_file_path()
+    local stat = vim.loop.fs_stat(path)
+    if stat then
+        local mtime = stat.mtime.sec
+        if mtime > last_mtime then
+            last_mtime = mtime
+            return true
+        end
+    end
+    return false
+end
 
 local function get_todo_module()
     if not todo_module then
@@ -36,37 +79,36 @@ local function get_todo_module()
     return todo_module
 end
 
--- Function to ensure state is loaded
+-- Function to ensure state is loaded (and reload if file changed externally)
 local function ensure_state_loaded()
     local module = get_todo_module()
-    
+    local needs_reload = file_modified()
+
     if module and module.state then
         state = module.state
-        
-        -- Initialize state if needed
-        if not initialized then
+
+        -- Load from disk on first call or when file changed
+        if needs_reload or not state.todos or #state.todos == 0 then
             if state.load_from_disk and type(state.load_from_disk) == "function" then
                 pcall(state.load_from_disk)
             end
-            initialized = true
         end
-        
+
         return state
     end
-    
+
     -- Fallback to compatibility shim
     if not state then
         local ok, compat_state = pcall(require, "doit.state")
         if ok then
             state = compat_state
-            if not initialized and state and state.load_from_disk then
+            if (needs_reload or not state.todos) and state.load_from_disk then
                 pcall(state.load_from_disk)
-                initialized = true
             end
             return state
         end
     end
-    
+
     return nil
 end
 
