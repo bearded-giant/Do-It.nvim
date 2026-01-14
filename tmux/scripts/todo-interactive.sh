@@ -21,25 +21,12 @@ if [[ ! -f "$TODO_LIST_PATH" ]]; then
     exit 1
 fi
 
-# Priority color codes
-priority_color() {
-    case "$1" in
-        "critical") echo "\033[1;31m" ;;  # bold red
-        "urgent")   echo "\033[1;33m" ;;  # bold yellow
-        "important") echo "\033[1;34m" ;; # bold blue
-        *)          echo "" ;;
-    esac
-}
-
-# Priority indicator
-priority_indicator() {
-    case "$1" in
-        "critical") echo "!" ;;
-        "urgent")   echo ">" ;;
-        "important") echo "*" ;;
-        *)          echo " " ;;
-    esac
-}
+# ANSI color codes
+COLOR_RESET=$'\e[0m'
+COLOR_GREEN=$'\e[1;32m'
+COLOR_RED=$'\e[1;31m'
+COLOR_YELLOW=$'\e[1;33m'
+COLOR_BLUE=$'\e[1;34m'
 
 # Function to display todos in a formatted way (excludes done todos)
 format_todos() {
@@ -51,13 +38,12 @@ format_todos() {
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
     ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status priority text; do
-        local pcolor=$(priority_color "$priority")
-        local pind=$(priority_indicator "$priority")
-        if [[ -n "$pcolor" ]]; then
-            printf "\033[1;32m%s${pcolor}%s %-70s\033[0m\n" "$status" "$pind" "$text"
-        else
-            printf "\033[1;32m%s%s %-70s\033[0m\n" "$status" "$pind" "$text"
-        fi
+        case "$priority" in
+            "critical")  printf "%s%s%s! %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s%s> %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$COLOR_RESET" ;;
+            "important") printf "%s%s%s* %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$COLOR_RESET" ;;
+            *)           printf "%s%s  %-70s%s\n" "$COLOR_GREEN" "$status" "$text" "$COLOR_RESET" ;;
+        esac
     done
 
     # Then print not started todos
@@ -68,13 +54,12 @@ format_todos() {
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
     ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status priority text; do
-        local pcolor=$(priority_color "$priority")
-        local pind=$(priority_indicator "$priority")
-        if [[ -n "$pcolor" ]]; then
-            printf "%s${pcolor}%s %-70s\033[0m\n" "$status" "$pind" "$text"
-        else
-            printf "%s%s %-70s\n" "$status" "$pind" "$text"
-        fi
+        case "$priority" in
+            "critical")  printf "%s%s! %-70s%s\n" "$COLOR_RED" "$status" "$text" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s> %-70s%s\n" "$COLOR_YELLOW" "$status" "$text" "$COLOR_RESET" ;;
+            "important") printf "%s%s* %-70s%s\n" "$COLOR_BLUE" "$status" "$text" "$COLOR_RESET" ;;
+            *)           printf "%s  %-70s\n" "$status" "$text" ;;
+        esac
     done
 }
 
