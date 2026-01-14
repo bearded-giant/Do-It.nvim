@@ -20,7 +20,12 @@ function M.setup(module)
         local core_actions = require("doit.ui.todo_actions")
         core_actions.toggle_todo(win_id, on_render)
     end
-    
+
+    function M.revert_to_pending(win_id, on_render)
+        local core_actions = require("doit.ui.todo_actions")
+        core_actions.revert_to_pending(win_id, on_render)
+    end
+
     function M.delete_todo(win_id, on_render)
         local core_actions = require("doit.ui.todo_actions")
         core_actions.delete_todo(win_id, on_render)

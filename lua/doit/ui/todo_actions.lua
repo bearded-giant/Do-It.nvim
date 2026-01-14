@@ -421,6 +421,35 @@ function M.toggle_todo(win_id, on_render)
 	end
 end
 
+function M.revert_to_pending(win_id, on_render)
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local cursor = vim.api.nvim_win_get_cursor(win_id)
+	local line_num = cursor[1]
+
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		local todo = state.todos[todo_index]
+		if todo.in_progress or todo.done then
+			state.revert_to_pending(todo_index)
+			maybe_render(on_render)
+			vim.notify("Todo reverted to pending", vim.log.levels.INFO)
+		else
+			vim.notify("Todo is already pending", vim.log.levels.INFO)
+		end
+	end
+end
+
 function M.delete_todo(win_id, on_render)
 	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then

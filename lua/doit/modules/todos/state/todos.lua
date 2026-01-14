@@ -148,6 +148,14 @@ function M.setup(state)
             state.save_todos()
         end
     end
+
+    function M.revert_to_pending(index)
+        if state.todos[index] then
+            state.todos[index].in_progress = false
+            state.todos[index].done = false
+            state.save_todos()
+        end
+    end
     
     function M.delete_todo(index)
         if state.todos[index] then

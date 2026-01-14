@@ -756,6 +756,7 @@ local function create_window()
 		local default_keymaps = {
 			new_todo = "i",
 			toggle_todo = "x",
+			revert_to_pending = "X",
 			delete_todo = "d",
 			delete_completed = "D",
 			close_window = "q",
@@ -822,6 +823,12 @@ local function create_window()
 
 	setup_keymap("toggle_todo", function()
 		todo_actions.toggle_todo(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("revert_to_pending", function()
+		todo_actions.revert_to_pending(win_id, function()
 			M.render_todos()
 		end)
 	end)

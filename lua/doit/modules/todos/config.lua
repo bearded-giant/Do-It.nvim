@@ -57,6 +57,7 @@ M.defaults = {
         toggle_list_window = "<leader>dl",
         new_todo = "i",
         toggle_todo = "x",
+        revert_to_pending = "X",
         delete_todo = "d",
         delete_completed = "D",
         delete_confirmation = "<Y>",

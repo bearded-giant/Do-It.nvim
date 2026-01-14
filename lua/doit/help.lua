@@ -14,6 +14,7 @@ M.keymaps = {
 		basic = {
 			{ key = "i", desc = "Add new todo" },
 			{ key = "<Space>", desc = "Toggle todo status (pending→in-progress→done)" },
+		{ key = "X", desc = "Revert todo to pending (not started)" },
 			{ key = "p", desc = "Set/change priority (critical/urgent/important)" },
 			{ key = "d", desc = "Delete current todo" },
 			{ key = "D", desc = "Delete all completed todos" },
