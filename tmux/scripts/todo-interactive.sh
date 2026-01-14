@@ -87,13 +87,11 @@ select_priority() {
     local header="$2"
 
     printf '%s\n' "${PRIORITIES[@]}" | fzf --ansi \
-        --header="${header:-Select Priority}" \
+        --header="${header:-Select Priority} (current: $current_priority)" \
         --prompt="Priority > " \
         --height=10 \
         --layout=reverse \
-        --no-sort \
-        --query="$current_priority" \
-        --select-1
+        --no-sort
 }
 
 # Function to update todo status
