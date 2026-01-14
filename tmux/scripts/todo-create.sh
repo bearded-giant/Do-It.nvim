@@ -9,6 +9,44 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
+# Check if fzf is installed (for priority selection)
+HAS_FZF=false
+if command -v fzf &> /dev/null; then
+    HAS_FZF=true
+fi
+
+# Priority options (matches Neovim config)
+PRIORITIES=("critical" "urgent" "important" "none")
+
+# Function to select priority via fzf
+select_priority() {
+    if [[ "$HAS_FZF" == "true" ]]; then
+        printf '%s\n' "${PRIORITIES[@]}" | fzf --ansi \
+            --header="Select Priority (ESC for none)" \
+            --prompt="Priority > " \
+            --height=10 \
+            --layout=reverse \
+            --no-sort
+    else
+        # fallback to simple menu if fzf not available
+        echo ""
+        echo -e "${BOLD}Select Priority:${RESET}"
+        echo "  1) critical"
+        echo "  2) urgent"
+        echo "  3) important"
+        echo "  4) none (default)"
+        echo ""
+        echo -n "Choice [4]: "
+        read -r CHOICE
+        case "$CHOICE" in
+            1) echo "critical" ;;
+            2) echo "urgent" ;;
+            3) echo "important" ;;
+            *) echo "none" ;;
+        esac
+    fi
+}
+
 # Check if the daily list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
     echo "Error: Daily todo list not found at $TODO_LIST_PATH"
@@ -85,6 +123,11 @@ if [[ -z "$TODO_TEXT" ]]; then
     exit 0
 fi
 
+# Select priority
+echo ""
+echo -e "${BLUE}─────────────────────────────────────────────${RESET}"
+SELECTED_PRIORITY=$(select_priority)
+
 # Create backup
 cp "$TODO_LIST_PATH" "${TODO_LIST_PATH}.bak"
 
@@ -95,26 +138,49 @@ TODO_ID="${EPOCHSECONDS:-$(date +%s)}_$(( RANDOM * RANDOM % 9999999 ))"
 MAX_ORDER=$(jq '.todos | map(.order_index) | max // 0' "$TODO_LIST_PATH")
 NEW_ORDER=$((MAX_ORDER + 1))
 
-# Add the new todo to the list
-jq --arg id "$TODO_ID" \
-   --arg text "$TODO_TEXT" \
-   --arg order "$NEW_ORDER" \
-   '.todos += [{
-      id: $id,
-      text: $text,
-      done: false,
-      in_progress: false,
-      order_index: ($order | tonumber),
-      timestamp: (now | floor),
-      "_score": 10
-   }] |
-   ._metadata.updated_at = (now | floor)' \
-   "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+# Add the new todo to the list (with or without priority)
+if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+    jq --arg id "$TODO_ID" \
+       --arg text "$TODO_TEXT" \
+       --arg order "$NEW_ORDER" \
+       --arg priority "$SELECTED_PRIORITY" \
+       '.todos += [{
+          id: $id,
+          text: $text,
+          done: false,
+          in_progress: false,
+          order_index: ($order | tonumber),
+          timestamp: (now | floor),
+          priorities: $priority,
+          "_score": 10
+       }] |
+       ._metadata.updated_at = (now | floor)' \
+       "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+else
+    jq --arg id "$TODO_ID" \
+       --arg text "$TODO_TEXT" \
+       --arg order "$NEW_ORDER" \
+       '.todos += [{
+          id: $id,
+          text: $text,
+          done: false,
+          in_progress: false,
+          order_index: ($order | tonumber),
+          timestamp: (now | floor),
+          "_score": 10
+       }] |
+       ._metadata.updated_at = (now | floor)' \
+       "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+fi
 
 # Verify the todo was added
 if [[ $? -eq 0 ]]; then
     echo ""
-    echo -e "${GREEN}✓ Todo created successfully!${RESET}"
+    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+        echo -e "${GREEN}✓ Todo created successfully!${RESET} [${SELECTED_PRIORITY}]"
+    else
+        echo -e "${GREEN}✓ Todo created successfully!${RESET}"
+    fi
     echo -e "${BOLD}Text:${RESET} $TODO_TEXT"
 
     # Show quick stats

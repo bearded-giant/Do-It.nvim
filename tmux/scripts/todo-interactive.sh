@@ -21,6 +21,26 @@ if [[ ! -f "$TODO_LIST_PATH" ]]; then
     exit 1
 fi
 
+# Priority color codes
+priority_color() {
+    case "$1" in
+        "critical") echo "\033[1;31m" ;;  # bold red
+        "urgent")   echo "\033[1;33m" ;;  # bold yellow
+        "important") echo "\033[1;34m" ;; # bold blue
+        *)          echo "" ;;
+    esac
+}
+
+# Priority indicator
+priority_indicator() {
+    case "$1" in
+        "critical") echo "!" ;;
+        "urgent")   echo ">" ;;
+        "important") echo "*" ;;
+        *)          echo " " ;;
+    esac
+}
+
 # Function to display todos in a formatted way (excludes done todos)
 format_todos() {
     # First print in-progress todos
@@ -28,10 +48,16 @@ format_todos() {
         map(select(.in_progress == true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.text[0:80])"
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status text; do
-        printf "\033[1;32m%s %-80s\033[0m\n" "$status" "$text"
+    while IFS='|' read -r id status priority text; do
+        local pcolor=$(priority_color "$priority")
+        local pind=$(priority_indicator "$priority")
+        if [[ -n "$pcolor" ]]; then
+            printf "\033[1;32m%s${pcolor}%s %-70s\033[0m\n" "$status" "$pind" "$text"
+        else
+            printf "\033[1;32m%s%s %-70s\033[0m\n" "$status" "$pind" "$text"
+        fi
     done
 
     # Then print not started todos
@@ -39,17 +65,42 @@ format_todos() {
         map(select(.done == false and .in_progress != true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.text[0:80])"
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status text; do
-        printf "%s %-80s\n" "$status" "$text"
+    while IFS='|' read -r id status priority text; do
+        local pcolor=$(priority_color "$priority")
+        local pind=$(priority_indicator "$priority")
+        if [[ -n "$pcolor" ]]; then
+            printf "%s${pcolor}%s %-70s\033[0m\n" "$status" "$pind" "$text"
+        else
+            printf "%s%s %-70s\n" "$status" "$pind" "$text"
+        fi
     done
+}
+
+# Priority options (matches Neovim config)
+PRIORITIES=("critical" "urgent" "important" "none")
+
+# Function to select priority via fzf
+select_priority() {
+    local current_priority="${1:-none}"
+    local header="$2"
+
+    printf '%s\n' "${PRIORITIES[@]}" | fzf --ansi \
+        --header="${header:-Select Priority}" \
+        --prompt="Priority > " \
+        --height=10 \
+        --layout=reverse \
+        --no-sort \
+        --query="$current_priority" \
+        --select-1
 }
 
 # Function to update todo status
 update_todo() {
     local todo_id="$1"
     local action="$2"
+    local priority="$3"
 
     case "$action" in
         "toggle")
@@ -97,6 +148,67 @@ update_todo() {
                 ._metadata.updated_at = (now | floor)
             ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             ;;
+        "priority")
+            local new_priority="$priority"
+            if [[ "$new_priority" == "none" ]]; then
+                # remove priority field
+                jq --arg id "$todo_id" '
+                    .todos |= map(
+                        if .id == $id then
+                            del(.priorities)
+                        else . end
+                    ) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            else
+                jq --arg id "$todo_id" --arg priority "$new_priority" '
+                    .todos |= map(
+                        if .id == $id then
+                            .priorities = $priority
+                        else . end
+                    ) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            fi
+            ;;
+        "move_up")
+            # swap order_index with the todo above (lower order_index among non-done items)
+            jq --arg id "$todo_id" '
+                # get current todo order_index
+                (.todos[] | select(.id == $id) | .order_index) as $current_order |
+                # find the todo just above (highest order_index less than current, excluding done)
+                ([.todos[] | select(.done == false and .order_index < $current_order)] | max_by(.order_index)) as $above |
+                if $above then
+                    .todos |= map(
+                        if .id == $id then
+                            .order_index = $above.order_index
+                        elif .id == $above.id then
+                            .order_index = $current_order
+                        else . end
+                    )
+                else . end |
+                ._metadata.updated_at = (now | floor)
+            ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            ;;
+        "move_down")
+            # swap order_index with the todo below (higher order_index among non-done items)
+            jq --arg id "$todo_id" '
+                # get current todo order_index
+                (.todos[] | select(.id == $id) | .order_index) as $current_order |
+                # find the todo just below (lowest order_index greater than current, excluding done)
+                ([.todos[] | select(.done == false and .order_index > $current_order)] | min_by(.order_index)) as $below |
+                if $below then
+                    .todos |= map(
+                        if .id == $id then
+                            .order_index = $below.order_index
+                        elif .id == $below.id then
+                            .order_index = $current_order
+                        else . end
+                    )
+                else . end |
+                ._metadata.updated_at = (now | floor)
+            ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            ;;
     esac
 }
 
@@ -109,12 +221,13 @@ while true; do
 ├───────────────────────────────────────────────────┤
 │ ENTER: Toggle done       s: Start/In-progress     │
 │ c: Create new todo       x: Stop in-progress      │
-│ X: Revert to pending     r: Refresh               │
-│ q/ESC: Quit                                       │
+│ X: Revert to pending     p: Set priority          │
+│ K/C-Up: Move up          J/C-Down: Move down      │
+│ r: Refresh               q/ESC: Quit              │
 ╰───────────────────────────────────────────────────╯
 " \
         --prompt="Select todo > " \
-        --expect=enter,s,x,X,c,r,q \
+        --expect=enter,s,x,X,c,r,p,J,K,ctrl-up,ctrl-down,q \
         --no-sort \
         --height=35 \
         --layout=reverse)
@@ -128,8 +241,8 @@ while true; do
         break
     fi
 
-    # Extract the todo text from the selected line (remove leading status and spaces)
-    TODO_TEXT=$(echo "$TODO_LINE" | sed 's/^[▶✓ ]*//g' | sed 's/^ *//g' | xargs)
+    # Extract the todo text from the selected line (remove leading status, priority indicator, and spaces)
+    TODO_TEXT=$(echo "$TODO_LINE" | sed 's/^[▶✓ !>*]*//g' | sed 's/^ *//g' | xargs)
 
     # Find the todo ID by matching the text (compare first part of text to handle truncation)
     if [[ -n "$TODO_TEXT" ]]; then
@@ -166,6 +279,30 @@ while true; do
                 update_todo "$TODO_ID" "revert"
                 echo "Reverted to pending: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
+            fi
+            ;;
+        "p")
+            if [[ -n "$TODO_ID" ]]; then
+                # get current priority
+                CURRENT_PRIORITY=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .priorities // "none"' "$TODO_LIST_PATH")
+                NEW_PRIORITY=$(select_priority "$CURRENT_PRIORITY" "Set Priority")
+                if [[ -n "$NEW_PRIORITY" ]]; then
+                    update_todo "$TODO_ID" "priority" "$NEW_PRIORITY"
+                    echo "Priority set to: $NEW_PRIORITY"
+                    sleep 0.5
+                fi
+            fi
+            ;;
+        "K"|"ctrl-up")
+            if [[ -n "$TODO_ID" ]]; then
+                update_todo "$TODO_ID" "move_up"
+                # no sleep - immediately refresh to show new position
+            fi
+            ;;
+        "J"|"ctrl-down")
+            if [[ -n "$TODO_ID" ]]; then
+                update_todo "$TODO_ID" "move_down"
+                # no sleep - immediately refresh to show new position
             fi
             ;;
         "c")
@@ -205,6 +342,10 @@ while true; do
             TODO_TEXT=$(echo "$TODO_LINES" | xargs)
 
             if [[ -n "$TODO_TEXT" ]]; then
+                # Select priority
+                echo ""
+                SELECTED_PRIORITY=$(select_priority "none" "Select Priority (ESC for none)")
+
                 # Generate unique ID
                 TODO_ID="$(date +%s)_$(( RANDOM * RANDOM % 9999999 ))"
 
@@ -212,25 +353,48 @@ while true; do
                 MAX_ORDER=$(jq '.todos | map(.order_index) | max // 0' "$TODO_LIST_PATH")
                 NEW_ORDER=$((MAX_ORDER + 1))
 
-                # Add the new todo
-                jq --arg id "$TODO_ID" \
-                   --arg text "$TODO_TEXT" \
-                   --arg order "$NEW_ORDER" \
-                   '.todos += [{
-                      id: $id,
-                      text: $text,
-                      done: false,
-                      in_progress: false,
-                      order_index: ($order | tonumber),
-                      timestamp: (now | floor),
-                      "_score": 10
-                   }] |
-                   ._metadata.updated_at = (now | floor)' \
-                   "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                # Add the new todo (with or without priority)
+                if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+                    jq --arg id "$TODO_ID" \
+                       --arg text "$TODO_TEXT" \
+                       --arg order "$NEW_ORDER" \
+                       --arg priority "$SELECTED_PRIORITY" \
+                       '.todos += [{
+                          id: $id,
+                          text: $text,
+                          done: false,
+                          in_progress: false,
+                          order_index: ($order | tonumber),
+                          timestamp: (now | floor),
+                          priorities: $priority,
+                          "_score": 10
+                       }] |
+                       ._metadata.updated_at = (now | floor)' \
+                       "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                else
+                    jq --arg id "$TODO_ID" \
+                       --arg text "$TODO_TEXT" \
+                       --arg order "$NEW_ORDER" \
+                       '.todos += [{
+                          id: $id,
+                          text: $text,
+                          done: false,
+                          in_progress: false,
+                          order_index: ($order | tonumber),
+                          timestamp: (now | floor),
+                          "_score": 10
+                       }] |
+                       ._metadata.updated_at = (now | floor)' \
+                       "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                fi
 
                 if [[ $? -eq 0 ]]; then
                     echo ""
-                    echo "✓ Created: $TODO_TEXT"
+                    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+                        echo "✓ Created [$SELECTED_PRIORITY]: $TODO_TEXT"
+                    else
+                        echo "✓ Created: $TODO_TEXT"
+                    fi
 
                     # Ask if should mark as in-progress
                     echo ""
