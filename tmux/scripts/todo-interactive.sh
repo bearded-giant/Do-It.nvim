@@ -21,12 +21,8 @@ if [[ ! -f "$TODO_LIST_PATH" ]]; then
     exit 1
 fi
 
-# Function to display todos in a formatted way
+# Function to display todos in a formatted way (excludes done todos)
 format_todos() {
-    # Print header
-    printf "\033[1;34m%-84s\033[0m\n" "Tasks"
-    printf "\033[1;34m%-84s\033[0m\n" "------------------------------------------------------------------------------------"
-
     # First print in-progress todos
     jq -r '.todos |
         map(select(.in_progress == true)) |
@@ -47,17 +43,6 @@ format_todos() {
     ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status text; do
         printf "%s %-80s\n" "$status" "$text"
-    done
-
-    # Finally print completed todos
-    jq -r '.todos |
-        map(select(.done == true)) |
-        sort_by(.order_index) |
-        .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.text[0:80])"
-    ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status text; do
-        printf "\033[90m%s %-80s\033[0m\n" "$status" "$text"
     done
 }
 
@@ -119,14 +104,15 @@ update_todo() {
 while true; do
     # Show todos and prompt for selection
     SELECTION=$(format_todos | fzf --ansi --header="
-╭─────────────────────────────────────────────╮
-│ Todo Manager - Daily List                   │
-├─────────────────────────────────────────────┤
-│ ENTER: Toggle done    s: Start/In-progress │
-│ c: Create new todo    x: Stop in-progress  │
-│ X: Revert to pending  r: Refresh           │
-│ q/ESC: Quit                                 │
-╰─────────────────────────────────────────────╯" \
+╭───────────────────────────────────────────────────╮
+│ Todo Manager - Daily List                         │
+├───────────────────────────────────────────────────┤
+│ ENTER: Toggle done       s: Start/In-progress     │
+│ c: Create new todo       x: Stop in-progress      │
+│ X: Revert to pending     r: Refresh               │
+│ q/ESC: Quit                                       │
+╰───────────────────────────────────────────────────╯
+" \
         --prompt="Select todo > " \
         --expect=enter,s,x,X,c,r,q \
         --no-sort \
