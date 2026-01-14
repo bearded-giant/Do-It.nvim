@@ -27,22 +27,25 @@ COLOR_GREEN=$'\e[1;32m'
 COLOR_RED=$'\e[1;31m'
 COLOR_YELLOW=$'\e[1;33m'
 COLOR_BLUE=$'\e[1;34m'
+COLOR_DIM=$'\e[2m'
 
 # Function to display todos in a formatted way (excludes done todos)
+# Format: hidden ID at end for extraction, visible: status + priority indicator + text
 format_todos() {
     # First print in-progress todos
     jq -r '.todos |
         map(select(.in_progress == true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:60])"
     ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status priority text; do
+        # Append ID at end (dimmed) for reliable extraction
         case "$priority" in
-            "critical")  printf "%s%s%s! %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s> %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s* %-70s%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$COLOR_RESET" ;;
-            *)           printf "%s%s  %-70s%s\n" "$COLOR_GREEN" "$status" "$text" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s%s! %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s%s> %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s%s* %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s%s  %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 
@@ -51,14 +54,14 @@ format_todos() {
         map(select(.done == false and .in_progress != true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:70])"
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:60])"
     ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status priority text; do
         case "$priority" in
-            "critical")  printf "%s%s! %-70s%s\n" "$COLOR_RED" "$status" "$text" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s> %-70s%s\n" "$COLOR_YELLOW" "$status" "$text" "$COLOR_RESET" ;;
-            "important") printf "%s%s* %-70s%s\n" "$COLOR_BLUE" "$status" "$text" "$COLOR_RESET" ;;
-            *)           printf "%s  %-70s\n" "$status" "$text" ;;
+            "critical")  printf "%s%s! %-60s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s> %-60s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s* %-60s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s  %-60s %s[%s]%s\n" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 }
@@ -192,6 +195,12 @@ update_todo() {
                 ._metadata.updated_at = (now | floor)
             ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             ;;
+        "delete")
+            jq --arg id "$todo_id" '
+                .todos |= map(select(.id != $id)) |
+                ._metadata.updated_at = (now | floor)
+            ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            ;;
     esac
 }
 
@@ -206,11 +215,11 @@ while true; do
 │ c: Create new todo       x: Stop in-progress      │
 │ X: Revert to pending     p: Set priority          │
 │ K/C-Up: Move up          J/C-Down: Move down      │
-│ r: Refresh               q/ESC: Quit              │
+│ d: Delete                r: Refresh    q: Quit    │
 ╰───────────────────────────────────────────────────╯
 " \
         --prompt="Select todo > " \
-        --expect=enter,s,x,X,c,r,p,J,K,ctrl-up,ctrl-down,q \
+        --expect=enter,s,x,X,c,r,p,d,J,K,ctrl-up,ctrl-down,q \
         --no-sort \
         --height=35 \
         --layout=reverse)
@@ -224,15 +233,8 @@ while true; do
         break
     fi
 
-    # Extract the todo text from the selected line (remove leading status, priority indicator, and spaces)
-    TODO_TEXT=$(echo "$TODO_LINE" | sed 's/^[▶✓ !>*]*//g' | sed 's/^ *//g' | xargs)
-
-    # Find the todo ID by matching the text (compare first part of text to handle truncation)
-    if [[ -n "$TODO_TEXT" ]]; then
-        TODO_ID=$(jq -r --arg text "$TODO_TEXT" '.todos[] | select(.text | startswith($text)) | .id' "$TODO_LIST_PATH" | head -1)
-    else
-        TODO_ID=""
-    fi
+    # Extract the todo ID from the bracketed ID at end of line [id]
+    TODO_ID=$(echo "$TODO_LINE" | grep -oE '\[[^]]+\]$' | tr -d '[]')
 
     # Perform action based on key
     case "$KEY" in
@@ -286,6 +288,19 @@ while true; do
             if [[ -n "$TODO_ID" ]]; then
                 update_todo "$TODO_ID" "move_down"
                 # no sleep - immediately refresh to show new position
+            fi
+            ;;
+        "d")
+            if [[ -n "$TODO_ID" ]]; then
+                TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
+                echo -n "Delete '$TODO_TEXT'? (y/N): "
+                read -n 1 -r CONFIRM
+                echo
+                if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+                    update_todo "$TODO_ID" "delete"
+                    echo "Deleted."
+                    sleep 0.5
+                fi
             fi
             ;;
         "c")
