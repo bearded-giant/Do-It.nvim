@@ -19,6 +19,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Time Estimation** - Track estimated completion time
 - **Import/Export** - Backup or share your tasks
 - **Lualine Integration** - Show active tasks in your statusline
+- **Tmux Integration** - Manage todos from tmux with status bar and fzf
 
 ## Quick Start
 
@@ -289,6 +290,83 @@ Available components:
 - `current_list` - Shows current list name and todo count: `📋 work (5)`
 - `todo_stats` - Shows todo statistics: `✓3 ◐1 ○2` (done/in-progress/pending)
 - `active_todo` - Shows the current in-progress todo (if any)
+
+## Tmux Integration
+
+Do-It.nvim includes a tmux plugin for managing todos directly from tmux, with status bar integration and an interactive fzf-based manager.
+
+### Prerequisites
+
+- [tmux](https://github.com/tmux/tmux) with [TPM](https://github.com/tmux-plugins/tpm)
+- [fzf](https://github.com/junegunn/fzf) for interactive mode
+- [jq](https://stedolan.github.io/jq/) for JSON parsing
+
+### Installation
+
+Add to your `tmux.conf`:
+
+```bash
+set -g @plugin 'bearded-giant/do-it.nvim'
+```
+
+Then install with `prefix + I`.
+
+### Keybindings
+
+**With prefix key (`prefix + d + ...`):**
+
+| Key | Action                    |
+|-----|---------------------------|
+| `t` | Quick todo popup          |
+| `i` | Interactive manager (fzf) |
+| `x` | Toggle current todo done  |
+| `n` | Start next pending todo   |
+| `c` | Create new todo           |
+
+**Direct shortcuts (Alt+Shift):**
+
+| Key           | Action              |
+|---------------|---------------------|
+| `Alt+Shift+T` | Quick todo popup    |
+| `Alt+Shift+I` | Interactive manager |
+| `Alt+Shift+X` | Toggle todo done    |
+| `Alt+Shift+N` | Start next todo     |
+
+**In interactive manager:**
+
+| Key     | Action                |
+|---------|-----------------------|
+| `Enter` | Toggle done           |
+| `s`     | Start/In-progress     |
+| `x`     | Stop in-progress      |
+| `X`     | Revert to pending     |
+| `c`     | Create new todo       |
+| `r`     | Refresh               |
+| `q/ESC` | Quit                  |
+
+### Configuration
+
+```bash
+# Change the prefix key (default: d)
+set -g @doit-key "t"
+
+# Disable Alt+Shift shortcuts
+set -g @doit-alt-bindings "off"
+```
+
+### Status Bar Integration
+
+If using [bearded-giant-tmux](https://github.com/bearded-giant/bearded-giant-tmux) theme, add `todo` to your status modules:
+
+```bash
+set -g @bearded_giant_status_modules_right "meetings todo"
+```
+
+For other themes, use the status script directly:
+
+```bash
+set -g status-right "#(~/.tmux/plugins/do-it.nvim/tmux/scripts/todo-status.sh)"
+```
 
 ## Contributing
 
