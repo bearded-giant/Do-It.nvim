@@ -207,7 +207,7 @@ update_todo() {
 # Main interactive loop
 while true; do
     # Show todos and prompt for selection
-    SELECTION=$(format_todos | fzf --ansi --header="
+    SELECTION=$(format_todos | fzf --ansi --disabled --header="
 ╭───────────────────────────────────────────────────╮
 │ Todo Manager - Daily List                         │
 ├───────────────────────────────────────────────────┤
@@ -218,7 +218,7 @@ while true; do
 │ d: Delete                r: Refresh    q: Quit    │
 ╰───────────────────────────────────────────────────╯
 " \
-        --prompt="Select todo > " \
+        --prompt="" \
         --expect=enter,s,x,X,c,r,p,d,J,K,ctrl-up,ctrl-down,q \
         --no-sort \
         --height=35 \
