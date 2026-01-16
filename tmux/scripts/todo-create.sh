@@ -15,14 +15,14 @@ if command -v fzf &> /dev/null; then
     HAS_FZF=true
 fi
 
-# Priority options (matches Neovim config)
-PRIORITIES=("critical" "urgent" "important" "none")
+# Priority options (default first so Enter accepts it)
+PRIORITIES=("default" "critical" "urgent" "important")
 
 # Function to select priority via fzf
 select_priority() {
     if [[ "$HAS_FZF" == "true" ]]; then
         printf '%s\n' "${PRIORITIES[@]}" | fzf --ansi \
-            --header="Select Priority (ESC for none)" \
+            --header="Select Priority (Enter for default)" \
             --prompt="Priority > " \
             --height=10 \
             --layout=reverse \
@@ -31,18 +31,18 @@ select_priority() {
         # fallback to simple menu if fzf not available
         echo ""
         echo -e "${BOLD}Select Priority:${RESET}"
-        echo "  1) critical"
-        echo "  2) urgent"
-        echo "  3) important"
-        echo "  4) none (default)"
+        echo "  1) default"
+        echo "  2) critical"
+        echo "  3) urgent"
+        echo "  4) important"
         echo ""
-        echo -n "Choice [4]: "
+        echo -n "Choice [1]: "
         read -r CHOICE
         case "$CHOICE" in
-            1) echo "critical" ;;
-            2) echo "urgent" ;;
-            3) echo "important" ;;
-            *) echo "none" ;;
+            2) echo "critical" ;;
+            3) echo "urgent" ;;
+            4) echo "important" ;;
+            *) echo "default" ;;
         esac
     fi
 }
@@ -139,7 +139,7 @@ MAX_ORDER=$(jq '.todos | map(.order_index) | max // 0' "$TODO_LIST_PATH")
 NEW_ORDER=$((MAX_ORDER + 1))
 
 # Add the new todo to the list (with or without priority)
-if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
     jq --arg id "$TODO_ID" \
        --arg text "$TODO_TEXT" \
        --arg order "$NEW_ORDER" \
@@ -176,7 +176,7 @@ fi
 # Verify the todo was added
 if [[ $? -eq 0 ]]; then
     echo ""
-    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
         echo -e "${GREEN}✓ Todo created successfully!${RESET} [${SELECTED_PRIORITY}]"
     else
         echo -e "${GREEN}✓ Todo created successfully!${RESET}"

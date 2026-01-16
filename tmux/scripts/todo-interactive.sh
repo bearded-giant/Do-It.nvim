@@ -66,12 +66,12 @@ format_todos() {
     done
 }
 
-# Priority options (matches Neovim config)
-PRIORITIES=("critical" "urgent" "important" "none")
+# Priority options (default first so Enter accepts it)
+PRIORITIES=("default" "critical" "urgent" "important")
 
 # Function to select priority via fzf
 select_priority() {
-    local current_priority="${1:-none}"
+    local current_priority="${1:-default}"
     local header="$2"
 
     printf '%s\n' "${PRIORITIES[@]}" | fzf --ansi \
@@ -136,7 +136,7 @@ update_todo() {
             ;;
         "priority")
             local new_priority="$priority"
-            if [[ "$new_priority" == "none" ]]; then
+            if [[ "$new_priority" == "default" ]]; then
                 # remove priority field
                 jq --arg id "$todo_id" '
                     .todos |= map(
@@ -269,7 +269,7 @@ while true; do
         "p")
             if [[ -n "$TODO_ID" ]]; then
                 # get current priority
-                CURRENT_PRIORITY=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .priorities // "none"' "$TODO_LIST_PATH")
+                CURRENT_PRIORITY=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .priorities // "default"' "$TODO_LIST_PATH")
                 NEW_PRIORITY=$(select_priority "$CURRENT_PRIORITY" "Set Priority")
                 if [[ -n "$NEW_PRIORITY" ]]; then
                     update_todo "$TODO_ID" "priority" "$NEW_PRIORITY"
@@ -342,7 +342,7 @@ while true; do
             if [[ -n "$TODO_TEXT" ]]; then
                 # Select priority
                 echo ""
-                SELECTED_PRIORITY=$(select_priority "none" "Select Priority (ESC for none)")
+                SELECTED_PRIORITY=$(select_priority "default" "Select Priority (Enter for default)")
 
                 # Generate unique ID
                 TODO_ID="$(date +%s)_$(( RANDOM * RANDOM % 9999999 ))"
@@ -352,7 +352,7 @@ while true; do
                 NEW_ORDER=$((MAX_ORDER + 1))
 
                 # Add the new todo (with or without priority)
-                if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+                if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
                     jq --arg id "$TODO_ID" \
                        --arg text "$TODO_TEXT" \
                        --arg order "$NEW_ORDER" \
@@ -388,7 +388,7 @@ while true; do
 
                 if [[ $? -eq 0 ]]; then
                     echo ""
-                    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "none" ]]; then
+                    if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
                         echo "✓ Created [$SELECTED_PRIORITY]: $TODO_TEXT"
                     else
                         echo "✓ Created: $TODO_TEXT"
