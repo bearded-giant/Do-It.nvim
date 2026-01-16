@@ -112,7 +112,8 @@ if [[ ! -s "$TEMP_FILE" ]]; then
 fi
 
 # Read the todo text and combine multi-line into single line with spaces
-TODO_TEXT=$(cat "$TEMP_FILE" | tr '\n' ' ' | sed 's/  */ /g' | xargs)
+# Use sed for trimming instead of xargs (xargs breaks on apostrophes)
+TODO_TEXT=$(cat "$TEMP_FILE" | tr '\n' ' ' | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
 
 # Clean up temp file
 rm -f "$TEMP_FILE"

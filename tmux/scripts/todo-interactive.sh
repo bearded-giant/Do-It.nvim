@@ -336,8 +336,8 @@ while true; do
                 fi
             done
 
-            # Trim and check if we have text
-            TODO_TEXT=$(echo "$TODO_LINES" | xargs)
+            # Trim and check if we have text (sed instead of xargs - xargs breaks on apostrophes)
+            TODO_TEXT=$(echo "$TODO_LINES" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
 
             if [[ -n "$TODO_TEXT" ]]; then
                 # Select priority
