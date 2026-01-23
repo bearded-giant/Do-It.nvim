@@ -70,7 +70,8 @@ echo -e "${BLUE}${BOLD}│         Create New Todo - Daily List        │${RESE
 echo -e "${BLUE}${BOLD}╰─────────────────────────────────────────────╯${RESET}"
 echo ""
 echo -e "${BOLD}Instructions:${RESET}"
-echo "• Enter your todo text (can be multiple lines)"
+echo "• Enter your todo text (multi-line supported)"
+echo "• Newlines are preserved for viewing"
 echo "• Press Ctrl+D when done to save"
 echo "• Press Ctrl+C to cancel"
 echo ""
@@ -111,9 +112,9 @@ if [[ ! -s "$TEMP_FILE" ]]; then
     exit 0
 fi
 
-# Read the todo text and combine multi-line into single line with spaces
-# Use sed for trimming instead of xargs (xargs breaks on apostrophes)
-TODO_TEXT=$(cat "$TEMP_FILE" | tr '\n' ' ' | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+# Read the todo text preserving multi-line format
+# jq handles newline escaping in JSON automatically
+TODO_TEXT=$(cat "$TEMP_FILE")
 
 # Clean up temp file
 rm -f "$TEMP_FILE"

@@ -29,23 +29,46 @@ COLOR_YELLOW=$'\e[1;33m'
 COLOR_BLUE=$'\e[1;34m'
 COLOR_DIM=$'\e[2m'
 
+# preview command for fzf - shows full todo content with line wrapping
+preview_todo() {
+    local line="$1"
+    local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
+    if [[ -n "$todo_id" ]]; then
+        jq -r --arg id "$todo_id" '
+            .todos[] | select(.id == $id) |
+            "Priority: \(.priorities // "none")\n" +
+            "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
+            "────────────────────────────────────────\n" +
+            .text
+        ' "$TODO_LIST_PATH" 2>/dev/null || echo "No preview available"
+    fi
+}
+export -f preview_todo
+export TODO_LIST_PATH
+
 # Function to display todos in a formatted way (excludes done todos)
-# Format: hidden ID at end for extraction, visible: status + priority indicator + text
+# Format: hidden ID at end for extraction, visible: status + priority indicator + first line of text
+# Shows ... indicator for multi-line items
 format_todos() {
     # First print in-progress todos
     jq -r '.todos |
         map(select(.in_progress == true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:60])"
+        (.text | split("\n")[0][0:55]) as $first_line |
+        (.text | contains("\n")) as $multiline |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status priority text; do
+    while IFS='|' read -r id status priority text multiline; do
+        # Add ... for multi-line items
+        suffix=""
+        [[ "$multiline" == "true" ]] && suffix=" ..."
         # Append ID at end (dimmed) for reliable extraction
         case "$priority" in
-            "critical")  printf "%s%s%s! %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s> %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s* %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s%s  %-60s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s%s! %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s%s> %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s%s* %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s%s  %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 
@@ -54,14 +77,18 @@ format_todos() {
         map(select(.done == false and .in_progress != true)) |
         sort_by(.order_index) |
         .[] |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\(.text[0:60])"
+        (.text | split("\n")[0][0:55]) as $first_line |
+        (.text | contains("\n")) as $multiline |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status priority text; do
+    while IFS='|' read -r id status priority text multiline; do
+        suffix=""
+        [[ "$multiline" == "true" ]] && suffix=" ..."
         case "$priority" in
-            "critical")  printf "%s%s! %-60s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s> %-60s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s* %-60s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s  %-60s %s[%s]%s\n" "$status" "$text" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s! %-55s%s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s> %-55s%s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s* %-55s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s  %-55s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 }
@@ -208,21 +235,23 @@ update_todo() {
 while true; do
     # Show todos and prompt for selection
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
-╭───────────────────────────────────────────────────╮
-│ Todo Manager - Daily List                         │
-├───────────────────────────────────────────────────┤
-│ ENTER: Toggle done       s: Start/In-progress     │
-│ c: Create new todo       x: Stop in-progress      │
-│ X: Revert to pending     p: Set priority          │
-│ K/C-Up: Move up          J/C-Down: Move down      │
-│ d: Delete                r: Refresh    q: Quit    │
-╰───────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────╮
+│ Todo Manager - Daily List                              │
+├────────────────────────────────────────────────────────┤
+│ ENTER: Toggle done       s: Start/In-progress          │
+│ c: Create new todo       x: Stop in-progress           │
+│ X: Revert to pending     p: Set priority               │
+│ K/C-Up: Move up          J/C-Down: Move down           │
+│ d: Delete    v: View full    r: Refresh    q: Quit     │
+╰────────────────────────────────────────────────────────╯
 " \
         --prompt="" \
-        --expect=enter,s,x,X,c,r,p,d,J,K,ctrl-up,ctrl-down,q \
+        --expect=enter,s,x,X,c,r,p,d,v,J,K,ctrl-up,ctrl-down,q \
         --no-sort \
-        --height=35 \
-        --layout=reverse)
+        --height=80% \
+        --layout=reverse \
+        --preview='bash -c "preview_todo {}"' \
+        --preview-window=right:40%:wrap)
 
     # Parse the selection
     KEY=$(echo "$SELECTION" | head -1)
@@ -303,15 +332,39 @@ while true; do
                 fi
             fi
             ;;
+        "v")
+            # View full todo details
+            if [[ -n "$TODO_ID" ]]; then
+                clear
+                echo ""
+                echo "═══════════════════════════════════════════════"
+                echo "                 Todo Details"
+                echo "═══════════════════════════════════════════════"
+                echo ""
+                jq -r --arg id "$TODO_ID" '
+                    .todos[] | select(.id == $id) |
+                    "Priority: \(.priorities // "none")\n" +
+                    "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
+                    "Created: \(.timestamp | todate)\n" +
+                    "─────────────────────────────────────────────\n" +
+                    .text
+                ' "$TODO_LIST_PATH"
+                echo ""
+                echo "─────────────────────────────────────────────"
+                echo "Press any key to return..."
+                read -n 1 -s
+            fi
+            ;;
         "c")
-            # Create new todo
+            # Create new todo with multi-line support
             echo ""
             echo "═══════════════════════════════════════════════"
             echo "Create New Todo (press Enter twice when done)"
+            echo "Multi-line supported - newlines are preserved"
             echo "═══════════════════════════════════════════════"
             echo ""
 
-            # Collect multi-line input
+            # Collect multi-line input preserving newlines
             TODO_LINES=""
             EMPTY_COUNT=0
 
@@ -324,20 +377,22 @@ while true; do
                     if [[ $EMPTY_COUNT -ge 2 ]]; then
                         break
                     fi
-                    # Add single newline to preserve formatting
-                    TODO_LINES="${TODO_LINES} "
+                    # Preserve empty line as newline
+                    if [[ -n "$TODO_LINES" ]]; then
+                        TODO_LINES="${TODO_LINES}"$'\n'
+                    fi
                 else
                     EMPTY_COUNT=0
                     if [[ -z "$TODO_LINES" ]]; then
                         TODO_LINES="$line"
                     else
-                        TODO_LINES="${TODO_LINES} ${line}"
+                        TODO_LINES="${TODO_LINES}"$'\n'"${line}"
                     fi
                 fi
             done
 
-            # Trim and check if we have text (sed instead of xargs - xargs breaks on apostrophes)
-            TODO_TEXT=$(echo "$TODO_LINES" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+            # Remove trailing blank line from double-enter detection
+            TODO_TEXT="${TODO_LINES%$'\n'}"
 
             if [[ -n "$TODO_TEXT" ]]; then
                 # Select priority
