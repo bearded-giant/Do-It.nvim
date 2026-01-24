@@ -47,5 +47,4 @@ SELECTED=$(ls -1 "$LISTS_DIR"/*.json 2>/dev/null | xargs -n1 basename | sed 's/\
 
 if [[ -n "$SELECTED" && "$SELECTED" != "$CURRENT_LIST" ]]; then
     set_active_list "$SELECTED"
-    tmux display-message "Switched to list: $SELECTED"
 fi

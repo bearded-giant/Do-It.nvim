@@ -5,6 +5,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 
+# always read from session.json, not cached env var
+unset DOIT_ACTIVE_LIST
 TODO_LIST_PATH="$(get_active_list_path)"
 ACTIVE_LIST_NAME="$(get_active_list_name)"
 
@@ -39,13 +41,16 @@ preview_todo() {
     local line="$1"
     local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
     if [[ -n "$todo_id" ]]; then
-        jq -r --arg id "$todo_id" '
-            .todos[] | select(.id == $id) |
-            "Priority: \(.priorities // "none")\n" +
-            "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
-            "────────────────────────────────────────\n" +
-            .text
-        ' "$TODO_LIST_PATH" 2>/dev/null || echo "No preview available"
+        # use printf to safely output text with special chars (backticks, etc)
+        local priority=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .priorities // "none"' "$TODO_LIST_PATH" 2>/dev/null)
+        local status=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | if .in_progress then "In Progress" elif .done then "Done" else "Pending" end' "$TODO_LIST_PATH" 2>/dev/null)
+        local text=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH" 2>/dev/null)
+
+        printf 'ID: %s\n' "$todo_id"
+        printf 'Priority: %s\n' "$priority"
+        printf 'Status: %s\n' "$status"
+        echo "────────────────────────────────────────"
+        printf '%s\n' "$text"
     fi
 }
 export -f preview_todo
@@ -240,18 +245,16 @@ update_todo() {
 while true; do
     # Show todos and prompt for selection
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
-╭────────────────────────────────────────────────────────╮
-│ Todo Manager - ${ACTIVE_LIST_NAME}$(printf '%*s' $((38 - ${#ACTIVE_LIST_NAME})) '')│
-├────────────────────────────────────────────────────────┤
-│ ENTER: Toggle done       s: Start/In-progress          │
-│ c: Create new            e: Edit todo text             │
-│ x: Stop in-progress      X: Revert to pending          │
-│ p: Set priority          K/J: Move up/down             │
-│ d: Delete   D: Clear done   u: Undo   v: View   q: Quit│
-╰────────────────────────────────────────────────────────╯
+ Todo Manager - ${ACTIVE_LIST_NAME}
+───────────────────────────────────────────────────
+ ENTER: Toggle    s: Start    x: Stop    X: Revert
+ c: Create    e: Edit    p: Priority    K/J: Reorder
+ d: Delete    D: Clear done    u: Undo    m: Move to list
+ l: Switch list    L: List manager (new/rename/delete)
+───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,c,r,p,d,D,e,u,v,J,K,ctrl-up,ctrl-down,q \
+        --expect=enter,s,x,X,c,r,p,d,D,e,u,l,L,m,J,K,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -413,6 +416,63 @@ while true; do
                 sleep 0.5
             fi
             ;;
+        "l")
+            # Open list switch
+            "$SCRIPT_DIR/todo-list-switch.sh"
+            # Clear cached env var so we read fresh from session.json
+            unset DOIT_ACTIVE_LIST
+            # Reload list path after switch
+            TODO_LIST_PATH="$(get_active_list_path)"
+            ACTIVE_LIST_NAME="$(get_active_list_name)"
+            export TODO_LIST_PATH
+            ;;
+        "L")
+            # Open list manager
+            "$SCRIPT_DIR/todo-list-manager.sh"
+            # Clear cached env var so we read fresh from session.json
+            unset DOIT_ACTIVE_LIST
+            # Reload list path after switch
+            TODO_LIST_PATH="$(get_active_list_path)"
+            ACTIVE_LIST_NAME="$(get_active_list_name)"
+            export TODO_LIST_PATH
+            ;;
+        "m")
+            # Move todo to another list
+            if [[ -n "$TODO_ID" ]]; then
+                # Get available lists except current
+                TARGET_LIST=$(get_available_lists | grep -v "^${ACTIVE_LIST_NAME}$" | \
+                    fzf --ansi \
+                        --header="Move to list (from: $ACTIVE_LIST_NAME)" \
+                        --prompt="Target > " \
+                        --height=40% \
+                        --layout=reverse)
+
+                if [[ -n "$TARGET_LIST" ]]; then
+                    TARGET_PATH="$LISTS_DIR/${TARGET_LIST}.json"
+
+                    # Get the todo object
+                    TODO_OBJ=$(jq --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
+
+                    if [[ -n "$TODO_OBJ" ]]; then
+                        # Remove from current list
+                        jq --arg id "$TODO_ID" '
+                            .todos |= map(select(.id != $id)) |
+                            ._metadata.updated_at = (now | floor)
+                        ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+
+                        # Add to target list
+                        echo "$TODO_OBJ" | jq -s '.[0]' | jq -s --slurpfile todo /dev/stdin '
+                            .[0].todos += $todo |
+                            .[0]._metadata.updated_at = (now | floor)
+                        ' "$TARGET_PATH" > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
+
+                        TODO_TEXT=$(echo "$TODO_OBJ" | jq -r '.text | split("\n")[0][0:30]')
+                        echo "Moved to $TARGET_LIST: $TODO_TEXT"
+                        sleep 0.5
+                    fi
+                fi
+            fi
+            ;;
         "v")
             # View full todo details
             if [[ -n "$TODO_ID" ]]; then
@@ -558,6 +618,42 @@ while true; do
         "r")
             echo "Refreshed"
             sleep 0.3
+            ;;
+        "?")
+            # Show help
+            clear
+            echo ""
+            echo " Todo Manager - Help"
+            echo " ─────────────────────────────────────────"
+            echo ""
+            echo " Navigation"
+            echo "   j/k or arrows    Move up/down in list"
+            echo "   K/J              Reorder todo (move up/down)"
+            echo ""
+            echo " Status Changes"
+            echo "   Enter            Toggle done/pending"
+            echo "   s                Start (mark in-progress)"
+            echo "   x                Stop in-progress"
+            echo "   X                Revert to pending"
+            echo ""
+            echo " Editing"
+            echo "   c                Create new todo"
+            echo "   e                Edit todo text"
+            echo "   p                Set priority"
+            echo ""
+            echo " Delete/Undo"
+            echo "   d                Delete todo (can undo)"
+            echo "   D                Delete all completed"
+            echo "   u                Undo last delete"
+            echo ""
+            echo " Lists"
+            echo "   l                Switch lists"
+            echo "   L                List manager (create/rename/delete)"
+            echo "   m                Move todo to another list"
+            echo ""
+            echo " ─────────────────────────────────────────"
+            echo " Press any key to return..."
+            read -n 1 -s
             ;;
     esac
 done

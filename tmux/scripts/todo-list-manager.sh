@@ -30,10 +30,11 @@ preview_list() {
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false)] | length' "$list_file" 2>/dev/null || echo 0)
         local in_progress=$(jq '[.todos[] | select(.in_progress == true)] | length' "$list_file" 2>/dev/null || echo 0)
-        echo "Total: $total | Pending: $pending | In Progress: $in_progress"
+        echo "Total: $total  Pending: $pending  In Progress: $in_progress"
         echo ""
-        echo "Recent items:"
-        jq -r '.todos | sort_by(.order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:40])"' "$list_file" 2>/dev/null
+        jq -r '.todos | sort_by(.order_index) | .[0:5] | .[] | .text | split("\n")[0][0:50]' "$list_file" 2>/dev/null | while read -r line; do
+            echo "• $line"
+        done
     fi
 }
 export -f preview_list
@@ -152,8 +153,13 @@ while true; do
     done)
 
     SELECTION=$(echo "$LIST_DISPLAY" | fzf --ansi \
-        --header="List Manager [n:New r:Rename d:Delete Enter:Switch q:Quit]
-Active: $CURRENT_LIST" \
+        --header="
+ List Manager - Active: $CURRENT_LIST
+─────────────────────────────────────────
+ n: New    r: Rename    d: Delete
+ ENTER: Switch to list
+─────────────────────────────────────────
+" \
         --prompt="List > " \
         --height=60% \
         --layout=reverse \
@@ -187,7 +193,6 @@ Active: $CURRENT_LIST" \
         "enter")
             if [[ -n "$SELECTED_LIST" && "$SELECTED_LIST" != "$CURRENT_LIST" ]]; then
                 set_active_list "$SELECTED_LIST"
-                tmux display-message "Switched to: $SELECTED_LIST"
                 break
             fi
             ;;
