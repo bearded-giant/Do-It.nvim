@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# Get the current in-progress todo from do-it.nvim daily list
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+# Get the current in-progress todo from active list
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
 CHAR_LIMIT=25  # Character limit for todo text display
 NERD_FONT_TASK=""  # Nerd font task icon
 NERD_FONT_CHECK=""  # Alternative check icon
@@ -13,7 +17,7 @@ if ! command -v jq &> /dev/null; then
     exit 0
 fi
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
     echo ""
     exit 0

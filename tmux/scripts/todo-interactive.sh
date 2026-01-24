@@ -1,7 +1,12 @@
 #!/bin/bash
 
 # Interactive todo manager for tmux using fzf
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
+ACTIVE_LIST_NAME="$(get_active_list_name)"
 
 # Check dependencies
 if ! command -v jq &> /dev/null; then
@@ -15,9 +20,9 @@ if ! command -v fzf &> /dev/null; then
     exit 1
 fi
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
-    echo "Error: Daily todo list not found at $TODO_LIST_PATH"
+    echo "Error: Todo list '$ACTIVE_LIST_NAME' not found at $TODO_LIST_PATH"
     exit 1
 fi
 
@@ -236,17 +241,17 @@ while true; do
     # Show todos and prompt for selection
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
 ╭────────────────────────────────────────────────────────╮
-│ Todo Manager - Daily List                              │
+│ Todo Manager - ${ACTIVE_LIST_NAME}$(printf '%*s' $((38 - ${#ACTIVE_LIST_NAME})) '')│
 ├────────────────────────────────────────────────────────┤
 │ ENTER: Toggle done       s: Start/In-progress          │
-│ c: Create new todo       x: Stop in-progress           │
-│ X: Revert to pending     p: Set priority               │
-│ K/C-Up: Move up          J/C-Down: Move down           │
-│ d: Delete    v: View full    r: Refresh    q: Quit     │
+│ c: Create new            e: Edit todo text             │
+│ x: Stop in-progress      X: Revert to pending          │
+│ p: Set priority          K/J: Move up/down             │
+│ d: Delete   D: Clear done   u: Undo   v: View   q: Quit│
 ╰────────────────────────────────────────────────────────╯
 " \
         --prompt="" \
-        --expect=enter,s,x,X,c,r,p,d,v,J,K,ctrl-up,ctrl-down,q \
+        --expect=enter,s,x,X,c,r,p,d,D,e,u,v,J,K,ctrl-up,ctrl-down,q \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -319,17 +324,93 @@ while true; do
                 # no sleep - immediately refresh to show new position
             fi
             ;;
+        "e")
+            # Edit todo text
+            if [[ -n "$TODO_ID" ]]; then
+                CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
+
+                # Create temp file with current text
+                TEMP_FILE=$(mktemp /tmp/todo_edit.XXXXXX)
+                echo "$CURRENT_TEXT" > "$TEMP_FILE"
+
+                # Open in editor
+                ${EDITOR:-nano} "$TEMP_FILE"
+
+                # Read edited text
+                NEW_TEXT=$(cat "$TEMP_FILE")
+                rm -f "$TEMP_FILE"
+
+                # Update if changed and not empty
+                if [[ "$NEW_TEXT" != "$CURRENT_TEXT" && -n "$NEW_TEXT" ]]; then
+                    jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
+                        .todos |= map(if .id == $id then .text = $text else . end) |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Updated todo"
+                    sleep 0.5
+                else
+                    echo "No changes made"
+                    sleep 0.5
+                fi
+            fi
+            ;;
         "d")
+            # Soft delete - move to deleted_todos for undo
             if [[ -n "$TODO_ID" ]]; then
                 TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
                 echo -n "Delete '$TODO_TEXT'? (y/N): "
                 read -n 1 -r CONFIRM
                 echo
                 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-                    update_todo "$TODO_ID" "delete"
-                    echo "Deleted."
+                    jq --arg id "$TODO_ID" '
+                        (.todos[] | select(.id == $id)) as $deleted |
+                        .todos |= map(select(.id != $id)) |
+                        ._metadata.deleted_todos = ([$deleted] + (._metadata.deleted_todos // []))[0:10] |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Deleted (press 'u' to undo)"
                     sleep 0.5
                 fi
+            fi
+            ;;
+        "D")
+            # Batch delete all completed todos
+            COMPLETED_COUNT=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH")
+            if [[ "$COMPLETED_COUNT" -gt 0 ]]; then
+                echo -n "Delete $COMPLETED_COUNT completed todos? (y/N): "
+                read -n 1 -r CONFIRM
+                echo
+                if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+                    jq '
+                        [.todos[] | select(.done == true)] as $deleted |
+                        .todos |= map(select(.done == false)) |
+                        ._metadata.deleted_todos = ($deleted + (._metadata.deleted_todos // []))[0:10] |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Deleted $COMPLETED_COUNT completed todos"
+                    sleep 0.5
+                fi
+            else
+                echo "No completed todos to delete"
+                sleep 0.5
+            fi
+            ;;
+        "u")
+            # Undo last delete
+            HAS_DELETED=$(jq -r '._metadata.deleted_todos[0].id // empty' "$TODO_LIST_PATH")
+            if [[ -n "$HAS_DELETED" ]]; then
+                RESTORED_TEXT=$(jq -r '._metadata.deleted_todos[0].text' "$TODO_LIST_PATH")
+                jq '
+                    ._metadata.deleted_todos[0] as $restore |
+                    .todos += [$restore] |
+                    ._metadata.deleted_todos = ._metadata.deleted_todos[1:] |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                echo "Restored: $RESTORED_TEXT"
+                sleep 0.5
+            else
+                echo "Nothing to undo"
+                sleep 0.5
             fi
             ;;
         "v")
@@ -418,10 +499,8 @@ while true; do
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
-                          timestamp: (now | floor),
-                          priorities: $priority,
-                          "_score": 10
-                       }] |
+                          created_at: (now | floor),
+                          priorities: $priority                       }] |
                        ._metadata.updated_at = (now | floor)' \
                        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
                 else
@@ -434,9 +513,7 @@ while true; do
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
-                          timestamp: (now | floor),
-                          "_score": 10
-                       }] |
+                          created_at: (now | floor)                       }] |
                        ._metadata.updated_at = (now | floor)' \
                        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
                 fi

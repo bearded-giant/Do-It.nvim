@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# Create a new todo item for the daily list
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+# Create a new todo item
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
+ACTIVE_LIST_NAME="$(get_active_list_name)"
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -47,10 +52,9 @@ select_priority() {
     fi
 }
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
-    echo "Error: Daily todo list not found at $TODO_LIST_PATH"
-    echo "Please create a 'daily' list in Do-It.nvim first"
+    echo "Error: Todo list '$ACTIVE_LIST_NAME' not found at $TODO_LIST_PATH"
     exit 1
 fi
 
@@ -66,7 +70,7 @@ TEMP_FILE=$(mktemp /tmp/todo_create.XXXXXX)
 # Display header
 clear
 echo -e "${BLUE}${BOLD}╭─────────────────────────────────────────────╮${RESET}"
-echo -e "${BLUE}${BOLD}│         Create New Todo - Daily List        │${RESET}"
+echo -e "${BLUE}${BOLD}│     Create New Todo - ${ACTIVE_LIST_NAME}$(printf '%*s' $((22 - ${#ACTIVE_LIST_NAME})) '')│${RESET}"
 echo -e "${BLUE}${BOLD}╰─────────────────────────────────────────────╯${RESET}"
 echo ""
 echo -e "${BOLD}Instructions:${RESET}"
@@ -152,9 +156,8 @@ if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
-          timestamp: (now | floor),
-          priorities: $priority,
-          "_score": 10
+          created_at: (now | floor),
+          priorities: $priority
        }] |
        ._metadata.updated_at = (now | floor)' \
        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
@@ -168,8 +171,7 @@ else
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
-          timestamp: (now | floor),
-          "_score": 10
+          created_at: (now | floor)
        }] |
        ._metadata.updated_at = (now | floor)' \
        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
@@ -189,7 +191,7 @@ if [[ $? -eq 0 ]]; then
     TOTAL=$(jq '.todos | length' "$TODO_LIST_PATH")
     PENDING=$(jq '[.todos[] | select(.done == false)] | length' "$TODO_LIST_PATH")
     echo ""
-    echo -e "${BOLD}Daily list now has:${RESET} $TOTAL todos ($PENDING pending)"
+    echo -e "${BOLD}${ACTIVE_LIST_NAME} list now has:${RESET} $TOTAL todos ($PENDING pending)"
 
     # Option to immediately mark as in-progress
     echo ""

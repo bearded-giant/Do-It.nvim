@@ -4,7 +4,10 @@
 # Outputs: icon + truncated todo text
 # Use in tmux status bar: #(path/to/todo-status.sh)
 
-TODO_LIST_PATH="${DOIT_TODO_LIST:-$HOME/.local/share/nvim/doit/lists/daily.json}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
 CHAR_LIMIT="${DOIT_CHAR_LIMIT:-25}"
 
 # Icons (nerd font)

@@ -1,7 +1,12 @@
 #!/bin/bash
 
 # Simple todo list viewer/manager for tmux popup
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
+ACTIVE_LIST_NAME="$(get_active_list_name)"
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -9,10 +14,9 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
-    echo "Error: Daily todo list not found"
-    echo "Please create a 'daily' list in Do-It.nvim first"
+    echo "Error: Todo list '$ACTIVE_LIST_NAME' not found"
     exit 1
 fi
 
@@ -26,7 +30,7 @@ RESET='\033[0m'
 
 # Display header
 echo -e "${BLUE}${BOLD}╭─────────────────────────────────────────────╮${RESET}"
-echo -e "${BLUE}${BOLD}│         Do-It Daily Todo List               │${RESET}"
+echo -e "${BLUE}${BOLD}│         Do-It: ${ACTIVE_LIST_NAME}$(printf '%*s' $((27 - ${#ACTIVE_LIST_NAME})) '')│${RESET}"
 echo -e "${BLUE}${BOLD}╰─────────────────────────────────────────────╯${RESET}"
 echo ""
 
