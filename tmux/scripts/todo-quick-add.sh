@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Quick add todo with inline multi-line support
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -9,9 +13,9 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
-    tmux display-message "Error: Daily todo list not found"
+    tmux display-message "Error: Todo list not found"
     exit 1
 fi
 
@@ -51,8 +55,7 @@ if [[ "$1" == "--process" ]]; then
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
-          timestamp: (now | floor),
-          "_score": 10
+          created_at: (now | floor)
        }] |
        ._metadata.updated_at = (now | floor)' \
        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"

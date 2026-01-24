@@ -10,6 +10,12 @@ SCRIPTS_DIR="$CURRENT_DIR/scripts"
 tmux set-environment -g DOIT_TMUX_DIR "$CURRENT_DIR"
 tmux set-environment -g DOIT_SCRIPTS_DIR "$SCRIPTS_DIR"
 
+# Set active list from session.json
+if command -v jq &> /dev/null && [[ -f "$HOME/.local/share/nvim/doit/session.json" ]]; then
+    ACTIVE_LIST=$(jq -r '.active_list // "daily"' "$HOME/.local/share/nvim/doit/session.json")
+    tmux set-environment -g DOIT_ACTIVE_LIST "$ACTIVE_LIST"
+fi
+
 # Default keybinding prefix (can be overridden with @doit-key)
 default_key="d"
 doit_key=$(tmux show-option -gqv "@doit-key")
@@ -33,6 +39,12 @@ tmux bind-key -T doit-menu n run-shell "$SCRIPTS_DIR/todo-next.sh"
 # Create new todo (prefix + d + c)
 tmux bind-key -T doit-menu c display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
 
+# Switch todo list (prefix + d + l)
+tmux bind-key -T doit-menu l display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
+
+# List manager - create/rename/delete (prefix + d + L)
+tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-list-manager.sh"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")
@@ -41,4 +53,5 @@ if [[ "$alt_bindings" != "off" ]]; then
     tmux bind-key -n M-I display-popup -E -w 120 -h 45 "$SCRIPTS_DIR/todo-interactive.sh"
     tmux bind-key -n M-X run-shell "$SCRIPTS_DIR/todo-toggle.sh"
     tmux bind-key -n M-N run-shell "$SCRIPTS_DIR/todo-next.sh"
+    tmux bind-key -n M-L display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
 fi

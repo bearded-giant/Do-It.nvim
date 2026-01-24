@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Mark the next undone todo as in-progress
-TODO_LIST_PATH="$HOME/.local/share/nvim/doit/lists/daily.json"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/get-active-list.sh"
+
+TODO_LIST_PATH="$(get_active_list_path)"
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -9,9 +13,9 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Check if the daily list file exists
+# Check if the list file exists
 if [[ ! -f "$TODO_LIST_PATH" ]]; then
-    echo "Error: Daily todo list not found at $TODO_LIST_PATH"
+    tmux display-message "Error: Todo list not found"
     exit 1
 fi
 
