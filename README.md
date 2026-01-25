@@ -19,7 +19,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Time Estimation** - Track estimated completion time
 - **Import/Export** - Backup or share your tasks
 - **Lualine Integration** - Show active tasks in your statusline
-- **Tmux Integration** - Manage todos from tmux with status bar and fzf
+- **Tmux Add-on** - Optional tmux integration with shared data (see below)
 
 ## Quick Start
 
@@ -291,9 +291,11 @@ Available components:
 - `todo_stats` - Shows todo statistics: `✓3 ◐1 ○2` (done/in-progress/pending)
 - `active_todo` - Shows the current in-progress todo (if any)
 
-## Tmux Integration
+## Tmux Integration (Optional Add-on)
 
-Do-It.nvim includes a tmux plugin for managing todos directly from tmux, with status bar integration and an interactive fzf-based manager.
+> **Note**: The tmux integration is a separate, optional add-on that shares data with the Neovim plugin. You can use doit.nvim without tmux, or use both together for a seamless experience across your terminal workflow.
+
+The tmux add-on provides todo management directly from tmux, with status bar integration and an interactive fzf-based manager. Changes sync automatically between Neovim and tmux.
 
 ### Prerequisites
 
@@ -341,8 +343,13 @@ Then install with `prefix + I`.
 | `x`     | Stop in-progress      |
 | `X`     | Revert to pending     |
 | `c`     | Create new todo       |
-| `r`     | Refresh               |
-| `q/ESC` | Quit                  |
+| `e`     | Edit todo text        |
+| `d`     | Delete (can undo)     |
+| `u`     | Undo last delete      |
+| `?`     | Show help             |
+| `q`     | Quit                  |
+
+In create/edit mode: type text, Enter twice to save, Esc to cancel.
 
 ### Configuration
 

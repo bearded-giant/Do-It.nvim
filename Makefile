@@ -33,9 +33,9 @@ check-docs:
 	@echo ""
 	@echo "Checking for invalid tag references..."
 	@invalid_count=0; \
-	for tag in $$(grep -o '\*[^*]*\*' doc/*.txt | sort | uniq); do \
+	for tag in $$(grep -oh '\*[^*]*\*' doc/*.txt | sort | uniq); do \
 		ref=$${tag//\*/|}; \
-		if ! grep -q "$$ref" doc/*.txt && [ "$$tag" != "*doit*" ] && [ "$$tag" != "*doit.txt*" ] && [ "$$tag" != "*doit_framework.txt*" ] && [ "$$tag" != "*doit_linking.txt*" ]; then \
+		if ! grep -q "$$ref" doc/*.txt && [ "$$tag" != "*doit*" ] && [ "$$tag" != "*doit.txt*" ] && [ "$$tag" != "*doit_framework.txt*" ] && [ "$$tag" != "*doit_linking.txt*" ] && [ "$$tag" != "*doit_calendar.txt*" ] && [ "$$tag" != "*doit_tmux.txt*" ]; then \
 			echo "Warning: Tag $$tag has no corresponding reference ($$ref)"; \
 			invalid_count=$$((invalid_count + 1)); \
 		fi; \
