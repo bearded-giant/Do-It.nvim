@@ -141,6 +141,7 @@ delete_list() {
 
 # main loop
 while true; do
+    clear
     CURRENT_LIST=$(get_active_list_name)
 
     # format list with active indicator
