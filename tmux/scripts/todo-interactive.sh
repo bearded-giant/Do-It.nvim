@@ -119,6 +119,50 @@ select_priority() {
         --no-sort
 }
 
+# Multi-line input with Esc to cancel
+# Usage: result=$(multiline_input); status=$?
+# Returns: text on success, empty on cancel (exit code 130 = cancelled)
+multiline_input() {
+    local lines=""
+    local empty_count=0
+    local char
+
+    while true; do
+        IFS= read -rsn1 char
+
+        # Esc (ASCII 27) = cancel
+        if [[ "$char" == $'\e' ]]; then
+            read -rsn2 -t 0.1 _ 2>/dev/null
+            echo ""
+            return 130
+        fi
+
+        # Enter = empty char from read -n1
+        if [[ -z "$char" ]]; then
+            empty_count=$((empty_count + 1))
+            if [[ $empty_count -ge 2 ]]; then
+                break
+            fi
+            echo ""
+            if [[ -n "$lines" ]]; then
+                lines="${lines}"$'\n'
+            fi
+        else
+            empty_count=0
+            printf '%s' "$char"
+            if [[ -z "$lines" ]]; then
+                lines="$char"
+            else
+                lines="${lines}${char}"
+            fi
+        fi
+    done
+
+    lines="${lines%$'\n'}"
+    echo "$lines"
+    return 0
+}
+
 # Function to update todo status
 update_todo() {
     local todo_id="$1"
@@ -332,27 +376,33 @@ while true; do
             if [[ -n "$TODO_ID" ]]; then
                 CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
 
-                # Create temp file with current text
-                TEMP_FILE=$(mktemp /tmp/todo_edit.XXXXXX)
-                echo "$CURRENT_TEXT" > "$TEMP_FILE"
+                echo ""
+                echo "═══════════════════════════════════════════════"
+                echo "Edit Todo (Enter twice = save, Esc = cancel)"
+                echo "═══════════════════════════════════════════════"
+                echo ""
+                echo "Current: $CURRENT_TEXT"
+                echo ""
+                echo "New text:"
 
-                # Open in editor
-                ${EDITOR:-nano} "$TEMP_FILE"
+                NEW_TEXT=$(multiline_input)
+                INPUT_STATUS=$?
 
-                # Read edited text
-                NEW_TEXT=$(cat "$TEMP_FILE")
-                rm -f "$TEMP_FILE"
-
-                # Update if changed and not empty
-                if [[ "$NEW_TEXT" != "$CURRENT_TEXT" && -n "$NEW_TEXT" ]]; then
+                if [[ $INPUT_STATUS -eq 130 ]]; then
+                    echo "Cancelled"
+                    sleep 0.5
+                elif [[ -z "$NEW_TEXT" ]]; then
+                    echo "Keeping original"
+                    sleep 0.5
+                elif [[ "$NEW_TEXT" != "$CURRENT_TEXT" ]]; then
                     jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
                         .todos |= map(if .id == $id then .text = $text else . end) |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                    echo "Updated todo"
+                    echo "Updated"
                     sleep 0.5
                 else
-                    echo "No changes made"
+                    echo "No changes"
                     sleep 0.5
                 fi
             fi
@@ -500,42 +550,17 @@ while true; do
             # Create new todo with multi-line support
             echo ""
             echo "═══════════════════════════════════════════════"
-            echo "Create New Todo (press Enter twice when done)"
-            echo "Multi-line supported - newlines are preserved"
+            echo "Create New Todo (Enter twice = save, Esc = cancel)"
             echo "═══════════════════════════════════════════════"
             echo ""
 
-            # Collect multi-line input preserving newlines
-            TODO_LINES=""
-            EMPTY_COUNT=0
+            TODO_TEXT=$(multiline_input)
+            INPUT_STATUS=$?
 
-            while true; do
-                read -r line
-
-                # Check for double enter (two empty lines to finish)
-                if [[ -z "$line" ]]; then
-                    EMPTY_COUNT=$((EMPTY_COUNT + 1))
-                    if [[ $EMPTY_COUNT -ge 2 ]]; then
-                        break
-                    fi
-                    # Preserve empty line as newline
-                    if [[ -n "$TODO_LINES" ]]; then
-                        TODO_LINES="${TODO_LINES}"$'\n'
-                    fi
-                else
-                    EMPTY_COUNT=0
-                    if [[ -z "$TODO_LINES" ]]; then
-                        TODO_LINES="$line"
-                    else
-                        TODO_LINES="${TODO_LINES}"$'\n'"${line}"
-                    fi
-                fi
-            done
-
-            # Remove trailing blank line from double-enter detection
-            TODO_TEXT="${TODO_LINES%$'\n'}"
-
-            if [[ -n "$TODO_TEXT" ]]; then
+            if [[ $INPUT_STATUS -eq 130 ]]; then
+                echo "Cancelled"
+                sleep 0.5
+            elif [[ -n "$TODO_TEXT" ]]; then
                 # Select priority
                 echo ""
                 SELECTED_PRIORITY=$(select_priority "default" "Select Priority (Enter for default)")
@@ -611,8 +636,8 @@ while true; do
                 fi
                 sleep 2
             else
-                echo "No text entered, cancelled"
-                sleep 1
+                echo "No text entered"
+                sleep 0.5
             fi
             ;;
         "r")
@@ -640,6 +665,7 @@ while true; do
             echo "   c                Create new todo"
             echo "   e                Edit todo text"
             echo "   p                Set priority"
+            echo "   (In create/edit: Enter twice = save, Esc = cancel)"
             echo ""
             echo " Delete/Undo"
             echo "   d                Delete todo (can undo)"

@@ -18,8 +18,10 @@ Table of Contents                                          *doit-contents*
   - Todo Lists                                                  |doit-lists|
   - Import/Export                                             |doit-import|
   - Project Notes                                              |doit-notes|
+  - Tmux Integration                                       |doit-tmux-intro|
 3. Colors                                                      |doit-colors|
-4. Roadmap                                                    |doit-roadmap|
+4. Roadmap                                                    |doit-roadmap|}
+
 
 ==============================================================================
 1. doit                                                        *doit-intro*
@@ -498,6 +500,30 @@ The notes are automatically saved when:
 - The notes window is closed
 - You switch between global and project modes
 - You navigate away from the buffer
+
+TMUX INTEGRATION                                           *doit-tmux*
+
+Do-It.nvim includes full tmux integration, allowing you to manage todos
+from within tmux without opening Neovim. Both interfaces share the same
+data, so changes sync automatically.
+
+Features:
+- Full CRUD operations via fzf-based interactive manager
+- Quick actions (toggle, start next) without leaving your workflow
+- Status bar integration showing current todo
+- Multiple list support with shared session state
+
+Quick Start:~
+Add to ~/.tmux.conf with TPM: >tmux
+    set -g @plugin 'bearded-giant/do-it.nvim'
+<
+
+Key bindings use prefix + d as the menu key:
+    prefix + d + i     Interactive manager (full features)
+    prefix + d + t     Quick popup viewer
+    prefix + d + x     Toggle current todo
+
+For complete tmux documentation, see |doit_tmux.txt|
 
 ==============================================================================
 4. Roadmap                                                    *doit-roadmap*

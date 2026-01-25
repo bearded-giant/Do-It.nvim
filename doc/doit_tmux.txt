@@ -1,0 +1,207 @@
+*doit_tmux.txt*  Tmux integration for do-it.nvim
+
+==============================================================================
+CONTENTS                                                *doit-tmux-contents*
+
+  1. Introduction .......................... |doit-tmux-intro|
+  2. Requirements .......................... |doit-tmux-requirements|
+  3. Installation .......................... |doit-tmux-installation|
+  4. Keybindings ........................... |doit-tmux-keybindings|
+  5. Interactive Manager ................... |doit-tmux-interactive|
+  6. Status Bar ............................ |doit-tmux-status|
+  7. Shared Storage ........................ |doit-tmux-storage|
+  8. Configuration ......................... |doit-tmux-configuration|
+
+==============================================================================
+INTRODUCTION                                               *doit-tmux-intro*
+
+The DoIt tmux integration provides full todo management from within tmux,
+sharing the same data as the Neovim plugin. This allows you to manage your
+todos without opening Neovim while keeping both interfaces in sync.
+
+Key features:
+- Full CRUD operations (create, read, update, delete)
+- Interactive fzf-based manager
+- Multiple list support with switching
+- Undo support for accidental deletes
+- Status bar integration
+- Shared storage with Neovim (session.json)
+
+For the Neovim plugin documentation, see |doit.txt|
+
+==============================================================================
+REQUIREMENTS                                        *doit-tmux-requirements*
+
+Required:
+- tmux (tested with 3.0+)
+- fzf (for interactive features)
+- jq (for JSON processing)
+
+Optional:
+- TPM (Tmux Plugin Manager) for automatic installation
+
+==============================================================================
+INSTALLATION                                        *doit-tmux-installation*
+
+Using TPM (recommended):~
+
+Add to your ~/.tmux.conf: >tmux
+    set -g @plugin 'bearded-giant/do-it.nvim'
+<
+Then press `prefix + I` to install.
+
+Manual Installation:~
+
+Clone the repository and source the plugin: >tmux
+    run-shell /path/to/do-it.nvim/tmux/doit.tmux
+<
+
+After installation, reload tmux config: >bash
+    tmux source ~/.tmux.conf
+<
+
+==============================================================================
+KEYBINDINGS                                          *doit-tmux-keybindings*
+
+All keybindings use a two-key sequence starting with `prefix + d`.
+
+Popup Views~
+    prefix + d + t     Quick popup viewer (read-only)
+    prefix + d + i     Interactive manager (full CRUD)
+
+Quick Actions~
+    prefix + d + x     Toggle current todo done/undone
+    prefix + d + n     Start next pending todo
+    prefix + d + c     Create new todo (standalone popup)
+
+List Management~
+    prefix + d + l     Switch between lists
+    prefix + d + L     List manager (create/rename/delete lists)
+
+Alt+Shift Shortcuts (no prefix)~
+    Alt+Shift+T        Quick popup viewer
+    Alt+Shift+I        Interactive manager
+    Alt+Shift+X        Toggle current todo
+    Alt+Shift+N        Start next pending
+    Alt+Shift+L        Switch lists
+
+Disable alt bindings in tmux.conf: >tmux
+    set -g @doit-alt-bindings off
+<
+
+==============================================================================
+INTERACTIVE MANAGER                                  *doit-tmux-interactive*
+
+The interactive manager (prefix + d + i) provides full todo management
+with fzf. Press `?` within the manager to see all keybindings.
+
+Navigation~
+    j/k or arrows      Move up/down in list
+    K/J                Reorder todo (move up/down)
+
+Status Changes~
+    Enter              Toggle done/pending
+    s                  Start (mark in-progress)
+    x                  Stop in-progress
+    X                  Revert to pending
+
+Editing~
+    c                  Create new todo
+    e                  Edit todo text
+    p                  Set priority
+
+    In create/edit mode:
+    - Type text, Enter for newlines
+    - Enter twice to save
+    - Esc to cancel
+
+Delete/Undo~
+    d                  Delete todo (can undo)
+    D                  Delete all completed
+    u                  Undo last delete
+
+Lists~
+    l                  Switch lists
+    L                  List manager (create/rename/delete)
+    m                  Move todo to another list
+
+Other~
+    v                  View full todo details
+    r                  Refresh list
+    ?                  Show help
+    q                  Quit
+
+==============================================================================
+STATUS BAR                                              *doit-tmux-status*
+
+Add the current todo to your tmux status bar.
+
+In your tmux.conf: >tmux
+    set -g status-right '#($DOIT_TMUX_DIR/status/todo.sh)'
+<
+
+Or with custom formatting: >tmux
+    set -g status-right '#{?#{!=:#($DOIT_TMUX_DIR/status/todo.sh),},#[fg=yellow] #($DOIT_TMUX_DIR/status/todo.sh),}'
+<
+
+The status shows the currently in-progress todo text (truncated).
+
+==============================================================================
+SHARED STORAGE                                          *doit-tmux-storage*
+
+Tmux and Neovim share the same todo data through two mechanisms:
+
+Todo Lists:~
+    Location: ~/.local/share/nvim/doit/lists/*.json
+    Each list (daily.json, work.json, etc.) contains todos for that list.
+
+Session State:~
+    Location: ~/.local/share/nvim/doit/session.json
+    Tracks which list is currently active.
+
+When you switch lists in tmux, Neovim sees the change on next refresh.
+When you switch lists in Neovim, tmux picks it up immediately.
+
+JSON Schema:~
+>json
+    {
+      "todos": [
+        {
+          "id": "1234567890_1234567",
+          "text": "Todo text here",
+          "done": false,
+          "in_progress": true,
+          "order_index": 1,
+          "created_at": 1234567890,
+          "priorities": "urgent"
+        }
+      ],
+      "_metadata": {
+        "updated_at": 1234567890,
+        "deleted_todos": []
+      }
+    }
+<
+
+==============================================================================
+CONFIGURATION                                      *doit-tmux-configuration*
+
+Tmux Options:~
+
+Change the menu key (default: d): >tmux
+    set -g @doit-key "t"
+<
+
+Disable alt+shift shortcuts: >tmux
+    set -g @doit-alt-bindings off
+<
+
+Environment Variables:~
+
+The plugin sets these environment variables automatically:
+- DOIT_TMUX_DIR: Path to tmux plugin directory
+- DOIT_SCRIPTS_DIR: Path to scripts directory
+- DOIT_ACTIVE_LIST: Currently active list name
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
