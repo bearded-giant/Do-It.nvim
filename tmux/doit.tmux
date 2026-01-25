@@ -33,11 +33,11 @@ tmux bind-key -T doit-menu i display-popup -E -w 120 -h 45 "$SCRIPTS_DIR/todo-in
 # Toggle current todo done/undone (prefix + d + x)
 tmux bind-key -T doit-menu x run-shell "$SCRIPTS_DIR/todo-toggle.sh"
 
-# Start next pending todo (prefix + d + n)
-tmux bind-key -T doit-menu n run-shell "$SCRIPTS_DIR/todo-next.sh"
+# New todo (prefix + d + n)
+tmux bind-key -T doit-menu n display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
 
-# Create new todo (prefix + d + c)
-tmux bind-key -T doit-menu c display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
+# Start next pending todo (prefix + d + N)
+tmux bind-key -T doit-menu N run-shell "$SCRIPTS_DIR/todo-next.sh"
 
 # Switch todo list (prefix + d + l)
 tmux bind-key -T doit-menu l display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
@@ -56,6 +56,6 @@ if [[ "$alt_bindings" != "off" ]]; then
     tmux bind-key -n M-T display-popup -E -w 75 -h 38 "$SCRIPTS_DIR/todo-popup.sh"
     tmux bind-key -n M-I display-popup -E -w 120 -h 45 "$SCRIPTS_DIR/todo-interactive.sh"
     tmux bind-key -n M-X run-shell "$SCRIPTS_DIR/todo-toggle.sh"
-    tmux bind-key -n M-N run-shell "$SCRIPTS_DIR/todo-next.sh"
+    tmux bind-key -n M-N display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
     tmux bind-key -n M-L display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
 fi

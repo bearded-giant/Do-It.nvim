@@ -322,8 +322,8 @@ Then install with `prefix + I`.
 | `t` | Quick todo popup          |
 | `i` | Interactive manager (fzf) |
 | `x` | Toggle current todo done  |
-| `n` | Start next pending todo   |
-| `c` | Create new todo           |
+| `n` | New todo                  |
+| `N` | Start next pending todo   |
 
 **Direct shortcuts (Alt+Shift):**
 
@@ -332,7 +332,7 @@ Then install with `prefix + I`.
 | `Alt+Shift+T` | Quick todo popup    |
 | `Alt+Shift+I` | Interactive manager |
 | `Alt+Shift+X` | Toggle todo done    |
-| `Alt+Shift+N` | Start next todo     |
+| `Alt+Shift+N` | New todo            |
 
 **In interactive manager:**
 
@@ -342,7 +342,7 @@ Then install with `prefix + I`.
 | `s`     | Start/In-progress     |
 | `x`     | Stop in-progress      |
 | `X`     | Revert to pending     |
-| `c`     | Create new todo       |
+| `n`     | New todo              |
 | `e`     | Edit todo text        |
 | `d`     | Delete (can undo)     |
 | `u`     | Undo last delete      |

@@ -284,13 +284,13 @@ while true; do
  Todo Manager - ${ACTIVE_LIST_NAME}
 ───────────────────────────────────────────────────
  ENTER: Toggle    s: Start    x: Stop    X: Revert
- c: Create    e: Edit    p: Priority    K/J: Reorder
+ n: New    e: Edit    p: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,c,r,p,d,D,e,u,l,L,m,J,K,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -533,8 +533,8 @@ while true; do
                 read -n 1 -s
             fi
             ;;
-        "c")
-            # Create new todo
+        "n")
+            # New todo
             echo ""
             echo " New Todo (Enter=save, Esc=cancel)"
             echo ""
@@ -647,10 +647,10 @@ while true; do
             echo "   X                Revert to pending"
             echo ""
             echo " Editing"
-            echo "   c                Create new todo"
+            echo "   n                New todo"
             echo "   e                Edit todo text"
             echo "   p                Set priority"
-            echo "   (In create/edit: Enter twice = save, Esc = cancel)"
+            echo "   (In new/edit: Enter = save, Esc = cancel)"
             echo ""
             echo " Delete/Undo"
             echo "   d                Delete todo (can undo)"

@@ -72,8 +72,8 @@ Popup Views~
 
 Quick Actions~
     prefix + d + x     Toggle current todo done/undone
-    prefix + d + n     Start next pending todo
-    prefix + d + c     Create new todo (standalone popup)
+    prefix + d + n     New todo (standalone popup)
+    prefix + d + N     Start next pending todo
 
 List Management~
     prefix + d + l     Switch between lists
@@ -83,7 +83,7 @@ Alt+Shift Shortcuts (no prefix)~
     Alt+Shift+T        Quick popup viewer
     Alt+Shift+I        Interactive manager
     Alt+Shift+X        Toggle current todo
-    Alt+Shift+N        Start next pending
+    Alt+Shift+N        New todo
     Alt+Shift+L        Switch lists
 
 Disable alt bindings in tmux.conf: >tmux
@@ -107,14 +107,11 @@ Status Changes~
     X                  Revert to pending
 
 Editing~
-    c                  Create new todo
+    n                  New todo
     e                  Edit todo text
     p                  Set priority
 
-    In create/edit mode:
-    - Type text, Enter for newlines
-    - Enter twice to save
-    - Esc to cancel
+    In new/edit mode: Enter to save, Esc to cancel
 
 Delete/Undo~
     d                  Delete todo (can undo)
