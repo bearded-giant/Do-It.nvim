@@ -125,7 +125,7 @@ USE_EDITOR=$(tmux show-option -gqv "@doit-use-editor")
 
 # Edit/create text input
 # Usage: result=$(input_text "prefill"); status=$?
-# Returns: text on success, exit 130 on cancel (Ctrl+C or editor exit without save)
+# Returns: text on success, exit 130 on cancel (Esc)
 input_text() {
     local prefill="$1"
     local result=""
@@ -140,14 +140,15 @@ input_text() {
         echo "$result"
         return 0
     else
-        # Inline mode: readline with prefill, Ctrl+C to cancel
-        trap 'return 130' INT
-        if [[ -n "$prefill" ]]; then
-            read -e -i "$prefill" -r result
-        else
-            read -e -r result
-        fi
-        trap - INT
+        # Inline mode: fzf with prefilled query, Esc to cancel
+        result=$(echo "" | fzf --print-query --query="$prefill" \
+            --height=3 \
+            --layout=reverse \
+            --no-info \
+            --bind 'enter:accept' \
+            --bind 'esc:abort' | head -1)
+        local status=$?
+        [[ $status -eq 130 ]] && return 130
         echo "$result"
         return 0
     fi
@@ -368,7 +369,7 @@ while true; do
                 CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
 
                 echo ""
-                echo " Edit (Enter=save, Ctrl+C=cancel)"
+                echo " Edit (Enter=save, Esc=cancel)"
                 echo ""
 
                 NEW_TEXT=$(input_text "$CURRENT_TEXT")
@@ -535,7 +536,7 @@ while true; do
         "c")
             # Create new todo
             echo ""
-            echo " New Todo (Enter=save, Ctrl+C=cancel)"
+            echo " New Todo (Enter=save, Esc=cancel)"
             echo ""
 
             TODO_TEXT=$(input_text "")
