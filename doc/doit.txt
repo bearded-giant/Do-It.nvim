@@ -501,11 +501,12 @@ The notes are automatically saved when:
 - You switch between global and project modes
 - You navigate away from the buffer
 
-TMUX INTEGRATION                                           *doit-tmux*
+TMUX INTEGRATION (OPTIONAL ADD-ON)                         *doit-tmux*
 
-Do-It.nvim includes full tmux integration, allowing you to manage todos
-from within tmux without opening Neovim. Both interfaces share the same
-data, so changes sync automatically.
+An optional tmux add-on is included, allowing you to manage todos from
+within tmux without opening Neovim. Both interfaces share the same data,
+so changes sync automatically. The tmux integration is separate from the
+core Neovim plugin and requires additional setup.
 
 Features:
 - Full CRUD operations via fzf-based interactive manager
@@ -523,7 +524,7 @@ Key bindings use prefix + d as the menu key:
     prefix + d + t     Quick popup viewer
     prefix + d + x     Toggle current todo
 
-For complete tmux documentation, see |doit_tmux.txt|
+For complete tmux documentation, see |doit_tmux.txt| (|doit-tmux-contents|)
 
 ==============================================================================
 4. Roadmap                                                    *doit-roadmap*

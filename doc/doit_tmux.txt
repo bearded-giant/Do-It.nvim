@@ -3,14 +3,14 @@
 ==============================================================================
 CONTENTS                                                *doit-tmux-contents*
 
-  1. Introduction .......................... |doit-tmux-intro|
-  2. Requirements .......................... |doit-tmux-requirements|
-  3. Installation .......................... |doit-tmux-installation|
-  4. Keybindings ........................... |doit-tmux-keybindings|
-  5. Interactive Manager ................... |doit-tmux-interactive|
-  6. Status Bar ............................ |doit-tmux-status|
-  7. Shared Storage ........................ |doit-tmux-storage|
-  8. Configuration ......................... |doit-tmux-configuration|
+  1. Introduction ...................................... |doit-tmux-intro|
+  2. Requirements .................................. |doit-tmux-requirements|
+  3. Installation .................................. |doit-tmux-installation|
+  4. Keybindings ................................... |doit-tmux-keybindings|
+  5. Interactive Manager ......................... |doit-tmux-interactive|
+  6. Status Bar ........................................ |doit-tmux-status|
+  7. Shared Storage ................................... |doit-tmux-storage|
+  8. Configuration .............................. |doit-tmux-configuration|
 
 ==============================================================================
 INTRODUCTION                                               *doit-tmux-intro*
@@ -27,7 +27,8 @@ Key features:
 - Status bar integration
 - Shared storage with Neovim (session.json)
 
-For the Neovim plugin documentation, see |doit.txt|
+This is an optional add-on to the core do-it.nvim plugin. For Neovim
+plugin documentation, see |doit.txt| (tmux overview: |doit-tmux|)
 
 ==============================================================================
 REQUIREMENTS                                        *doit-tmux-requirements*
