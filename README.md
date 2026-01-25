@@ -37,7 +37,7 @@ return {
 ### Basic Usage
 
 1. **Open todos**: `:Doit` or `<leader>td`
-2. **Add a todo**: Press `i` in the todo window
+2. **Add a todo**: Press `n` in the todo window
 3. **Toggle status**: Press `x` on a todo
 4. **Open notes**: `:DoItNotes` or `<leader>dn`
 
@@ -133,7 +133,7 @@ _Calendar (macOS only):_
 
 **Basic Keys (in todo window):**
 
-- `i` - Add new todo
+- `n` - Add new todo
 - `x` - Toggle status
 - `d` - Delete todo
 - `?` - Show full help

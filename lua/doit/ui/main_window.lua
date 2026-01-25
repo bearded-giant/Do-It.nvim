@@ -754,7 +754,7 @@ local function create_window()
 	local function setup_keymap(key_option, fn)
 		-- Default keymaps
 		local default_keymaps = {
-			new_todo = "i",
+			new_todo = "n",
 			toggle_todo = "x",
 			revert_to_pending = "X",
 			delete_todo = "d",

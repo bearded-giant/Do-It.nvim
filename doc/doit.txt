@@ -222,7 +222,7 @@ USAGE                                                          *doit-usage*
 
 Basic Operations:
 1. Open the to-do window with `:Doit`
-2. Add new to-dos with `i`
+2. Add new to-dos with `n`
 3. Toggle completion with `x`
 4. Delete to-dos with `d`
 5. Add due dates with `H`
@@ -266,7 +266,7 @@ Main Window~
     <leader>td   Toggle to-do window
     <leader>dl   Toggle active to-dos list window
     <leader>dn   Toggle project notes window
-    i           Add new to-do
+    n           Add new to-do
     x           Toggle to-do status
     d           Delete current to-do
     D           Delete all completed
