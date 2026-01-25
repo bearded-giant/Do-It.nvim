@@ -119,48 +119,38 @@ select_priority() {
         --no-sort
 }
 
-# Multi-line input with Esc to cancel
-# Usage: result=$(multiline_input); status=$?
-# Returns: text on success, empty on cancel (exit code 130 = cancelled)
-multiline_input() {
-    local lines=""
-    local empty_count=0
-    local char
+# Check for editor config: @doit-use-editor (true/false)
+USE_EDITOR=$(tmux show-option -gqv "@doit-use-editor")
+[[ "$USE_EDITOR" == "true" ]] && USE_EDITOR=true || USE_EDITOR=false
 
-    while true; do
-        IFS= read -rsn1 char
+# Edit/create text input
+# Usage: result=$(input_text "prefill"); status=$?
+# Returns: text on success, exit 130 on cancel (Ctrl+C or editor exit without save)
+input_text() {
+    local prefill="$1"
+    local result=""
 
-        # Esc (ASCII 27) = cancel
-        if [[ "$char" == $'\e' ]]; then
-            read -rsn2 -t 0.1 _ 2>/dev/null
-            echo ""
-            return 130
-        fi
-
-        # Enter = empty char from read -n1
-        if [[ -z "$char" ]]; then
-            empty_count=$((empty_count + 1))
-            if [[ $empty_count -ge 2 ]]; then
-                break
-            fi
-            echo ""
-            if [[ -n "$lines" ]]; then
-                lines="${lines}"$'\n'
-            fi
+    if [[ "$USE_EDITOR" == true ]]; then
+        # Editor mode: use $EDITOR with temp file
+        local temp_file=$(mktemp /tmp/todo_edit.XXXXXX)
+        [[ -n "$prefill" ]] && echo "$prefill" > "$temp_file"
+        ${EDITOR:-nvim} "$temp_file"
+        result=$(cat "$temp_file")
+        rm -f "$temp_file"
+        echo "$result"
+        return 0
+    else
+        # Inline mode: readline with prefill, Ctrl+C to cancel
+        trap 'return 130' INT
+        if [[ -n "$prefill" ]]; then
+            read -e -i "$prefill" -r result
         else
-            empty_count=0
-            printf '%s' "$char"
-            if [[ -z "$lines" ]]; then
-                lines="$char"
-            else
-                lines="${lines}${char}"
-            fi
+            read -e -r result
         fi
-    done
-
-    lines="${lines%$'\n'}"
-    echo "$lines"
-    return 0
+        trap - INT
+        echo "$result"
+        return 0
+    fi
 }
 
 # Function to update todo status
@@ -287,6 +277,7 @@ update_todo() {
 
 # Main interactive loop
 while true; do
+    clear
     # Show todos and prompt for selection
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
  Todo Manager - ${ACTIVE_LIST_NAME}
@@ -377,33 +368,28 @@ while true; do
                 CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
 
                 echo ""
-                echo "═══════════════════════════════════════════════"
-                echo "Edit Todo (Enter twice = save, Esc = cancel)"
-                echo "═══════════════════════════════════════════════"
+                echo " Edit (Enter=save, Ctrl+C=cancel)"
                 echo ""
-                echo "Current: $CURRENT_TEXT"
-                echo ""
-                echo "New text:"
 
-                NEW_TEXT=$(multiline_input)
+                NEW_TEXT=$(input_text "$CURRENT_TEXT")
                 INPUT_STATUS=$?
 
                 if [[ $INPUT_STATUS -eq 130 ]]; then
                     echo "Cancelled"
-                    sleep 0.5
+                    sleep 0.3
                 elif [[ -z "$NEW_TEXT" ]]; then
                     echo "Keeping original"
-                    sleep 0.5
+                    sleep 0.3
                 elif [[ "$NEW_TEXT" != "$CURRENT_TEXT" ]]; then
                     jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
                         .todos |= map(if .id == $id then .text = $text else . end) |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
                     echo "Updated"
-                    sleep 0.5
+                    sleep 0.3
                 else
                     echo "No changes"
-                    sleep 0.5
+                    sleep 0.3
                 fi
             fi
             ;;
@@ -547,19 +533,17 @@ while true; do
             fi
             ;;
         "c")
-            # Create new todo with multi-line support
+            # Create new todo
             echo ""
-            echo "═══════════════════════════════════════════════"
-            echo "Create New Todo (Enter twice = save, Esc = cancel)"
-            echo "═══════════════════════════════════════════════"
+            echo " New Todo (Enter=save, Ctrl+C=cancel)"
             echo ""
 
-            TODO_TEXT=$(multiline_input)
+            TODO_TEXT=$(input_text "")
             INPUT_STATUS=$?
 
             if [[ $INPUT_STATUS -eq 130 ]]; then
                 echo "Cancelled"
-                sleep 0.5
+                sleep 0.3
             elif [[ -n "$TODO_TEXT" ]]; then
                 # Select priority
                 echo ""

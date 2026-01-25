@@ -359,6 +359,9 @@ set -g @doit-key "t"
 
 # Disable Alt+Shift shortcuts
 set -g @doit-alt-bindings "off"
+
+# Use $EDITOR (nvim, vim) for create/edit instead of inline input
+set -g @doit-use-editor "true"
 ```
 
 ### Status Bar Integration

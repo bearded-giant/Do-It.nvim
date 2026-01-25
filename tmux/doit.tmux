@@ -45,6 +45,10 @@ tmux bind-key -T doit-menu l display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-lis
 # List manager - create/rename/delete (prefix + d + L)
 tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-list-manager.sh"
 
+# Editor mode for create/edit (default: off, uses inline input)
+# Set to "true" to use $EDITOR (nvim, vim, etc) instead
+# set -g @doit-use-editor "true"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")
