@@ -307,7 +307,8 @@ while true; do
     fi
 
     # Extract the todo ID from the bracketed ID at end of line [id]
-    TODO_ID=$(echo "$TODO_LINE" | grep -oE '\[[^]]+\]$' | tr -d '[]')
+    # Strip ANSI codes first since COLOR_RESET follows the ID
+    TODO_ID=$(echo "$TODO_LINE" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
 
     # Perform action based on key
     case "$KEY" in
