@@ -55,7 +55,8 @@ local function get_todo_icon_pattern()
 	local done_icon = config.options.formatting.done.icon
 	local pending_icon = config.options.formatting.pending.icon
 	local in_progress_icon = config.options.formatting.in_progress.icon
-	return "^%s+[" .. done_icon .. pending_icon .. in_progress_icon .. "]"
+	-- pattern allows optional notes icon (any non-space chars) before status icon
+	return "^%s+.-%s*[" .. done_icon .. pending_icon .. in_progress_icon .. "]"
 end
 
 local function find_bullet_line_for_cursor(buf_id, line_num)

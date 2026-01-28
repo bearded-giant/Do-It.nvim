@@ -99,33 +99,45 @@ function M.get_window_id()
     return win_id
 end
 
+-- helper to get effective keymap (same priority as setup_keymap)
+local function get_effective_key(key_option, default)
+	-- same priority order as setup_keymap
+	local key = nil
+	if config.options and config.options.modules and config.options.modules.todos and config.options.modules.todos.keymaps then
+		key = config.options.modules.todos.keymaps[key_option]
+	end
+	if not key and config.options and config.options.keymaps then
+		key = config.options.keymaps[key_option]
+	end
+	return key or default
+end
+
 local function create_small_keys_window(main_win_pos)
 	if not config.options.quick_keys then
 		return nil
 	end
 
-	local keys = config.options.keymaps
 	local small_buf = vim.api.nvim_create_buf(false, true)
 	-- Use the actual width from the main window position
 	local width = main_win_pos.width
 
 	local lines_1 = {
 		"",
-		string.format("  %-6s - New to-do", keys.new_todo),
-		string.format("  %-6s - Toggle status", keys.toggle_todo),
-		string.format("  %-6s - Delete to-do", keys.delete_todo),
-		string.format("  %-6s - Undo delete", keys.undo_delete),
-		string.format("  %-6s - Add due date", keys.add_due_date),
+		string.format("  %-6s - New to-do", get_effective_key("new_todo", "n")),
+		string.format("  %-6s - Toggle status", get_effective_key("toggle_todo", "x")),
+		string.format("  %-6s - Delete to-do", get_effective_key("delete_todo", "d")),
+		string.format("  %-6s - Undo delete", get_effective_key("undo_delete", "u")),
+		string.format("  %-6s - Add due date", get_effective_key("add_due_date", "H")),
 		"",
 	}
 
 	local lines_2 = {
 		"",
-		string.format("  %-6s - Reorder to-do", keys.reorder_todo),
-		string.format("  %-6s - Move to list", keys.move_todo_to_list or "m"),
-		string.format("  %-6s - List manager", keys.toggle_list_manager or "L"),
-		string.format("  %-6s - Tags", keys.toggle_tags),
-		string.format("  %-6s - Search", keys.search_todos),
+		string.format("  %-6s - Reorder to-do", get_effective_key("reorder_todo", "r")),
+		string.format("  %-6s - Move to list", get_effective_key("move_todo_to_list", "m")),
+		string.format("  %-6s - List manager", get_effective_key("toggle_list_manager", "L")),
+		string.format("  %-6s - Tags", get_effective_key("toggle_tags", "t")),
+		string.format("  %-6s - Search", get_effective_key("search_todos", "/")),
 		"",
 	}
 
@@ -846,7 +858,8 @@ local function create_window()
 	end)
 
 	setup_keymap("undo_delete", function()
-		if state.undo_delete() then
+		state = ensure_state_loaded()
+		if state and state.undo_delete and state.undo_delete() then
 			M.render_todos()
 			vim.notify("Todo restored", vim.log.levels.INFO)
 		end
@@ -876,8 +889,11 @@ local function create_window()
 	end)
 
 	setup_keymap("clear_filter", function()
-		state.set_filter(nil)
-		state.clear_category_filter()
+		state = ensure_state_loaded()
+		if state then
+			if state.set_filter then state.set_filter(nil) end
+			if state.clear_category_filter then state.clear_category_filter() end
+		end
 		M.render_todos()
 	end)
 
@@ -929,8 +945,7 @@ local function create_window()
 	end)
 	
 	-- Add keymap for linking to notes
-	-- Since this might not be in config.options.keymaps yet, add it manually
-	vim.keymap.set("n", "n", function()
+	vim.keymap.set("n", "N", function()
 		todo_actions.link_to_note(win_id, function()
 			M.render_todos()
 		end)
