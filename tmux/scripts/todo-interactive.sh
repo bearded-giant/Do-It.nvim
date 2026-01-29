@@ -287,10 +287,11 @@ while true; do
  n: New    e: Edit    p: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
+ SPACE: View note    y: Copy text
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,ctrl-up,ctrl-down,q,? \
+        --expect=enter,space,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -511,27 +512,40 @@ while true; do
                 fi
             fi
             ;;
-        "v")
-            # View full todo details
+        "space")
+            # view full note text in pager (supports tmux copy mode)
             if [[ -n "$TODO_ID" ]]; then
-                clear
-                echo ""
-                echo "═══════════════════════════════════════════════"
-                echo "                 Todo Details"
-                echo "═══════════════════════════════════════════════"
-                echo ""
-                jq -r --arg id "$TODO_ID" '
-                    .todos[] | select(.id == $id) |
-                    "Priority: \(.priorities // "none")\n" +
-                    "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
-                    "Created: \(.timestamp | todate)\n" +
-                    "─────────────────────────────────────────────\n" +
-                    .text
-                ' "$TODO_LIST_PATH"
-                echo ""
-                echo "─────────────────────────────────────────────"
-                echo "Press any key to return..."
-                read -n 1 -s
+                {
+                    jq -r --arg id "$TODO_ID" '
+                        .todos[] | select(.id == $id) |
+                        "Priority: \(.priorities // "none")" + "\n" +
+                        "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)" + "\n" +
+                        "Created: \(.timestamp | todate)" + "\n" +
+                        "\n─────────────────────────────────────────────\n\n" +
+                        .text
+                    ' "$TODO_LIST_PATH" 2>/dev/null
+                } | less -R
+            fi
+            ;;
+        "y")
+            # copy todo text to system clipboard
+            if [[ -n "$TODO_ID" ]]; then
+                COPY_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH" 2>/dev/null)
+                if [[ -n "$COPY_TEXT" ]]; then
+                    if command -v pbcopy &>/dev/null; then
+                        printf '%s' "$COPY_TEXT" | pbcopy
+                    elif command -v xclip &>/dev/null; then
+                        printf '%s' "$COPY_TEXT" | xclip -selection clipboard
+                    elif command -v xsel &>/dev/null; then
+                        printf '%s' "$COPY_TEXT" | xsel --clipboard
+                    else
+                        echo "No clipboard tool found (pbcopy/xclip/xsel)"
+                        sleep 1
+                        continue
+                    fi
+                    echo "Copied to clipboard"
+                    sleep 0.5
+                fi
             fi
             ;;
         "n")
@@ -657,6 +671,10 @@ while true; do
             echo "   d                Delete todo (can undo)"
             echo "   D                Delete all completed"
             echo "   u                Undo last delete"
+            echo ""
+            echo " View/Copy"
+            echo "   Space            View full note (scrollable, q to exit)"
+            echo "   y                Copy text to clipboard"
             echo ""
             echo " Lists"
             echo "   l                Switch lists"
