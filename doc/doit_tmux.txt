@@ -109,9 +109,13 @@ Status Changes~
 Editing~
     n                  New todo
     e                  Edit todo text
-    p                  Set priority
+    P                  Set priority
 
     In new/edit mode: Enter to save, Esc to cancel
+
+View/Copy~
+    p                  View full note (scrollable popup, q to exit)
+    y                  Copy text to clipboard
 
 Delete/Undo~
     d                  Delete todo (can undo)
@@ -124,7 +128,6 @@ Lists~
     m                  Move todo to another list
 
 Other~
-    v                  View full todo details
     r                  Refresh list
     ?                  Show help
     q                  Quit
@@ -199,6 +202,13 @@ Use $EDITOR for create/edit (default: off, uses inline input): >tmux
 <
 When enabled, create and edit operations open $EDITOR (nvim, vim, etc)
 instead of the inline readline input. Useful for multi-line todos.
+
+Note popup dimensions (default: 80x20): >tmux
+    set -g @doit-note-popup-w "100"
+    set -g @doit-note-popup-h "25"
+<
+Controls the width and height of the popup opened by `p` (view note)
+in the interactive manager.
 
 Environment Variables:~
 

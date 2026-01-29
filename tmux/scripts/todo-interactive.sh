@@ -290,19 +290,18 @@ while true; do
  Todo Manager - ${ACTIVE_LIST_NAME}
 ───────────────────────────────────────────────────
  ENTER: Toggle    s: Start    x: Stop    X: Revert
- n: New    e: Edit    p: Priority    K/J: Reorder
+ n: New    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- SPACE: View note    y: Copy text
+ p: View note    y: Copy text
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,p,P,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
-        --no-preview \
-        --bind 'space:become(printf "space\n{}")')
+        --no-preview)
 
     # Parse the selection
     KEY=$(echo "$SELECTION" | head -1)
@@ -348,6 +347,14 @@ while true; do
             fi
             ;;
         "p")
+            # view full note in less (q to close, tmux copy mode to yank)
+            if [[ -n "$TODO_ID" ]]; then
+                jq -r --arg id "$TODO_ID" '
+                    .todos[] | select(.id == $id) | .text
+                ' "$TODO_LIST_PATH" 2>/dev/null | less
+            fi
+            ;;
+        "P")
             if [[ -n "$TODO_ID" ]]; then
                 # get current priority
                 CURRENT_PRIORITY=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .priorities // "default"' "$TODO_LIST_PATH")
@@ -518,24 +525,6 @@ while true; do
                 fi
             fi
             ;;
-        "space")
-            # view full note in a tmux popup with copy support
-            if [[ -n "$TODO_ID" ]]; then
-                NOTE_TMP=$(mktemp /tmp/doit_note.XXXXXX)
-                jq -r --arg id "$TODO_ID" '
-                    .todos[] | select(.id == $id) |
-                    "Priority: \(.priorities // "none")\n" +
-                    "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
-                    "────────────────────────────────────────\n\n" +
-                    .text + "\n\n" +
-                    "────────────────────────────────────────\n" +
-                    "[q/Esc: close] [y: copy to clipboard]"
-                ' "$TODO_LIST_PATH" > "$NOTE_TMP" 2>/dev/null
-                tmux display-popup -E -w "$NOTE_POPUP_W" -h "$NOTE_POPUP_H" \
-                    "less -R '$NOTE_TMP'; rm -f '$NOTE_TMP'"
-                rm -f "$NOTE_TMP" 2>/dev/null
-            fi
-            ;;
         "y")
             # copy todo text to system clipboard
             if [[ -n "$TODO_ID" ]]; then
@@ -673,7 +662,7 @@ while true; do
             echo " Editing"
             echo "   n                New todo"
             echo "   e                Edit todo text"
-            echo "   p                Set priority"
+            echo "   P                Set priority"
             echo "   (In new/edit: Enter = save, Esc = cancel)"
             echo ""
             echo " Delete/Undo"
@@ -682,7 +671,7 @@ while true; do
             echo "   u                Undo last delete"
             echo ""
             echo " View/Copy"
-            echo "   Space            View full note (scrollable, q to exit)"
+            echo "   p                View full note (scrollable, q to exit)"
             echo "   y                Copy text to clipboard"
             echo ""
             echo " Lists"
