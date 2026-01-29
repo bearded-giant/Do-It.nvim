@@ -1,12 +1,13 @@
--- UI components for the notes module
+-- ui components for the notes module
 local M = {}
 
--- Setup function for the notes UI
 function M.setup(module)
-    -- Load and initialize notes window with module reference
     local notes_window = require("doit.modules.notes.ui.notes_window")
     M.notes_window = notes_window.setup(module)
-    
+
+    local notes_picker = require("doit.modules.notes.ui.notes_picker")
+    M.notes_picker = notes_picker.setup(module)
+
     return M
 end
 
