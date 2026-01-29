@@ -121,6 +121,12 @@ select_priority() {
 
 # Check for editor config: @doit-use-editor (true/false)
 USE_EDITOR=$(tmux show-option -gqv "@doit-use-editor")
+
+# note popup dimensions (configurable via @doit-note-popup-w / @doit-note-popup-h)
+NOTE_POPUP_W=$(tmux show-option -gqv "@doit-note-popup-w")
+NOTE_POPUP_H=$(tmux show-option -gqv "@doit-note-popup-h")
+NOTE_POPUP_W="${NOTE_POPUP_W:-80}"
+NOTE_POPUP_H="${NOTE_POPUP_H:-20}"
 [[ "$USE_EDITOR" == "true" ]] && USE_EDITOR=true || USE_EDITOR=false
 
 # Edit/create text input
@@ -291,12 +297,12 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,space,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,p,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
-        --preview='bash -c "preview_todo {}"' \
-        --preview-window=right:40%:wrap)
+        --no-preview \
+        --bind 'space:become(printf "space\n{}")')
 
     # Parse the selection
     KEY=$(echo "$SELECTION" | head -1)
@@ -513,18 +519,21 @@ while true; do
             fi
             ;;
         "space")
-            # view full note text in pager (supports tmux copy mode)
+            # view full note in a tmux popup with copy support
             if [[ -n "$TODO_ID" ]]; then
-                {
-                    jq -r --arg id "$TODO_ID" '
-                        .todos[] | select(.id == $id) |
-                        "Priority: \(.priorities // "none")" + "\n" +
-                        "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)" + "\n" +
-                        "Created: \(.timestamp | todate)" + "\n" +
-                        "\n─────────────────────────────────────────────\n\n" +
-                        .text
-                    ' "$TODO_LIST_PATH" 2>/dev/null
-                } | less -R
+                NOTE_TMP=$(mktemp /tmp/doit_note.XXXXXX)
+                jq -r --arg id "$TODO_ID" '
+                    .todos[] | select(.id == $id) |
+                    "Priority: \(.priorities // "none")\n" +
+                    "Status: \(if .in_progress then "In Progress" elif .done then "Done" else "Pending" end)\n" +
+                    "────────────────────────────────────────\n\n" +
+                    .text + "\n\n" +
+                    "────────────────────────────────────────\n" +
+                    "[q/Esc: close] [y: copy to clipboard]"
+                ' "$TODO_LIST_PATH" > "$NOTE_TMP" 2>/dev/null
+                tmux display-popup -E -w "$NOTE_POPUP_W" -h "$NOTE_POPUP_H" \
+                    "less -R '$NOTE_TMP'; rm -f '$NOTE_TMP'"
+                rm -f "$NOTE_TMP" 2>/dev/null
             fi
             ;;
         "y")

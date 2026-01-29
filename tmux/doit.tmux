@@ -49,6 +49,10 @@ tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-lis
 # Set to "true" to use $EDITOR (nvim, vim, etc) instead
 # set -g @doit-use-editor "true"
 
+# Note popup dimensions (default: 80x20)
+# set -g @doit-note-popup-w "80"
+# set -g @doit-note-popup-h "20"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")
