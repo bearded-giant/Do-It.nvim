@@ -424,6 +424,21 @@ Commands:
         }
     }
     
+    commands.DoItBackup = {
+        callback = function()
+            local success, msg = module.state.backup_all_lists()
+            if success then
+                vim.notify(msg, vim.log.levels.INFO)
+            else
+                vim.notify(msg, vim.log.levels.ERROR)
+            end
+        end,
+        opts = {
+            desc = "Backup all todo lists",
+            nargs = 0,
+        }
+    }
+
     return commands
 end
 

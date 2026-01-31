@@ -122,7 +122,7 @@ function M.render()
 	table.insert(left_col, "──────────")
 	if doit.todos then
 		if doit.todos.state.todo_lists then
-			local active_list = doit.todos.state.todo_lists.active or "default"
+			local active_list = doit.todos.state.todo_lists.active or "daily"
 			-- Count only active todos (exclude completed)
 			local todo_count = 0
 			local todos = doit.todos.state.todos or {}

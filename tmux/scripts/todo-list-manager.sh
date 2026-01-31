@@ -157,14 +157,14 @@ while true; do
         --header="
  List Manager - Active: $CURRENT_LIST
 ─────────────────────────────────────────
- n: New    r: Rename    d: Delete
+ n: New    r: Rename    d: Delete    b: Backup
  ENTER: Switch to list
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=60% \
         --layout=reverse \
-        --expect=n,r,d,enter,q \
+        --expect=n,r,d,b,enter,q \
         --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
         --preview-window=right:50%:wrap)
 
@@ -190,6 +190,10 @@ while true; do
             if [[ -n "$SELECTED_LIST" ]]; then
                 delete_list "$SELECTED_LIST"
             fi
+            ;;
+        "b")
+            "$SCRIPT_DIR/todo-backup.sh"
+            sleep 1
             ;;
         "enter")
             if [[ -n "$SELECTED_LIST" && "$SELECTED_LIST" != "$CURRENT_LIST" ]]; then

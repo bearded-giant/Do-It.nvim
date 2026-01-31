@@ -82,7 +82,7 @@ function M.render_list()
     -- Update window title with current list name
     if win_id and vim.api.nvim_win_is_valid(win_id) then
         local loaded_state = ensure_state_loaded()
-        local list_name = "default"
+        local list_name = "daily"
         if loaded_state and loaded_state.todo_lists and loaded_state.todo_lists.active then
             list_name = loaded_state.todo_lists.active
         end
@@ -158,7 +158,7 @@ end
 local function create_list_window()
     -- Get the active list name for the window title
     local loaded_state = ensure_state_loaded()
-    local list_name = "default"
+    local list_name = "daily"
     if loaded_state and loaded_state.todo_lists and loaded_state.todo_lists.active then
         list_name = loaded_state.todo_lists.active
     end

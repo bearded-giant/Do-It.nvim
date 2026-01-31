@@ -11,7 +11,8 @@ local storage = {
     rename_list = function() return true, "Not implemented" end,
     get_available_lists = function() return {} end,
     import_todos = function() return true, "Not implemented" end,
-    export_todos = function() return true, "Not implemented" end
+    export_todos = function() return true, "Not implemented" end,
+    backup_all_lists = function() return true, "Not implemented" end
 }
 
 function storage.setup(M)
@@ -25,13 +26,15 @@ function storage.setup(M)
         config = {
             save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
             lists_dir = vim.fn.stdpath("data") .. "/doit/lists",
-            default_list = "default",
+            default_list = "daily",
             priorities = {}
         }
     end
 
-    -- Get the configured default list name
-    local default_list_name = config.default_list or "default"
+    -- get configured default list name (check nested lists config too)
+    local default_list_name = config.default_list
+        or (config.lists and config.lists.default_list)
+        or "daily"
     
     -- Ensure lists directory exists
     if not config.lists_dir then
@@ -291,9 +294,14 @@ function storage.setup(M)
         -- Update available lists
         storage.get_available_lists()
         
-        -- If we deleted the active list, switch to default
+        -- if we deleted the active list, switch to first available
         if M.todo_lists.active == list_name then
-            storage.load_list(default_list_name)
+            local available = storage.get_available_lists()
+            if #available > 0 then
+                storage.load_list(available[1].name)
+            else
+                storage.load_list(default_list_name)
+            end
         end
         
         return true, "Deleted list '" .. list_name .. "'"
@@ -341,10 +349,11 @@ function storage.setup(M)
     
     -- Load from disk (compatibility with older versions)
     storage.load_from_disk = function()
-        -- Handle migration from old save path if needed
+        -- handle migration from old save path (only once)
+        local migration_marker = config.lists_dir .. "/.migrated"
         if config.save_path and vim.fn.filereadable(config.save_path) == 1 and
+           vim.fn.filereadable(migration_marker) == 0 and
            vim.fn.filereadable(get_list_path(default_list_name)) == 0 then
-            -- Old file exists but new default list doesn't - migrate
             local file = io.open(config.save_path, "r")
             if file then
                 local content = file:read("*all")
@@ -359,6 +368,12 @@ function storage.setup(M)
                         })
                     end
                 end
+            end
+            -- mark migration as done so it never re-runs
+            local marker = io.open(migration_marker, "w")
+            if marker then
+                marker:write(tostring(os.time()))
+                marker:close()
             end
         end
         
@@ -509,6 +524,59 @@ function storage.setup(M)
         
         return true, string.format("Exported %d todos from list '%s' to %s",
                                    #M.todos, M.todo_lists.active, file_path)
+    end
+
+    storage.backup_all_lists = function()
+        local backup_dir = config.backup_dir
+            or (config.storage and config.storage.backup_dir)
+            or (vim.fn.stdpath("data") .. "/doit/backups")
+
+        local timestamp = os.date("%Y-%m-%d_%H-%M-%S")
+        local backup_path = backup_dir .. "/" .. timestamp
+
+        vim.fn.mkdir(backup_path, "p")
+
+        local lists_dir = config.lists_dir
+        local copied = 0
+
+        -- copy all list json files
+        local ls_cmd = string.format("ls %s/*.json 2>/dev/null || true", vim.fn.shellescape(lists_dir))
+        local files = vim.fn.systemlist(ls_cmd)
+        for _, file_path in ipairs(files) do
+            if file_path ~= "" then
+                local filename = file_path:match("[^/]+$")
+                local src = io.open(file_path, "r")
+                if src then
+                    local content = src:read("*all")
+                    src:close()
+                    local dst = io.open(backup_path .. "/" .. filename, "w")
+                    if dst then
+                        dst:write(content)
+                        dst:close()
+                        copied = copied + 1
+                    end
+                end
+            end
+        end
+
+        -- copy session.json
+        local session_path = vim.fn.stdpath("data") .. "/doit/session.json"
+        local src = io.open(session_path, "r")
+        if src then
+            local content = src:read("*all")
+            src:close()
+            local dst = io.open(backup_path .. "/session.json", "w")
+            if dst then
+                dst:write(content)
+                dst:close()
+            end
+        end
+
+        if copied == 0 then
+            return false, "No lists found to backup"
+        end
+
+        return true, string.format("Backed up %d lists to %s", copied, backup_path)
     end
 
     storage.move_todo_to_list = function(todo_id, destination_list_name)

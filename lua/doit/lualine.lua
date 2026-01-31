@@ -175,7 +175,7 @@ function M.current_list()
         return ""
     end
 
-    local list_name = "default"
+    local list_name = "daily"
     if loaded_state.todo_lists and loaded_state.todo_lists.active then
         list_name = loaded_state.todo_lists.active
     end

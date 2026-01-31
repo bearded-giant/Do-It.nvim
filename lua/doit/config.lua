@@ -36,7 +36,7 @@ M.defaults = {
 		-- Todo module configuration
 		todos = {
 			enabled = true,
-			default_list = "default",
+			default_list = "daily",
 			ui = {
 				window = {
 					width = 55,
@@ -116,6 +116,7 @@ M.defaults = {
 			storage = {
 				save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
 				import_export_path = vim.fn.expand("~/todos.json"),
+				backup_dir = vim.fn.stdpath("data") .. "/doit/backups",
 			},
 			keymaps = {
 				toggle_window = "<leader>do",

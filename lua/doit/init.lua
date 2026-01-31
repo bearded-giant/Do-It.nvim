@@ -143,7 +143,7 @@ function M.setup(opts)
 
 		if M.todos then
 			if M.todos.state.todo_lists then
-				local active_list = M.todos.state.todo_lists.active or "default"
+				local active_list = M.todos.state.todo_lists.active or "daily"
 				-- Count only active todos (exclude completed)
 				local todo_count = 0
 				local todos = M.todos.state.todos or {}

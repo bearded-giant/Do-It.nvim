@@ -59,7 +59,7 @@ local function ensure_state_loaded()
                     active_category = nil,
                     deleted_todos = {},
                     reordering_todo_index = nil,
-                    todo_lists = { active = "default" }
+                    todo_lists = { active = "daily" }
                 }
                 
                 -- Add stub functions
@@ -128,6 +128,7 @@ local function create_small_keys_window(main_win_pos)
 		string.format("  %-6s - Delete to-do", get_effective_key("delete_todo", "d")),
 		string.format("  %-6s - Undo delete", get_effective_key("undo_delete", "u")),
 		string.format("  %-6s - Add due date", get_effective_key("add_due_date", "H")),
+		string.format("  %-6s - Backup all", get_effective_key("backup_todos", "B")),
 		"",
 	}
 
@@ -228,7 +229,7 @@ function M.render_todos()
 	if win_id and vim.api.nvim_win_is_valid(win_id) then
 		saved_cursor = vim.api.nvim_win_get_cursor(win_id)
 
-		local list_name = "default"
+		local list_name = "daily"
 		if state and state.todo_lists and state.todo_lists.active then
 			list_name = state.todo_lists.active
 		end
@@ -565,7 +566,7 @@ local function create_window()
 	state = ensure_state_loaded()
 	
 	-- Get the active list name for the window title
-	local list_name = "default"
+	local list_name = "daily"
 	if state and state.todo_lists and state.todo_lists.active then
 		list_name = state.todo_lists.active
 	end
@@ -789,6 +790,7 @@ local function create_window()
 			toggle_list_manager = "L",
 			import_todos = "I",
 			export_todos = "E",
+			backup_todos = "B",
 			search_todos = "/",
 			move_todo_up = "k",
 			move_todo_down = "j",
@@ -984,6 +986,15 @@ local function create_window()
 		prompt_io("export")
 	end)
 
+	setup_keymap("backup_todos", function()
+		local success, msg = state.backup_all_lists()
+		if success then
+			vim.notify(msg, vim.log.levels.INFO)
+		else
+			vim.notify(msg, vim.log.levels.ERROR)
+		end
+	end)
+
 	setup_keymap("move_todo_to_list", function()
 		if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 			return
@@ -1004,7 +1015,7 @@ local function create_window()
 			return
 		end
 
-		local current_list = state.todo_lists and state.todo_lists.active or "default"
+		local current_list = state.todo_lists and state.todo_lists.active or "daily"
 
 		list_selector.show_list_selector(current_list, function(destination_list)
 			-- Re-ensure state is loaded before move
@@ -1123,7 +1134,7 @@ function M.toggle_todo_window()
 		-- Force reload from disk when opening window to get latest changes
 		-- This handles git worktree switches and external file changes
 		if state and state.load_list and state.todo_lists then
-			local active_list = state.todo_lists.active or "default"
+			local active_list = state.todo_lists.active or "daily"
 			state.load_list(active_list)
 		end
 

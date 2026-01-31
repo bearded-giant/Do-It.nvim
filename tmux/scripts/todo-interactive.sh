@@ -293,11 +293,11 @@ while true; do
  n: New    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- p: View note    y: Copy text
+ p: View note    y: Copy text    B: Backup all lists
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,p,P,d,D,e,u,l,L,m,J,K,y,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,p,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -487,6 +487,10 @@ while true; do
             TODO_LIST_PATH="$(get_active_list_path)"
             ACTIVE_LIST_NAME="$(get_active_list_name)"
             export TODO_LIST_PATH
+            ;;
+        "B")
+            "$SCRIPT_DIR/todo-backup.sh"
+            sleep 1
             ;;
         "m")
             # Move todo to another list
