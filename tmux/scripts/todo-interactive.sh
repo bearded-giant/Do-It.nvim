@@ -286,8 +286,9 @@ update_todo() {
 while true; do
     clear
     # Show todos and prompt for selection
+    local done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
- Todo Manager - ${ACTIVE_LIST_NAME}
+ Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
 ───────────────────────────────────────────────────
  ENTER: Toggle    s: Start    x: Stop    X: Revert
  n: New    e: Edit    P: Priority    K/J: Reorder

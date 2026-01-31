@@ -28,12 +28,19 @@ preview_list() {
     local list_file="$LISTS_DIR/${1}.json"
     if [[ -f "$list_file" ]]; then
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
-        local pending=$(jq '[.todos[] | select(.done == false)] | length' "$list_file" 2>/dev/null || echo 0)
+        local pending=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$list_file" 2>/dev/null || echo 0)
         local in_progress=$(jq '[.todos[] | select(.in_progress == true)] | length' "$list_file" 2>/dev/null || echo 0)
-        echo "Total: $total  Pending: $pending  In Progress: $in_progress"
+        local done_count=$(jq '[.todos[] | select(.done == true)] | length' "$list_file" 2>/dev/null || echo 0)
+        echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
         echo ""
-        jq -r '.todos | sort_by(.order_index) | .[0:5] | .[] | .text | split("\n")[0][0:50]' "$list_file" 2>/dev/null | while read -r line; do
-            echo "• $line"
+        # show in-progress first, then pending (skip done items)
+        jq -r '
+            [.todos[] | select(.done == false)] |
+            sort_by(if .in_progress then 0 else 1 end, .order_index) |
+            .[0:5] | .[] |
+            (if .in_progress then "▶ " else "• " end) + (.text | split("\n")[0][0:50])
+        ' "$list_file" 2>/dev/null | while read -r line; do
+            echo "$line"
         done
     fi
 }
