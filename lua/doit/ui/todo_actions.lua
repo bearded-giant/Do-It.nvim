@@ -95,10 +95,23 @@ local function get_real_todo_index(line_num, filter)
 		line_offset = line_offset + 2  -- blank line + category text
 	end
 
+	-- Check show_completed config (must match rendering logic)
+	local show_completed = true
+	if config.options and config.options.modules and config.options.modules.todos then
+		if config.options.modules.todos.show_completed == false then
+			show_completed = false
+		end
+	end
+
 	-- First todo starts at line_offset + 1 (after all headers)
 	local current_line = line_offset + 1
 
 	for i, todo in ipairs(state.todos) do
+		-- Skip completed todos if show_completed is false (must match rendering)
+		if todo.done and not show_completed then
+			goto continue
+		end
+
 		local show_by_tag = not filter or todo.text:match("#" .. filter)
 		local show_by_category = true
 
@@ -128,6 +141,7 @@ local function get_real_todo_index(line_num, filter)
 
 			current_line = current_line + num_lines
 		end
+		::continue::
 	end
 	return nil
 end
