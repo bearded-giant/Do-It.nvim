@@ -265,8 +265,19 @@ function M.render_todos()
 		table.insert(lines, "  Filtered by category: " .. category_name)
 	end
 
+	local show_completed = true
+	if config.options and config.options.modules and config.options.modules.todos then
+		if config.options.modules.todos.show_completed == false then
+			show_completed = false
+		end
+	end
+
 	local todo_line_map = {}
 	for _, todo in ipairs(state.todos) do
+		if todo.done and not show_completed then
+			goto continue
+		end
+
 		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
 		local show_by_category = true
 
@@ -298,6 +309,7 @@ function M.render_todos()
 				end
 			end
 		end
+		::continue::
 	end
 	table.insert(lines, "")
 

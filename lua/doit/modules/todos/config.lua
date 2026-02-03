@@ -4,6 +4,7 @@ local M = {}
 -- Default module configuration
 M.defaults = {
     enabled = true,
+    show_completed = true,
     save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
     import_export_path = vim.fn.expand("~/todos.json"),
     backup_dir = vim.fn.stdpath("data") .. "/doit/backups",

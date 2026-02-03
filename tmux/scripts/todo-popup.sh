@@ -26,7 +26,12 @@ GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
 GRAY='\033[90m'
+DIM='\033[2m'
 RESET='\033[0m'
+
+# config: show completed items (default true)
+SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
+SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
 # Display header
 echo -e "${BLUE}${BOLD}╭─────────────────────────────────────────────╮${RESET}"
@@ -71,12 +76,12 @@ if [[ $PENDING_COUNT -gt 0 ]]; then
     echo ""
 fi
 
-# Show recently completed (last 3)
+# Show completed items (if enabled)
 COMPLETED_COUNT=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH")
-if [[ $COMPLETED_COUNT -gt 0 ]]; then
-    echo -e "${GRAY}✓ Recently Completed:${RESET}"
-    jq -r '.todos | sort_by(.order_index) | reverse | .[] | select(.done == true) | "  • \(.text)"' "$TODO_LIST_PATH" | head -3 | while IFS= read -r line; do
-        echo -e "${GRAY}$line${RESET}"
+if [[ $COMPLETED_COUNT -gt 0 && "$SHOW_COMPLETED" == "true" ]]; then
+    echo -e "${DIM}✓ Completed:${RESET}"
+    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == true) | "  • \(.text)"' "$TODO_LIST_PATH" | while IFS= read -r line; do
+        echo -e "${DIM}$line${RESET}"
     done
     echo ""
 fi

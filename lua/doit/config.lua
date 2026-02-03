@@ -36,6 +36,7 @@ M.defaults = {
 		-- Todo module configuration
 		todos = {
 			enabled = true,
+			show_completed = true,
 			default_list = "daily",
 			ui = {
 				window = {

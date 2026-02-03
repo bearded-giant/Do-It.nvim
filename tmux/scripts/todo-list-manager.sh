@@ -22,7 +22,12 @@ CURRENT_LIST=$(get_active_list_name)
 COLOR_GREEN=$'\e[1;32m'
 COLOR_YELLOW=$'\e[1;33m'
 COLOR_RED=$'\e[1;31m'
+COLOR_DIM=$'\e[2m'
 COLOR_RESET=$'\e[0m'
+
+# config: show completed items (default true)
+SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
+SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
 preview_list() {
     local list_file="$LISTS_DIR/${1}.json"
@@ -33,7 +38,7 @@ preview_list() {
         local done_count=$(jq '[.todos[] | select(.done == true)] | length' "$list_file" 2>/dev/null || echo 0)
         echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
         echo ""
-        # show in-progress first, then pending (skip done items)
+        # show in-progress first, then pending
         jq -r '
             [.todos[] | select(.done == false)] |
             sort_by(if .in_progress then 0 else 1 end, .order_index) |
@@ -42,10 +47,24 @@ preview_list() {
         ' "$list_file" 2>/dev/null | while read -r line; do
             echo "$line"
         done
+        # show completed items if enabled
+        if [[ "$SHOW_COMPLETED" == "true" && "$done_count" -gt 0 ]]; then
+            jq -r '
+                [.todos[] | select(.done == true)] |
+                sort_by(.order_index) |
+                .[0:3] | .[] |
+                "✓ " + (.text | split("\n")[0][0:50])
+            ' "$list_file" 2>/dev/null | while read -r line; do
+                printf '%s%s%s\n' "$COLOR_DIM" "$line" "$COLOR_RESET"
+            done
+        fi
     fi
 }
 export -f preview_list
 export LISTS_DIR
+export SHOW_COMPLETED
+export COLOR_DIM
+export COLOR_RESET
 
 create_list() {
     echo ""

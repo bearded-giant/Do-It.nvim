@@ -36,6 +36,10 @@ COLOR_YELLOW=$'\e[1;33m'
 COLOR_BLUE=$'\e[1;34m'
 COLOR_DIM=$'\e[2m'
 
+# config: show completed items (default true)
+SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
+SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
+
 # preview command for fzf - shows full todo content with line wrapping
 preview_todo() {
     local line="$1"
@@ -101,6 +105,23 @@ format_todos() {
             *)           printf "%s  %-55s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
+
+    # Finally print completed todos (if show_completed is enabled)
+    if [[ "$SHOW_COMPLETED" == "true" ]]; then
+        jq -r '.todos |
+            map(select(.done == true)) |
+            sort_by(.order_index) |
+            .[] |
+            (.text | split("\n")[0][0:55]) as $first_line |
+            (.text | contains("\n")) as $multiline |
+            "\(.id)|✓|\(.priorities // "")|\($first_line)|\($multiline)"
+        ' "$TODO_LIST_PATH" |
+        while IFS='|' read -r id status priority text multiline; do
+            suffix=""
+            [[ "$multiline" == "true" ]] && suffix=" ..."
+            printf "%s%s  %-55s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET"
+        done
+    fi
 }
 
 # Priority options (default first so Enter accepts it)
