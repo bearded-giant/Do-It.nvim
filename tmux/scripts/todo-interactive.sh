@@ -315,11 +315,11 @@ while true; do
  n: New    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- p: View note    y: Copy text    B: Backup all lists
+ v: View    N: Note    y: Copy text    B: Backup all lists
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,p,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,v,N,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -368,12 +368,31 @@ while true; do
                 sleep 0.5
             fi
             ;;
-        "p")
-            # view full note in less (q to close, tmux copy mode to yank)
+        "v")
+            # view full todo text in less (q to close)
             if [[ -n "$TODO_ID" ]]; then
                 jq -r --arg id "$TODO_ID" '
                     .todos[] | select(.id == $id) | .text
                 ' "$TODO_LIST_PATH" 2>/dev/null | less
+            fi
+            ;;
+        "N")
+            # edit todo text as a note in $EDITOR (always uses editor)
+            if [[ -n "$TODO_ID" ]]; then
+                CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
+                local temp_file=$(mktemp /tmp/todo_note.XXXXXX)
+                printf '%s' "$CURRENT_TEXT" > "$temp_file"
+                ${EDITOR:-nvim} "$temp_file"
+                NEW_TEXT=$(cat "$temp_file")
+                if [[ -n "$NEW_TEXT" && "$NEW_TEXT" != "$CURRENT_TEXT" ]]; then
+                    jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
+                        .todos |= map(if .id == $id then .text = $text else . end) |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Note updated"
+                    sleep 0.3
+                fi
+                rm -f "$temp_file"
             fi
             ;;
         "P")
@@ -697,7 +716,8 @@ while true; do
             echo "   u                Undo last delete"
             echo ""
             echo " View/Copy"
-            echo "   p                View full note (scrollable, q to exit)"
+            echo "   v                View full text (scrollable, q to exit)"
+            echo "   N                Edit note in \$EDITOR"
             echo "   y                Copy text to clipboard"
             echo ""
             echo " Lists"
