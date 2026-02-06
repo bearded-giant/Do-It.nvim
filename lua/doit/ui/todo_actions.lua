@@ -356,6 +356,9 @@ function M.toggle_todo(win_id, on_render)
 		local was_done = state.todos[todo_index].done
 		local will_be_done = state.todos[todo_index].in_progress -- if in_progress, it will become done
 
+		-- capture reference before render/sort changes array order
+		local todo_ref = state.todos[todo_index]
+
 		state.toggle_todo(todo_index)
 
 		maybe_render(on_render)
@@ -382,10 +385,7 @@ function M.toggle_todo(win_id, on_render)
 				vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
 			end
 		else
-			-- For other status changes (pending → in_progress), keep tracking the item
-			local todo_ref = state.todos[todo_index]
-
-			-- Find the new position of the todo after sorting
+			-- find new position of the todo after sorting
 			local new_position
 			for i, todo in ipairs(state.todos) do
 				if todo == todo_ref then
@@ -395,7 +395,6 @@ function M.toggle_todo(win_id, on_render)
 			end
 
 			if new_position then
-				-- Calculate the new line number accounting for multiline todos
 				local new_line_num
 				local line_offset = 1
 				if state.active_filter then
@@ -405,17 +404,45 @@ function M.toggle_todo(win_id, on_render)
 					line_offset = line_offset + 2
 				end
 
-				local current_line = line_offset
-				for i, todo in ipairs(state.todos) do
-					if i == new_position then
-						new_line_num = current_line
-						break
+				local show_completed = true
+				if config.options and config.options.modules and config.options.modules.todos then
+					if config.options.modules.todos.show_completed == false then
+						show_completed = false
 					end
+				end
+
+				local current_line = line_offset + 1
+				for i, todo in ipairs(state.todos) do
+					if todo.done and not show_completed then
+						goto continue_cursor
+					end
+
 					local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-					if show_by_tag then
+					local show_by_category = true
+
+					if state.active_category then
+						local module = get_todo_module()
+						if module and module.state and module.state.get_todo_category then
+							local todo_category_id = module.state.get_todo_category(todo.id)
+							show_by_category = (todo_category_id == state.active_category) or
+											  (state.active_category == "uncategorized" and
+											   (todo_category_id == "uncategorized" or not todo_category_id))
+						else
+							show_by_category = (todo.category == state.active_category) or
+											  (state.active_category == "Uncategorized" and
+											   (not todo.category or todo.category == ""))
+						end
+					end
+
+					if show_by_tag and show_by_category then
+						if i == new_position then
+							new_line_num = current_line
+							break
+						end
 						local text_lines = vim.split(todo.text, "\n", { plain = true })
 						current_line = current_line + #text_lines
 					end
+					::continue_cursor::
 				end
 
 				-- Validate cursor position

@@ -377,12 +377,15 @@ while true; do
             fi
             ;;
         "N")
-            # edit todo text as a note in $EDITOR (always uses editor)
+            # quick note editor - clean nvim, no config, q to save+quit
             if [[ -n "$TODO_ID" ]]; then
                 CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
                 local temp_file=$(mktemp /tmp/todo_note.XXXXXX)
                 printf '%s' "$CURRENT_TEXT" > "$temp_file"
-                ${EDITOR:-nvim} "$temp_file"
+                nvim --clean --noplugin \
+                    -c 'set noswapfile nobackup nowritebackup wrap linebreak' \
+                    -c 'nnoremap <buffer> q :wq<CR>' \
+                    "$temp_file"
                 NEW_TEXT=$(cat "$temp_file")
                 if [[ -n "$NEW_TEXT" && "$NEW_TEXT" != "$CURRENT_TEXT" ]]; then
                     jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
