@@ -86,6 +86,10 @@ end
 local function get_real_todo_index(line_num, filter)
 	ensure_state_loaded()
 
+	-- state may have been reloaded from disk in unsorted order;
+	-- re-sort to match the rendered display order
+	state.sort_todos()
+
 	-- Calculate header offset
 	local line_offset = 1  -- blank line at top
 	if state.active_filter then
@@ -351,6 +355,7 @@ function M.toggle_todo(win_id, on_render)
 	end
 
 	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+
 	if todo_index then
 		-- Store the current status of the todo
 		local was_done = state.todos[todo_index].done
