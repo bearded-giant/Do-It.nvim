@@ -148,6 +148,10 @@ NOTE_POPUP_W="${NOTE_POPUP_W:-80}"
 NOTE_POPUP_H="${NOTE_POPUP_H:-20}"
 [[ "$USE_EDITOR" == "true" ]] && USE_EDITOR=true || USE_EDITOR=false
 
+# @doit-long-desc: enable multi-line description editor (nvim --clean)
+LONG_DESC=$(tmux show-option -gqv "@doit-long-desc")
+[[ "$LONG_DESC" == "true" ]] && LONG_DESC=true || LONG_DESC=false
+
 # Edit/create text input
 # Usage: result=$(input_text "prefill"); status=$?
 # Returns: text on success, exit 130 on cancel (Esc)
@@ -317,7 +321,7 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,v,N,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -368,25 +372,26 @@ while true; do
             fi
             ;;
         "v")
-            # view full todo text in less (q to close)
-            if [[ -n "$TODO_ID" ]]; then
-                jq -r --arg id "$TODO_ID" '
-                    .todos[] | select(.id == $id) | .text
-                ' "$TODO_LIST_PATH" 2>/dev/null | less
-            fi
+            # no-op, preview pane replaces this
             ;;
         "N")
             # add/edit description on a todo
             if [[ -n "$TODO_ID" ]]; then
                 CURRENT_DESC=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH")
-                NEW_DESC=$(input_text "$CURRENT_DESC" "Description (enter to save, esc to cancel)")
-                local input_status=$?
-                if [[ $input_status -ne 130 ]]; then
-                    jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
-                        .todos |= map(if .id == $id then .description = $desc else . end) |
-                        ._metadata.updated_at = (now | floor)
-                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                if [[ "$LONG_DESC" == true ]]; then
+                    DESC_TMP=$(mktemp /tmp/todo_desc.XXXXXX)
+                    [[ -n "$CURRENT_DESC" ]] && printf '%s' "$CURRENT_DESC" > "$DESC_TMP"
+                    nvim -u NONE -c "edit $DESC_TMP" -c 'set noswapfile nobackup nowritebackup wrap linebreak' -c 'nnoremap <buffer> q :wq<CR>'
+                    NEW_DESC=$(cat "$DESC_TMP")
+                    rm -f "$DESC_TMP"
+                else
+                    NEW_DESC=$(input_text "$CURRENT_DESC" "Description (enter to save, esc to cancel)")
+                    [[ $? -eq 130 ]] && continue
                 fi
+                jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
+                    .todos |= map(if .id == $id then .description = $desc else . end) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             fi
             ;;
         "P")
