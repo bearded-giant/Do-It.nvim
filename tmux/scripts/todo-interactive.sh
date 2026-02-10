@@ -45,22 +45,14 @@ preview_todo() {
     local line="$1"
     local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
     if [[ -n "$todo_id" ]]; then
-        # use printf to safely output text with special chars (backticks, etc)
-        local priority=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .priorities // "none"' "$TODO_LIST_PATH" 2>/dev/null)
-        local status=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | if .in_progress then "In Progress" elif .done then "Done" else "Pending" end' "$TODO_LIST_PATH" 2>/dev/null)
-        local text=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH" 2>/dev/null)
-
-        printf 'ID: %s\n' "$todo_id"
-        printf 'Priority: %s\n' "$priority"
-        printf 'Status: %s\n' "$status"
-        echo "────────────────────────────────────────"
-        printf '%s\n' "$text"
-        local desc=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH" 2>/dev/null)
-        if [[ -n "$desc" ]]; then
-            echo ""
-            echo "Description:"
-            printf '%s\n' "$desc"
-        fi
+        jq -r --arg id "$todo_id" '
+            .todos[] | select(.id == $id) |
+            "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
+            "\nPriority: " + (.priorities // "none") +
+            "\n────────────────────────────────" +
+            "\n" + .text +
+            (if (.description // "") != "" then "\n\nDescription:\n" + .description else "" end)
+        ' "$TODO_LIST_PATH" 2>/dev/null
     fi
 }
 export -f preview_todo
@@ -321,7 +313,7 @@ while true; do
  n: New    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- v: View    N: Note    y: Copy text    B: Backup all lists
+ N: Description    y: Copy text    B: Backup all lists
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
@@ -329,7 +321,8 @@ while true; do
         --no-sort \
         --height=80% \
         --layout=reverse \
-        --no-preview)
+        --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
+        --preview-window=right:40%)
 
     # Parse the selection
     KEY=$(echo "$SELECTION" | head -1)
