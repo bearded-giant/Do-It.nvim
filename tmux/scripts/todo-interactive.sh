@@ -55,6 +55,12 @@ preview_todo() {
         printf 'Status: %s\n' "$status"
         echo "────────────────────────────────────────"
         printf '%s\n' "$text"
+        local desc=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH" 2>/dev/null)
+        if [[ -n "$desc" ]]; then
+            echo ""
+            echo "Description:"
+            printf '%s\n' "$desc"
+        fi
     fi
 }
 export -f preview_todo
@@ -155,6 +161,7 @@ NOTE_POPUP_H="${NOTE_POPUP_H:-20}"
 # Returns: text on success, exit 130 on cancel (Esc)
 input_text() {
     local prefill="$1"
+    local header="$2"
     local result=""
 
     if [[ "$USE_EDITOR" == true ]]; then
@@ -168,12 +175,11 @@ input_text() {
         return 0
     else
         # Inline mode: fzf with prefilled query, Esc to cancel
-        result=$(echo "" | fzf --print-query --query="$prefill" \
-            --height=3 \
-            --layout=reverse \
-            --no-info \
-            --bind 'enter:accept' \
-            --bind 'esc:abort' | head -1)
+        local fzf_args=(--print-query --query="$prefill"
+            --height=4 --layout=reverse --no-info
+            --bind 'enter:accept' --bind 'esc:abort')
+        [[ -n "$header" ]] && fzf_args+=(--header "$header")
+        result=$(true | fzf "${fzf_args[@]}" | head -1)
         local status=$?
         [[ $status -eq 130 ]] && return 130
         echo "$result"
@@ -377,25 +383,17 @@ while true; do
             fi
             ;;
         "N")
-            # quick note editor - clean nvim, no config, q to save+quit
+            # add/edit description on a todo
             if [[ -n "$TODO_ID" ]]; then
-                CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
-                local temp_file=$(mktemp /tmp/todo_note.XXXXXX)
-                printf '%s' "$CURRENT_TEXT" > "$temp_file"
-                nvim --clean --noplugin \
-                    -c 'set noswapfile nobackup nowritebackup wrap linebreak' \
-                    -c 'nnoremap <buffer> q :wq<CR>' \
-                    "$temp_file"
-                NEW_TEXT=$(cat "$temp_file")
-                if [[ -n "$NEW_TEXT" && "$NEW_TEXT" != "$CURRENT_TEXT" ]]; then
-                    jq --arg id "$TODO_ID" --arg text "$NEW_TEXT" '
-                        .todos |= map(if .id == $id then .text = $text else . end) |
+                CURRENT_DESC=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH")
+                NEW_DESC=$(input_text "$CURRENT_DESC" "Description (enter to save, esc to cancel)")
+                local input_status=$?
+                if [[ $input_status -ne 130 ]]; then
+                    jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
+                        .todos |= map(if .id == $id then .description = $desc else . end) |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                    echo "Note updated"
-                    sleep 0.3
                 fi
-                rm -f "$temp_file"
             fi
             ;;
         "P")
