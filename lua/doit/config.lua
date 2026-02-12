@@ -37,6 +37,7 @@ M.defaults = {
 		todos = {
 			enabled = true,
 			show_completed = true,
+			show_descriptions = true,
 			default_list = "daily",
 			ui = {
 				window = {

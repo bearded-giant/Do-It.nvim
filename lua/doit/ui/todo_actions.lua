@@ -99,11 +99,15 @@ local function get_real_todo_index(line_num, filter)
 		line_offset = line_offset + 2  -- blank line + category text
 	end
 
-	-- Check show_completed config (must match rendering logic)
+	-- Check show_completed and show_descriptions config (must match rendering logic)
 	local show_completed = true
+	local show_descriptions = true
 	if config.options and config.options.modules and config.options.modules.todos then
 		if config.options.modules.todos.show_completed == false then
 			show_completed = false
+		end
+		if config.options.modules.todos.show_descriptions == false then
+			show_descriptions = false
 		end
 	end
 
@@ -137,8 +141,12 @@ local function get_real_todo_index(line_num, filter)
 		if show_by_tag and show_by_category then
 			local text_lines = vim.split(todo.text, "\n", { plain = true })
 			local num_lines = #text_lines
+			if show_descriptions and todo.description and todo.description ~= "" then
+				local desc_lines = vim.split(todo.description, "\n", { plain = true })
+				num_lines = num_lines + #desc_lines
+			end
 
-			-- Check if line_num falls within this todo's line range
+			-- Check if line_num falls within this todo's line range (including description)
 			if line_num >= current_line and line_num < current_line + num_lines then
 				return i
 			end
@@ -410,9 +418,13 @@ function M.toggle_todo(win_id, on_render)
 				end
 
 				local show_completed = true
+				local show_descriptions = true
 				if config.options and config.options.modules and config.options.modules.todos then
 					if config.options.modules.todos.show_completed == false then
 						show_completed = false
+					end
+					if config.options.modules.todos.show_descriptions == false then
+						show_descriptions = false
 					end
 				end
 
@@ -445,7 +457,12 @@ function M.toggle_todo(win_id, on_render)
 							break
 						end
 						local text_lines = vim.split(todo.text, "\n", { plain = true })
-						current_line = current_line + #text_lines
+						local num_lines = #text_lines
+						if show_descriptions and todo.description and todo.description ~= "" then
+							local desc_lines = vim.split(todo.description, "\n", { plain = true })
+							num_lines = num_lines + #desc_lines
+						end
+						current_line = current_line + num_lines
 					end
 					::continue_cursor::
 				end
@@ -765,6 +782,33 @@ function M.edit_todo(win_id, on_render)
 				vim.cmd("echo ''")
 			end
 		})
+	end
+end
+
+function M.edit_description(win_id, on_render)
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local cursor = vim.api.nvim_win_get_cursor(win_id)
+	local line_num = cursor[1]
+	local buf_id = vim.api.nvim_win_get_buf(win_id)
+
+	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
+	if not bullet_line then
+		return
+	end
+
+	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
+	if todo_index then
+		local current_desc = state.todos[todo_index].description or ""
+		vim.ui.input({ prompt = "Description: ", default = current_desc }, function(input)
+			if input == nil then return end
+			state.todos[todo_index].description = input
+			state.save_to_disk()
+			maybe_render(on_render)
+		end)
 	end
 end
 

@@ -557,9 +557,9 @@ while true; do
                         ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
 
                         # Add to target list
-                        echo "$TODO_OBJ" | jq -s '.[0]' | jq -s --slurpfile todo /dev/stdin '
-                            .[0].todos += $todo |
-                            .[0]._metadata.updated_at = (now | floor)
+                        jq --argjson todo "$TODO_OBJ" '
+                            .todos += [$todo] |
+                            ._metadata.updated_at = (now | floor)
                         ' "$TARGET_PATH" > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
 
                         TODO_TEXT=$(echo "$TODO_OBJ" | jq -r '.text | split("\n")[0][0:30]')

@@ -266,9 +266,13 @@ function M.render_todos()
 	end
 
 	local show_completed = true
+	local show_descriptions = true
 	if config.options and config.options.modules and config.options.modules.todos then
 		if config.options.modules.todos.show_completed == false then
 			show_completed = false
+		end
+		if config.options.modules.todos.show_descriptions == false then
+			show_descriptions = false
 		end
 	end
 
@@ -308,6 +312,14 @@ function M.render_todos()
 					todo_line_map[line_idx] = { todo = todo, is_first = false }
 				end
 			end
+			if show_descriptions and todo.description and todo.description ~= "" then
+				local desc_lines = vim.split(todo.description, "\n", { plain = true })
+				for _, desc_line in ipairs(desc_lines) do
+					local line_idx = #lines + 1
+					table.insert(lines, "      " .. desc_line)
+					todo_line_map[line_idx] = { todo = todo, is_description = true }
+				end
+			end
 		end
 		::continue::
 	end
@@ -322,7 +334,9 @@ function M.render_todos()
 
 		if todo_info then
 			local todo = todo_info.todo
-			if todo.done then
+			if todo_info.is_description then
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Comment", line_nr, 0, -1)
+			elseif todo.done then
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
 			else
 				local hl_group = highlights.get_priority_highlight(todo.priorities, config)
@@ -791,6 +805,7 @@ local function create_window()
 			toggle_categories = "C",
 			clear_filter = "c",
 			edit_todo = "e",
+			edit_description = "A",
 			edit_priorities = "p",
 			add_due_date = "H",
 			remove_due_date = "r",
@@ -913,6 +928,12 @@ local function create_window()
 
 	setup_keymap("edit_todo", function()
 		todo_actions.edit_todo(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("edit_description", function()
+		todo_actions.edit_description(win_id, function()
 			M.render_todos()
 		end)
 	end)
