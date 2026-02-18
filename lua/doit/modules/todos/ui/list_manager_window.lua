@@ -157,24 +157,60 @@ function M.setup(parent_module)
         table.insert(lines, string.format("  ✓ Done: %d", done))
         table.insert(lines, "")
         
-        -- Recent todos (show up to 10)
+        -- preview: open items first (sorted by order_index), then done
         if #todos > 0 then
-            table.insert(lines, "  Recent Todos:")
-            table.insert(lines, "  " .. string.rep("─", 12))
-            
-            local count = 0
-            for i = #todos, 1, -1 do
-                if count >= 10 then break end
-                local todo = todos[i]
-                
-                local icon = todo.done and "✓" or (todo.in_progress and "◐" or "○")
-                local text = todo.text
-                if #text > 40 then
-                    text = text:sub(1, 37) .. "..."
+            local open_todos = {}
+            local done_todos = {}
+            for _, todo in ipairs(todos) do
+                if todo.done then
+                    table.insert(done_todos, todo)
+                else
+                    table.insert(open_todos, todo)
                 end
-                
-                table.insert(lines, string.format("  %s %s", icon, text))
-                count = count + 1
+            end
+
+            table.sort(open_todos, function(a, b)
+                if (a.in_progress and not b.in_progress) then return true end
+                if (b.in_progress and not a.in_progress) then return false end
+                return (a.order_index or 0) < (b.order_index or 0)
+            end)
+            table.sort(done_todos, function(a, b)
+                return (a.order_index or 0) < (b.order_index or 0)
+            end)
+
+            local max_preview = 10
+            local count = 0
+
+            if #open_todos > 0 then
+                table.insert(lines, "  Open:")
+                table.insert(lines, "  " .. string.rep("─", 12))
+                for _, todo in ipairs(open_todos) do
+                    if count >= max_preview then break end
+                    local icon = todo.in_progress and "◐" or "○"
+                    local text = todo.text
+                    if #text > 40 then
+                        text = text:sub(1, 37) .. "..."
+                    end
+                    table.insert(lines, string.format("  %s %s", icon, text))
+                    count = count + 1
+                end
+            end
+
+            local done_slots = max_preview - count
+            if done_slots > 0 and #done_todos > 0 then
+                table.insert(lines, "")
+                table.insert(lines, "  Done:")
+                table.insert(lines, "  " .. string.rep("─", 12))
+                local done_count = 0
+                for _, todo in ipairs(done_todos) do
+                    if done_count >= done_slots then break end
+                    local text = todo.text
+                    if #text > 40 then
+                        text = text:sub(1, 37) .. "..."
+                    end
+                    table.insert(lines, string.format("  ✓ %s", text))
+                    done_count = done_count + 1
+                end
             end
         else
             table.insert(lines, "  (No todos in this list)")

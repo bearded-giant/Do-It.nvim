@@ -41,7 +41,7 @@ preview_list() {
         # show in-progress first, then pending
         jq -r '
             [.todos[] | select(.done == false)] |
-            sort_by(if .in_progress then 0 else 1 end, .order_index) |
+            sort_by((if .in_progress then 0 else 1 end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
             .[0:5] | .[] |
             (if .in_progress then "▶ " else "• " end) + (.text | split("\n")[0][0:50])
         ' "$list_file" 2>/dev/null | while read -r line; do
@@ -51,7 +51,7 @@ preview_list() {
         if [[ "$SHOW_COMPLETED" == "true" && "$done_count" -gt 0 ]]; then
             jq -r '
                 [.todos[] | select(.done == true)] |
-                sort_by(.order_index) |
+                sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
                 .[0:3] | .[] |
                 "✓ " + (.text | split("\n")[0][0:50])
             ' "$list_file" 2>/dev/null | while read -r line; do
