@@ -349,6 +349,12 @@ function M.render_todos()
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
 			end
 
+			-- Obsidian sync icon highlight
+			if todo.obsidian_ref and line:find("", 1, true) then
+				local obs_start = line:find("", 1, true) - 1
+				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItObsidian", line_nr, obs_start, obs_start + #"")
+			end
+
 			-- Note link highlight for [[note-title]] syntax
 			for link in line:gmatch("%[%[([^%]]+)%]%]") do
 				local link_pattern = "%[%[" .. link .. "%]%]"
@@ -423,15 +429,15 @@ function M.format_todo_line(todo)
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			}
 		}
 	end
@@ -442,26 +448,26 @@ function M.format_todo_line(todo)
 	if not formatting.pending then
 		formatting.pending = {
 			icon = "○",
-			format = { "icon", "text", "relative_time" }
+			format = { "obsidian_icon", "icon", "text", "relative_time" }
 		}
 	end
 	if not formatting.done then
 		formatting.done = {
 			icon = "✓",
-			format = { "icon", "text", "relative_time" }
+			format = { "obsidian_icon", "icon", "text", "relative_time" }
 		}
 	end
 	if not formatting.in_progress then
 		formatting.in_progress = {
 			icon = "◐",
-			format = { "icon", "text", "relative_time" }
+			format = { "obsidian_icon", "icon", "text", "relative_time" }
 		}
 	end
 
 	local format = todo.done and formatting.done.format or 
 	               (todo.in_progress and formatting.in_progress.format or formatting.pending.format)
 	if not format then
-		format = { "icon", "text", "ect", "relative_time" } -- fallback
+		format = { "obsidian_icon", "icon", "text", "ect", "relative_time" } -- fallback
 	end
 
 	-- Visual indicator if this todo is being reordered
@@ -480,6 +486,11 @@ function M.format_todo_line(todo)
 		notes_icon = config.options.notes and config.options.notes.linked_icon or "🔗"
 	elseif todo.notes and todo.notes ~= "" then
 		notes_icon = config.options.notes and config.options.notes.icon or "✎"
+	end
+
+	local obsidian_icon = ""
+	if todo.obsidian_ref then
+		obsidian_icon = ""
 	end
 
 	local components = {}
@@ -542,6 +553,8 @@ function M.format_todo_line(todo)
 			table.insert(components, todo.text)
 		elseif part == "notes_icon" then
 			table.insert(components, notes_icon)
+		elseif part == "obsidian_icon" then
+			table.insert(components, obsidian_icon)
 		elseif part == "relative_time" then
 			if todo.created_at and config.options.timestamp and config.options.timestamp.enabled then
 				table.insert(components, "@" .. format_relative_time(todo.created_at))
@@ -620,15 +633,15 @@ local function create_window()
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
 			}
 		}
 	end
@@ -822,6 +835,7 @@ local function create_window()
 			move_todo_up = "k",
 			move_todo_down = "j",
 			move_todo_to_list = "m",
+			export_to_daily = "O",
 		}
 
 		-- Try to get key from config, fall back to default
@@ -1066,6 +1080,21 @@ local function create_window()
 				vim.notify("Move functionality not available", vim.log.levels.ERROR)
 			end
 		end)
+	end)
+
+	setup_keymap("export_to_daily", function()
+		local todo = todo_actions.get_todo_at_cursor(win_id)
+		if not todo then
+			vim.notify("No todo selected", vim.log.levels.WARN)
+			return
+		end
+
+		local obsidian_sync = core.get_module("obsidian-sync")
+		if obsidian_sync and obsidian_sync.export_to_daily then
+			obsidian_sync.export_to_daily(todo)
+		else
+			vim.notify("Obsidian sync module not available", vim.log.levels.WARN)
+		end
 	end)
 
 	-- Always allow Esc to close the window, in addition to the configured close key

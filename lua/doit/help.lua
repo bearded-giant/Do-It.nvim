@@ -42,6 +42,7 @@ M.keymaps = {
 		import_export = {
 			{ key = "I", desc = "Import todos from file" },
 			{ key = "E", desc = "Export todos to file" },
+			{ key = "O", desc = "Export todo to Obsidian daily note" },
 		},
 	},
 	list_manager = {

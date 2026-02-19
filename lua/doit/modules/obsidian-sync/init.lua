@@ -253,6 +253,13 @@ function M.setup_functions()
 					-- Create todo in the target list (don't pass list as second param)
 					local new_todo = todos_module.state.add_todo(clean_text)
 
+					-- persist obsidian ref on the todo for visual indicator
+					new_todo.obsidian_ref = {
+						file = file,
+						date = file:match("(%d%d%d%d%-%d%d%-%d%d)") or os.date("%Y-%m-%d"),
+						lnum = lnum,
+					}
+
 					-- Track reference
 					M.refs[new_todo.id] = {
 						bufnr = bufnr,
@@ -471,6 +478,104 @@ function M.setup_functions()
 		end
 	end
 
+	-- export a single todo to today's daily note
+	function M.export_to_daily(todo)
+		if not todo or not todo.text or not todo.id then
+			vim.notify("No valid todo to export", vim.log.levels.WARN)
+			return false
+		end
+
+		-- check if already exported (persisted ref or session ref)
+		if todo.obsidian_ref then
+			vim.notify("Todo already linked to daily note", vim.log.levels.WARN)
+			return false
+		end
+		if M.refs[todo.id] then
+			local ref = M.refs[todo.id]
+			if ref.file and ref.file:match("/daily/") then
+				vim.notify("Todo already linked to daily note", vim.log.levels.WARN)
+				return false
+			end
+		end
+
+		local today = os.date("%Y-%m-%d")
+		local daily_path = vim.fn.expand(M.config.vault_path .. "/daily/" .. today .. ".md")
+
+		if vim.fn.filereadable(daily_path) ~= 1 then
+			vim.notify("Today's daily note not found: " .. daily_path, vim.log.levels.ERROR)
+			return false
+		end
+
+		local lines = vim.fn.readfile(daily_path)
+		local todo_section_start = nil
+		local insert_at = nil
+
+		-- find the ## TODO section and where to insert
+		for i, line in ipairs(lines) do
+			if line:match("^## TODO") then
+				todo_section_start = i
+			elseif todo_section_start then
+				-- look for the end of the section (--- or next ## heading)
+				if line:match("^---") or line:match("^## ") then
+					insert_at = i
+					break
+				end
+			end
+		end
+
+		if not todo_section_start then
+			vim.notify("No ## TODO section found in daily note", vim.log.levels.ERROR)
+			return false
+		end
+
+		-- default to end of file if no terminator found
+		if not insert_at then
+			insert_at = #lines + 1
+		end
+
+		-- skip blank lines above the separator to insert right before them
+		while insert_at > todo_section_start + 1 and lines[insert_at - 1]:match("^%s*$") do
+			insert_at = insert_at - 1
+		end
+
+		local new_line = "- [ ] - " .. todo.text .. " <!-- doit:" .. todo.id .. " -->"
+		table.insert(lines, insert_at, new_line)
+		vim.fn.writefile(lines, daily_path)
+
+		-- track the reference
+		M.refs[todo.id] = {
+			bufnr = nil,
+			lnum = insert_at,
+			file = daily_path,
+			date = today,
+			list = todo.list_name or (M.config.list_mapping.daily or "daily"),
+		}
+		M.imported_lines[daily_path .. ":" .. insert_at] = todo.id
+
+		-- reload buffer if it's open
+		for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+			if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) == daily_path then
+				vim.api.nvim_buf_call(bufnr, function()
+					vim.cmd("checktime")
+				end)
+				M.refs[todo.id].bufnr = bufnr
+				break
+			end
+		end
+
+		-- persist the reference on the todo so it survives across sessions
+		todo.obsidian_ref = { file = daily_path, date = today, lnum = insert_at }
+		local core = require("doit.core")
+		local todos_module = core.get_module("todos")
+		if todos_module and todos_module.state and todos_module.state.save_todos then
+			todos_module.state.save_todos()
+		end
+
+		local short_text = #todo.text > 40 and todo.text:sub(1, 40) .. "..." or todo.text
+		vim.notify("Exported to daily: " .. short_text, vim.log.levels.INFO)
+		return true
+	end
+
 	-- Get current todo index (helper for hooks)
 	function M.get_current_todo_index(win_id)
 		if not win_id or not vim.api.nvim_win_is_valid(win_id) then
@@ -526,6 +631,29 @@ function M.create_commands()
 			vim.notify("Imported " .. count .. " todos from today's note", vim.log.levels.INFO)
 		end
 	end, { desc = "Import todos from today's daily note" })
+
+	-- Export current todo to today's daily note
+	vim.api.nvim_create_user_command("DoItExportToDaily", function()
+		local core = require("doit.core")
+		local todos_module = core.get_module("todos")
+		if not todos_module or not todos_module.state then
+			vim.notify("Todos module not available", vim.log.levels.ERROR)
+			return
+		end
+
+		-- try to get the todo at cursor from main window
+		local main_window = require("doit.ui.main_window")
+		local todo_actions = require("doit.ui.todo_actions")
+		if main_window.win_id and vim.api.nvim_win_is_valid(main_window.win_id) then
+			local todo = todo_actions.get_todo_at_cursor(main_window.win_id)
+			if todo then
+				M.export_to_daily(todo)
+				return
+			end
+		end
+
+		vim.notify("No todo selected - open the DoIt window and select a todo", vim.log.levels.WARN)
+	end, { desc = "Export current todo to today's Obsidian daily note" })
 
 	-- Show sync status
 	vim.api.nvim_create_user_command("DoItSyncStatus", function()
