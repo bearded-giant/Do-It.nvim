@@ -314,14 +314,14 @@ while true; do
  Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
 ───────────────────────────────────────────────────
  ENTER: Toggle    s: Start    x: Stop    X: Revert
- n: New    e: Edit    P: Priority    K/J: Reorder
+ n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- N: Description    y: Copy text    B: Backup all lists
+ v: View (select text)    y: Copy text    N: Description
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,B,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -372,7 +372,35 @@ while true; do
             fi
             ;;
         "v")
-            # no-op, preview pane replaces this
+            # view full text in less for text selection/copy
+            if [[ -n "$TODO_ID" ]]; then
+                VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
+                TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
+                VIEW_TEXT=$(echo "$TODO_OBJ" | jq -r '.text // ""')
+                VIEW_DESC=$(echo "$TODO_OBJ" | jq -r '.description // ""')
+                VIEW_PRIORITY=$(echo "$TODO_OBJ" | jq -r '.priorities // "default"')
+                VIEW_STATUS="pending"
+                echo "$TODO_OBJ" | jq -e '.in_progress == true' &>/dev/null && VIEW_STATUS="in-progress"
+                echo "$TODO_OBJ" | jq -e '.done == true' &>/dev/null && VIEW_STATUS="done"
+
+                {
+                    echo "[$VIEW_STATUS] [$VIEW_PRIORITY]"
+                    echo "────────────────────────────────────────"
+                    echo ""
+                    echo "$VIEW_TEXT"
+                    if [[ -n "$VIEW_DESC" ]]; then
+                        echo ""
+                        echo "── description ─────────────────────────"
+                        echo "$VIEW_DESC"
+                    fi
+                    echo ""
+                    echo "────────────────────────────────────────"
+                    echo "select text with mouse/keyboard, q to exit"
+                } > "$VIEW_TMP"
+
+                less -R "$VIEW_TMP"
+                rm -f "$VIEW_TMP"
+            fi
             ;;
         "N")
             # add/edit description on a todo
@@ -590,6 +618,87 @@ while true; do
                 fi
             fi
             ;;
+        "p")
+            # paste from clipboard as new todo
+            PASTED=""
+            if command -v pbpaste &>/dev/null; then
+                PASTED=$(pbpaste)
+            elif command -v xclip &>/dev/null; then
+                PASTED=$(xclip -selection clipboard -o)
+            elif command -v xsel &>/dev/null; then
+                PASTED=$(xsel --clipboard)
+            fi
+
+            if [[ -z "$PASTED" ]]; then
+                echo "Clipboard is empty"
+                sleep 0.5
+                continue
+            fi
+
+            # show preview and confirm
+            echo ""
+            PREVIEW=$(echo "$PASTED" | head -3)
+            LINE_COUNT=$(echo "$PASTED" | wc -l | tr -d ' ')
+            echo " Paste from clipboard ($LINE_COUNT lines):"
+            echo " $PREVIEW"
+            [[ "$LINE_COUNT" -gt 3 ]] && echo " ..."
+            echo ""
+            echo -n " Create todo from clipboard? (Y/n): "
+            read -n 1 -r CONFIRM
+            echo
+
+            if [[ "$CONFIRM" =~ ^[Nn]$ ]]; then
+                echo "Cancelled"
+                sleep 0.3
+                continue
+            fi
+
+            TODO_TEXT="$PASTED"
+
+            SELECTED_PRIORITY=$(select_priority "default" "Select Priority (Enter for default)")
+
+            TODO_ID="$(date +%s)_$(( RANDOM * RANDOM % 9999999 ))"
+            MAX_ORDER=$(jq '.todos | map(.order_index) | max // 0' "$TODO_LIST_PATH")
+            NEW_ORDER=$((MAX_ORDER + 1))
+
+            if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
+                jq --arg id "$TODO_ID" \
+                   --arg text "$TODO_TEXT" \
+                   --arg order "$NEW_ORDER" \
+                   --arg priority "$SELECTED_PRIORITY" \
+                   '.todos += [{
+                      id: $id,
+                      text: $text,
+                      done: false,
+                      in_progress: false,
+                      order_index: ($order | tonumber),
+                      created_at: (now | floor),
+                      priorities: $priority
+                   }] |
+                   ._metadata.updated_at = (now | floor)' \
+                   "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            else
+                jq --arg id "$TODO_ID" \
+                   --arg text "$TODO_TEXT" \
+                   --arg order "$NEW_ORDER" \
+                   '.todos += [{
+                      id: $id,
+                      text: $text,
+                      done: false,
+                      in_progress: false,
+                      order_index: ($order | tonumber),
+                      created_at: (now | floor)
+                   }] |
+                   ._metadata.updated_at = (now | floor)' \
+                   "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            fi
+
+            if [[ $? -eq 0 ]]; then
+                SHORT=$(echo "$TODO_TEXT" | head -1 | cut -c1-40)
+                echo "✓ Created from clipboard: $SHORT"
+                sleep 0.5
+            fi
+            ;;
         "n")
             # New todo
             echo ""
@@ -705,6 +814,7 @@ while true; do
             echo ""
             echo " Editing"
             echo "   n                New todo"
+            echo "   p                Paste new todo from clipboard"
             echo "   e                Edit todo text"
             echo "   P                Set priority"
             echo "   (In new/edit: Enter = save, Esc = cancel)"
