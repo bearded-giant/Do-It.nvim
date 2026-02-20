@@ -78,15 +78,15 @@ M.defaults = {
 			formatting = {
 				pending = {
 					icon = "○",
-					format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 				},
 				in_progress = {
 					icon = "◐",
-					format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 				},
 				done = {
 					icon = "✓",
-					format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 				},
 			},
 			priorities = {
@@ -154,6 +154,7 @@ M.defaults = {
 				move_todo_down = "j",
 				open_linked_note = "o",
 				move_todo_to_list = "m",
+				export_to_daily = "O",
 			},
 		},
 		
@@ -229,15 +230,15 @@ M.defaults = {
 	formatting = {
 		pending = {
 			icon = "○",
-			format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+			format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 		},
 		in_progress = {
 			icon = "◐",
-			format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+			format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 		},
 		done = {
 			icon = "✓",
-			format = { "notes_icon", "icon", "text", "ect", "due_date", "relative_time" },
+			format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
 		},
 	},
 	priorities = {
@@ -302,6 +303,7 @@ M.defaults = {
 		move_todo_down = "j",
 		open_linked_note = "o",
 		move_todo_to_list = "m",
+		export_to_daily = "O",
 	},
 	calendar = {
 		language = "en",

@@ -65,7 +65,7 @@ format_todos() {
     # First print in-progress todos
     jq -r '.todos |
         map(select(.in_progress == true)) |
-        sort_by(.order_index) |
+        sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:55]) as $first_line |
         (.text | contains("\n")) as $multiline |
@@ -87,7 +87,7 @@ format_todos() {
     # Then print not started todos
     jq -r '.todos |
         map(select(.done == false and .in_progress != true)) |
-        sort_by(.order_index) |
+        sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:55]) as $first_line |
         (.text | contains("\n")) as $multiline |
@@ -108,7 +108,7 @@ format_todos() {
     if [[ "$SHOW_COMPLETED" == "true" ]]; then
         jq -r '.todos |
             map(select(.done == true)) |
-            sort_by(.order_index) |
+            sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
             .[] |
             (.text | split("\n")[0][0:55]) as $first_line |
             (.text | contains("\n")) as $multiline |

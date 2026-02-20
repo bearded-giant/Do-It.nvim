@@ -43,15 +43,15 @@ M.defaults = {
     formatting = {
         pending = {
             icon = "○",
-            format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+            format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" },
         },
         in_progress = {
             icon = "◐",
-            format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+            format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" },
         },
         done = {
             icon = "✓",
-            format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+            format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" },
         },
     },
     keymaps = {
@@ -87,6 +87,7 @@ M.defaults = {
         reorder_todo = "r",
         move_todo_up = "k",
         move_todo_down = "j",
+        export_to_daily = "O",
     },
     calendar = {
         language = "en",
