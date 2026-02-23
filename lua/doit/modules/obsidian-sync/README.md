@@ -28,7 +28,12 @@ require("doit").setup({
             auto_import_on_open = false,  -- Auto-import when opening daily notes
             sync_completions = true,       -- Sync completion status back to Obsidian
             default_list = "obsidian",    -- Default list for imported todos
-            list_mapping = {
+            path_to_list = {              -- Map vault directories to DoIt lists
+                { pattern = "/daily/", list = "daily" },
+                { pattern = "/inbox/", list = "inbox" },
+                { pattern = "/projects/", list = "projects" },
+            },
+            list_mapping = {              -- Map #tags in todo text to DoIt lists
                 daily = "daily",
                 inbox = "inbox",
                 projects = "projects"

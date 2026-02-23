@@ -21,6 +21,7 @@ M.metadata = {
 		auto_import_on_open = { type = "boolean", default = false },
 		sync_completions = { type = "boolean", default = true },
 		default_list = { type = "string", default = "obsidian" },
+		path_to_list = { type = "table" },
 		list_mapping = { type = "table" },
 		keymaps = { type = "table" },
 	},
@@ -46,6 +47,11 @@ function M.setup(opts)
 		auto_import_on_open = false,
 		sync_completions = true,
 		default_list = "obsidian",
+		path_to_list = {
+			{ pattern = "/daily/", list = "daily" },
+			{ pattern = "/inbox/", list = "inbox" },
+			{ pattern = "/projects/", list = "projects" },
+		},
 		list_mapping = {
 			daily = "daily",
 			inbox = "inbox",
@@ -211,16 +217,14 @@ function M.setup_functions()
 
 	-- Helper: Determine which list a todo should go into
 	function M.determine_list(file, text)
-		-- Check file path patterns
-		if file:match("/daily/") then
-			return M.config.list_mapping.daily or "daily"
-		elseif file:match("/inbox/") then
-			return M.config.list_mapping.inbox or "inbox"
-		elseif file:match("/projects/") then
-			return M.config.list_mapping.projects or "projects"
+		-- check configurable path patterns
+		for _, mapping in ipairs(M.config.path_to_list or {}) do
+			if file:find(mapping.pattern, 1, true) then
+				return mapping.list
+			end
 		end
 
-		-- Check for tags in text
+		-- check for tags in text
 		local tag = text:match("#(%w+)")
 		if tag and M.config.list_mapping[tag] then
 			return M.config.list_mapping[tag]
