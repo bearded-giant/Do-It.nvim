@@ -657,9 +657,9 @@ while true; do
 
                 # find ## TODO section and insert before the separator/next heading
                 INSERT_LINE=$(awk '
-                    /^## TODO/ { in_section=1; next }
-                    in_section && (/^---/ || /^## /) { print NR; exit }
-                    END { if (in_section) print NR+1 }
+                    /^## TODO/ { found=1; next }
+                    found && (/^---/ || /^## /) { print NR; found=0; exit }
+                    END { if (found) print NR+1 }
                 ' "$DAILY_PATH")
 
                 if [[ -z "$INSERT_LINE" ]]; then
@@ -669,20 +669,23 @@ while true; do
                 fi
 
                 # skip trailing blank lines above separator
-                while [[ $INSERT_LINE -gt 1 ]] && sed -n "$((INSERT_LINE - 1))p" "$DAILY_PATH" | grep -qE '^\s*$'; do
+                TOTAL_LINES=$(wc -l < "$DAILY_PATH" | tr -d ' ')
+                while [[ $INSERT_LINE -gt 1 && $INSERT_LINE -le $TOTAL_LINES ]] && awk -v n="$((INSERT_LINE - 1))" 'NR==n { exit ($0 ~ /^[[:space:]]*$/ ? 0 : 1) }' "$DAILY_PATH"; do
                     INSERT_LINE=$((INSERT_LINE - 1))
                 done
 
-                # insert the line
-                sed -i '' "${INSERT_LINE}i\\
-${NEW_LINE}
-" "$DAILY_PATH"
+                # insert using head/tail to avoid sed escaping issues
+                {
+                    head -n "$((INSERT_LINE - 1))" "$DAILY_PATH"
+                    printf '%s\n' "$NEW_LINE"
+                    tail -n +"$INSERT_LINE" "$DAILY_PATH"
+                } > "${DAILY_PATH}.tmp" && mv "${DAILY_PATH}.tmp" "$DAILY_PATH"
 
                 # set obsidian_ref on the todo
-                jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" --arg lnum "$INSERT_LINE" '
+                jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" --argjson lnum "$INSERT_LINE" '
                     .todos |= map(
                         if .id == $id then
-                            .obsidian_ref = { file: $file, date: $date, lnum: ($lnum | tonumber) }
+                            .obsidian_ref = { file: $file, date: $date, lnum: $lnum }
                         else . end
                     ) |
                     ._metadata.updated_at = (now | floor)
