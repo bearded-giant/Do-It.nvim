@@ -329,10 +329,11 @@ while true; do
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
  v: View (select text)    y: Copy text    N: Description
+ O: Send to Obsidian daily
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,? \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -629,6 +630,69 @@ while true; do
                 fi
             fi
             ;;
+        "O")
+            # send todo to obsidian daily note
+            if [[ -n "$TODO_ID" ]]; then
+                # check if already linked
+                HAS_REF=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .obsidian_ref // empty' "$TODO_LIST_PATH")
+                if [[ -n "$HAS_REF" ]]; then
+                    echo "Already linked to daily note"
+                    sleep 1
+                    continue
+                fi
+
+                VAULT_PATH=$(tmux show-option -gqv "@doit-obsidian-vault")
+                VAULT_PATH="${VAULT_PATH:-$HOME/Recharge-Notes}"
+                TODAY=$(date +%Y-%m-%d)
+                DAILY_PATH="$VAULT_PATH/daily/$TODAY.md"
+
+                if [[ ! -f "$DAILY_PATH" ]]; then
+                    echo "Today's daily note not found: $DAILY_PATH"
+                    sleep 1
+                    continue
+                fi
+
+                TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
+                NEW_LINE="- [ ] - $TODO_TEXT <!-- doit:$TODO_ID -->"
+
+                # find ## TODO section and insert before the separator/next heading
+                INSERT_LINE=$(awk '
+                    /^## TODO/ { in_section=1; next }
+                    in_section && (/^---/ || /^## /) { print NR; exit }
+                    END { if (in_section) print NR+1 }
+                ' "$DAILY_PATH")
+
+                if [[ -z "$INSERT_LINE" ]]; then
+                    echo "No ## TODO section found in daily note"
+                    sleep 1
+                    continue
+                fi
+
+                # skip trailing blank lines above separator
+                while [[ $INSERT_LINE -gt 1 ]] && sed -n "$((INSERT_LINE - 1))p" "$DAILY_PATH" | grep -qE '^\s*$'; do
+                    INSERT_LINE=$((INSERT_LINE - 1))
+                done
+
+                # insert the line
+                sed -i '' "${INSERT_LINE}i\\
+${NEW_LINE}
+" "$DAILY_PATH"
+
+                # set obsidian_ref on the todo
+                jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" --arg lnum "$INSERT_LINE" '
+                    .todos |= map(
+                        if .id == $id then
+                            .obsidian_ref = { file: $file, date: $date, lnum: ($lnum | tonumber) }
+                        else . end
+                    ) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+
+                SHORT=$(echo "$TODO_TEXT" | head -1 | cut -c1-40)
+                echo "Sent to daily: $SHORT"
+                sleep 1
+            fi
+            ;;
         "p")
             # paste from clipboard as new todo
             PASTED=""
@@ -839,6 +903,9 @@ while true; do
             echo "   v                View full text (scrollable, q to exit)"
             echo "   N                Edit note in \$EDITOR"
             echo "   y                Copy text to clipboard"
+            echo ""
+            echo " Obsidian"
+            echo "   O                Send to today's daily note"
             echo ""
             echo " Lists"
             echo "   l                Switch lists"

@@ -1082,7 +1082,8 @@ local function create_window()
 		end)
 	end)
 
-	setup_keymap("export_to_daily", function()
+	-- export to obsidian daily note
+	vim.keymap.set("n", "O", function()
 		local todo = todo_actions.get_todo_at_cursor(win_id)
 		if not todo then
 			vim.notify("No todo selected", vim.log.levels.WARN)
@@ -1092,10 +1093,11 @@ local function create_window()
 		local obsidian_sync = core.get_module("obsidian-sync")
 		if obsidian_sync and obsidian_sync.export_to_daily then
 			obsidian_sync.export_to_daily(todo)
+			M.render_todos()
 		else
 			vim.notify("Obsidian sync module not available", vim.log.levels.WARN)
 		end
-	end)
+	end, { buffer = buf_id, nowait = true, desc = "Export to Obsidian daily note" })
 
 	-- Always allow Esc to close the window, in addition to the configured close key
 	vim.keymap.set("n", "<Esc>", function()
