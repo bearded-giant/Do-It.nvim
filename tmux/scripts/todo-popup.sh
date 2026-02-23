@@ -25,6 +25,7 @@ BOLD='\033[1m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
+PURPLE='\033[38;5;141m'
 GRAY='\033[90m'
 DIM='\033[2m'
 RESET='\033[0m'
@@ -56,8 +57,10 @@ echo ""
 # Show in-progress todos first
 if [[ $IN_PROGRESS -gt 0 ]]; then
     echo -e "${YELLOW}▶ In Progress:${RESET}"
-    jq -r '.todos[] | select(.in_progress == true) | "  • \(.text)"' "$TODO_LIST_PATH" | while IFS= read -r line; do
-        echo -e "${GREEN}$line${RESET}"
+    jq -r '.todos[] | select(.in_progress == true) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | while IFS='|' read -r obs line; do
+        obs_icon=""
+        [[ "$obs" == "true" ]] && obs_icon=" ${PURPLE}${RESET}"
+        echo -e "${GREEN}  • ${line}${obs_icon}${RESET}"
     done
     echo ""
 fi
@@ -66,8 +69,10 @@ fi
 PENDING_COUNT=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$TODO_LIST_PATH")
 if [[ $PENDING_COUNT -gt 0 ]]; then
     echo -e "${BOLD}◯ Pending:${RESET}"
-    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == false and .in_progress != true) | "  • \(.text)"' "$TODO_LIST_PATH" | head -10 | while IFS= read -r line; do
-        echo "$line"
+    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == false and .in_progress != true) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | head -10 | while IFS='|' read -r obs line; do
+        obs_icon=""
+        [[ "$obs" == "true" ]] && obs_icon=" ${PURPLE}${RESET}"
+        echo -e "  • ${line}${obs_icon}"
     done
 
     if [[ $PENDING_COUNT -gt 10 ]]; then
@@ -80,8 +85,10 @@ fi
 COMPLETED_COUNT=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH")
 if [[ $COMPLETED_COUNT -gt 0 && "$SHOW_COMPLETED" == "true" ]]; then
     echo -e "${DIM}✓ Completed:${RESET}"
-    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == true) | "  • \(.text)"' "$TODO_LIST_PATH" | while IFS= read -r line; do
-        echo -e "${DIM}$line${RESET}"
+    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == true) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | while IFS='|' read -r obs line; do
+        obs_icon=""
+        [[ "$obs" == "true" ]] && obs_icon=" ${PURPLE}${RESET}"
+        echo -e "${DIM}  • ${line}${obs_icon}${RESET}"
     done
     echo ""
 fi

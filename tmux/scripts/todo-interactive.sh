@@ -34,6 +34,7 @@ COLOR_GREEN=$'\e[1;32m'
 COLOR_RED=$'\e[1;31m'
 COLOR_YELLOW=$'\e[1;33m'
 COLOR_BLUE=$'\e[1;34m'
+COLOR_PURPLE=$'\e[38;5;141m'
 COLOR_DIM=$'\e[2m'
 
 # config: show completed items (default true)
@@ -49,6 +50,7 @@ preview_todo() {
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
             "\nPriority: " + (.priorities // "none") +
+            (if .obsidian_ref then "\nObsidian:  " + (.obsidian_ref.date // "linked") else "" end) +
             "\n────────────────────────────────" +
             "\n" + .text +
             (if (.description // "") != "" then "\n\nDescription:\n" + .description else "" end)
@@ -69,18 +71,21 @@ format_todos() {
         .[] |
         (.text | split("\n")[0][0:55]) as $first_line |
         (.text | contains("\n")) as $multiline |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)"
+        (if .obsidian_ref then "true" else "false" end) as $obs |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status priority text multiline; do
+    while IFS='|' read -r id status priority text multiline obs; do
         # Add ... for multi-line items
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
+        obs_icon=""
+        [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         # Append ID at end (dimmed) for reliable extraction
         case "$priority" in
-            "critical")  printf "%s%s%s! %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s> %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s* %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s%s  %-55s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s%s! %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s%s> %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 
@@ -91,16 +96,19 @@ format_todos() {
         .[] |
         (.text | split("\n")[0][0:55]) as $first_line |
         (.text | contains("\n")) as $multiline |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)"
+        (if .obsidian_ref then "true" else "false" end) as $obs |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
     ' "$TODO_LIST_PATH" |
-    while IFS='|' read -r id status priority text multiline; do
+    while IFS='|' read -r id status priority text multiline obs; do
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
+        obs_icon=""
+        [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         case "$priority" in
-            "critical")  printf "%s%s! %-55s%s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s> %-55s%s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s* %-55s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s  %-55s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s! %-55s%s%s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s> %-55s%s%s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s  %-55s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
     done
 
@@ -112,12 +120,15 @@ format_todos() {
             .[] |
             (.text | split("\n")[0][0:55]) as $first_line |
             (.text | contains("\n")) as $multiline |
-            "\(.id)|✓|\(.priorities // "")|\($first_line)|\($multiline)"
+            (if .obsidian_ref then "true" else "false" end) as $obs |
+            "\(.id)|✓|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
         ' "$TODO_LIST_PATH" |
-        while IFS='|' read -r id status priority text multiline; do
+        while IFS='|' read -r id status priority text multiline obs; do
             suffix=""
             [[ "$multiline" == "true" ]] && suffix=" ..."
-            printf "%s%s  %-55s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$COLOR_DIM" "$id" "$COLOR_RESET"
+            obs_icon=""
+            [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
+            printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
         done
     fi
 }
