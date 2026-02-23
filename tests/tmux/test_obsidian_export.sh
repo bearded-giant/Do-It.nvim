@@ -338,6 +338,26 @@ make_todo_list "$TODOLIST" "mm123" "missing marker"
 OUTPUT=$(run_export "mm123" "missing marker" "$DAILY" "$TODOLIST" "## Tasks")
 assert_contains "$OUTPUT" "No ## Tasks section"
 
+describe "obsidian export: custom daily note path"
+
+it "works with daily note in a non-standard directory"
+mkdir -p "$TEST_TMPDIR/vault/journal/2026/02"
+DAILY="$TEST_TMPDIR/vault/journal/2026/02/2026-02-22.md"
+TODOLIST="$TEST_TMPDIR/export_custom_path.json"
+make_daily_note "$DAILY"
+make_todo_list "$TODOLIST" "cp123" "custom path todo"
+run_export "cp123" "custom path todo" "$DAILY" "$TODOLIST" > /dev/null
+assert_file_contains "$DAILY" "- [ ] - custom path todo <!-- doit:cp123 -->"
+
+it "works with daily note using alternate naming"
+mkdir -p "$TEST_TMPDIR/vault/logs"
+DAILY="$TEST_TMPDIR/vault/logs/2026-02-22-daily.md"
+TODOLIST="$TEST_TMPDIR/export_alt_name.json"
+make_daily_note "$DAILY"
+make_todo_list "$TODOLIST" "an123" "alt name todo"
+run_export "an123" "alt name todo" "$DAILY" "$TODOLIST" > /dev/null
+assert_file_contains "$DAILY" "- [ ] - alt name todo <!-- doit:an123 -->"
+
 # -- done --
 
 report

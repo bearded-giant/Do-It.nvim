@@ -19,6 +19,11 @@ require("doit").setup({
         ["obsidian-sync"] = {
             vault_path = "~/Recharge-Notes",
             section_marker = "## TODO",    -- Heading where todos are inserted in daily notes
+            daily_note = {
+                path_template = "daily/%Y-%m-%d.md",  -- strftime tokens, relative to vault_path
+                -- OR for full control:
+                -- resolve = function(vault_path) return vault_path .. "/my-note.md" end
+            },
             auto_import_on_open = false,  -- Auto-import when opening daily notes
             sync_completions = true,       -- Sync completion status back to Obsidian
             default_list = "obsidian",    -- Default list for imported todos

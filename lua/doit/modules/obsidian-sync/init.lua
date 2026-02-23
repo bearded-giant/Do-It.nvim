@@ -17,6 +17,7 @@ M.metadata = {
 		enabled = { type = "boolean", default = true },
 		vault_path = { type = "string", default = "~/Recharge-Notes" },
 		section_marker = { type = "string", default = "## TODO" },
+		daily_note = { type = "table" },
 		auto_import_on_open = { type = "boolean", default = false },
 		sync_completions = { type = "boolean", default = true },
 		default_list = { type = "string", default = "obsidian" },
@@ -38,6 +39,9 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", {
 		vault_path = "~/Recharge-Notes",
 		section_marker = "## TODO",
+		daily_note = {
+			path_template = "daily/%Y-%m-%d.md",
+		},
 		auto_import_on_open = false,
 		sync_completions = true,
 		default_list = "obsidian",
@@ -85,6 +89,18 @@ end
 
 -- Core functions setup
 function M.setup_functions()
+	-- resolve today's daily note path from config template (strftime tokens)
+	-- pass optional os.time() value to resolve a different date
+	function M.resolve_daily_path(time)
+		local daily_note = M.config.daily_note or {}
+		if daily_note.resolve and type(daily_note.resolve) == "function" then
+			return daily_note.resolve(vim.fn.expand(M.config.vault_path), time)
+		end
+		local template = daily_note.path_template or "daily/%Y-%m-%d.md"
+		local expanded = os.date(template, time)
+		return vim.fn.expand(M.config.vault_path) .. "/" .. expanded
+	end
+
 	-- Helper: Find a todo by ID across all lists
 	function M.find_todo_by_id(todo_id, target_list)
 		local core = require("doit.core")
@@ -492,16 +508,16 @@ function M.setup_functions()
 			vim.notify("Todo already linked to daily note", vim.log.levels.WARN)
 			return false
 		end
+		local today = os.date("%Y-%m-%d")
+		local daily_path = M.resolve_daily_path()
+
 		if M.refs[todo.id] then
 			local ref = M.refs[todo.id]
-			if ref.file and ref.file:match("/daily/") then
+			if ref.file and ref.file == daily_path then
 				vim.notify("Todo already linked to daily note", vim.log.levels.WARN)
 				return false
 			end
 		end
-
-		local today = os.date("%Y-%m-%d")
-		local daily_path = vim.fn.expand(M.config.vault_path .. "/daily/" .. today .. ".md")
 
 		if vim.fn.filereadable(daily_path) ~= 1 then
 			vim.notify("Today's daily note not found: " .. daily_path, vim.log.levels.ERROR)
@@ -624,8 +640,7 @@ function M.create_commands()
 
 	-- Import today's daily note
 	vim.api.nvim_create_user_command("DoItImportToday", function()
-		local today = os.date("%Y-%m-%d")
-		local file = vim.fn.expand(M.config.vault_path .. "/daily/" .. today .. ".md")
+		local file = M.resolve_daily_path()
 
 		if vim.fn.filereadable(file) == 1 then
 			vim.cmd("edit " .. file)
@@ -760,7 +775,9 @@ function M.setup_autocmds()
 
 	local vault_expanded = vim.fn.expand(M.config.vault_path)
 	local vault_pattern = vault_expanded .. "/**/*.md"
-	local daily_pattern = vault_expanded .. "/daily/*.md"
+	local template = (M.config.daily_note or {}).path_template or "daily/%Y-%m-%d.md"
+	local daily_glob = template:gsub("%%[A-Za-z]", "*")
+	local daily_pattern = vault_expanded .. "/" .. daily_glob
 
 	-- Auto-import on daily note open
 	if M.config.auto_import_on_open then

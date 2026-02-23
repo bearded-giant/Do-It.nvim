@@ -645,8 +645,10 @@ while true; do
                 VAULT_PATH="${VAULT_PATH:-$HOME/Recharge-Notes}"
                 SECTION_MARKER=$(tmux show-option -gqv "@doit-obsidian-section")
                 SECTION_MARKER="${SECTION_MARKER:-## TODO}"
+                DAILY_TEMPLATE=$(tmux show-option -gqv "@doit-obsidian-daily-path")
+                DAILY_TEMPLATE="${DAILY_TEMPLATE:-daily/%Y-%m-%d.md}"
                 TODAY=$(date +%Y-%m-%d)
-                DAILY_PATH="$VAULT_PATH/daily/$TODAY.md"
+                DAILY_PATH="$VAULT_PATH/$(date +"$DAILY_TEMPLATE")"
 
                 if [[ ! -f "$DAILY_PATH" ]]; then
                     echo "Today's daily note not found: $DAILY_PATH"
