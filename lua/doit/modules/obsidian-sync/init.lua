@@ -552,35 +552,19 @@ function M.setup_functions()
 		end
 
 		local lines = vim.fn.readfile(daily_path)
-		local todo_section_start = nil
 		local insert_at = nil
 
-		-- find the ## TODO section and where to insert
+		-- find the section heading and insert immediately after it
 		for i, line in ipairs(lines) do
 			if line:match("^" .. vim.pesc(M.config.section_marker)) then
-				todo_section_start = i
-			elseif todo_section_start then
-				-- look for the end of the section (--- or next ## heading)
-				if line:match("^---") or line:match("^## ") then
-					insert_at = i
-					break
-				end
+				insert_at = i + 1
+				break
 			end
 		end
 
-		if not todo_section_start then
+		if not insert_at then
 			vim.notify("No " .. M.config.section_marker .. " section found in daily note", vim.log.levels.ERROR)
 			return false
-		end
-
-		-- default to end of file if no terminator found
-		if not insert_at then
-			insert_at = #lines + 1
-		end
-
-		-- skip blank lines above the separator to insert right before them
-		while insert_at > todo_section_start + 1 and lines[insert_at - 1]:match("^%s*$") do
-			insert_at = insert_at - 1
 		end
 
 		local new_line = "- [ ] - " .. todo.text .. " <!-- doit:" .. todo.id .. " -->"
