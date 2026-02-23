@@ -66,9 +66,9 @@ show_todo() {
     local todo_text_trimmed=$(echo "$todo_text" | xargs)
 
     if [[ "$todo_text_trimmed" == *"All done"* ]]; then
-        icon=""
+        icon="󰄬"
     else
-        icon=""
+        icon=""
     fi
 
     case "$todo_color" in
