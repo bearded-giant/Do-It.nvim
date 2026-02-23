@@ -609,6 +609,103 @@ function M.setup_functions()
 		return true
 	end
 
+	-- update a single todo's done state directly in the json file on disk
+	function M.update_todo_in_json(lists_dir, todo_id, is_done)
+		local json_files = vim.fn.glob(lists_dir .. "/*.json", false, true)
+
+		for _, json_path in ipairs(json_files) do
+			local f = io.open(json_path, "r")
+			if f then
+				local content = f:read("*all")
+				f:close()
+
+				local ok, data = pcall(vim.fn.json_decode, content)
+				if ok and data and data.todos then
+					for _, todo in ipairs(data.todos) do
+						if todo.id == todo_id then
+							if todo.done ~= is_done then
+								todo.done = is_done
+								if is_done then
+									todo.in_progress = false
+								end
+								data._metadata = data._metadata or {}
+								data._metadata.updated_at = os.time()
+
+								local wf = io.open(json_path, "w")
+								if wf then
+									wf:write(vim.fn.json_encode(data))
+									wf:close()
+									return true
+								end
+							end
+							return false
+						end
+					end
+				end
+			end
+		end
+
+		return false
+	end
+
+	-- reload in-memory doit state from disk and refresh ui if open
+	function M.refresh_doit_state()
+		local core = require("doit.core")
+		local todos_module = core.get_module("todos")
+		if not todos_module or not todos_module.state then
+			return
+		end
+
+		local active = todos_module.state.todo_lists.active
+		if active then
+			todos_module.state.load_list(active)
+		end
+
+		local ok, main_window = pcall(require, "doit.ui.main_window")
+		if ok and main_window and main_window.render_todos then
+			pcall(main_window.render_todos)
+		end
+	end
+
+	-- reverse sync: read checkbox states from an obsidian buffer, update doit json
+	function M.sync_completions_from_buffer(bufnr)
+		bufnr = bufnr or vim.api.nvim_get_current_buf()
+		local file = vim.api.nvim_buf_get_name(bufnr)
+
+		local vault_path = vim.fn.expand(M.config.vault_path)
+		if not file:match(vim.pesc(vault_path)) then
+			return 0
+		end
+
+		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		local updated = 0
+
+		local core = require("doit.core")
+		local todos_config = core.get_module_config and core.get_module_config("todos")
+		local lists_dir = (todos_config and todos_config.lists_dir)
+			or vim.fn.stdpath("data") .. "/doit/lists"
+
+		for _, line in ipairs(lines) do
+			local checkbox_char, todo_id = line:match("^%s*%- %[([^%]]-)%].-<!%-%- doit:(%S+) %-%->")
+			if todo_id then
+				local is_done = (checkbox_char == "x" or checkbox_char == "X")
+				if M.update_todo_in_json(lists_dir, todo_id, is_done) then
+					updated = updated + 1
+				end
+			end
+		end
+
+		if updated > 0 then
+			M.refresh_doit_state()
+			vim.notify(
+				string.format("[ObsidianSync] Synced %d completion%s from buffer", updated, updated > 1 and "s" or ""),
+				vim.log.levels.INFO
+			)
+		end
+
+		return updated
+	end
+
 	-- Get current todo index (helper for hooks)
 	function M.get_current_todo_index(win_id)
 		if not win_id or not vim.api.nvim_win_is_valid(win_id) then
@@ -759,6 +856,14 @@ function M.create_commands()
 		end
 	end, { nargs = "?", desc = "Test sync for a specific todo ID" })
 
+	-- Reverse sync: pull completions from obsidian buffer into doit json
+	vim.api.nvim_create_user_command("DoItSyncFromObsidian", function()
+		local count = M.sync_completions_from_buffer()
+		if count == 0 then
+			vim.notify("No completion changes to sync", vim.log.levels.INFO)
+		end
+	end, { desc = "Sync checkbox completions from Obsidian buffer to DoIt" })
+
 	-- Debug: List all references
 	vim.api.nvim_create_user_command("DoItListRefs", function()
 		if vim.tbl_count(M.refs) == 0 then
@@ -806,6 +911,15 @@ function M.setup_autocmds()
 			end,
 		})
 	end
+
+	-- Reverse sync: on save, pull checkbox states back into doit json
+	vim.api.nvim_create_autocmd("BufWritePost", {
+		group = group,
+		pattern = vault_pattern,
+		callback = function(ev)
+			M.sync_completions_from_buffer(ev.buf)
+		end,
+	})
 
 	-- Refresh references when entering Obsidian buffers
 	vim.api.nvim_create_autocmd({ "BufEnter" }, {
