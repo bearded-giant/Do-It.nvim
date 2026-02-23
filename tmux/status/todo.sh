@@ -15,7 +15,7 @@ source "$SCRIPTS_DIR/get-active-list.sh"
 
 TODO_LIST_PATH="$(get_active_list_path)"
 ACTIVE_LIST_NAME="$(get_active_list_name)"
-CHAR_LIMIT="${DOIT_CHAR_LIMIT:-25}"
+CHAR_LIMIT="${DOIT_CHAR_LIMIT:-20}"
 
 get_todo_status() {
     if ! command -v jq &> /dev/null; then
@@ -79,10 +79,8 @@ show_todo() {
     *) color="$thm_fg" ;;
     esac
 
-    # use todo-exec.sh for dynamic status text, include list name
     local script_path="${SCRIPTS_DIR}/todo-exec.sh"
-    local list_name="${ACTIVE_LIST_NAME:-daily}"
-    text="  [${list_name}] #(${script_path})  "
+    text=" #(${script_path}) "
 
     module=$(build_status_module "$index" "$icon" "$color" "$text")
 
