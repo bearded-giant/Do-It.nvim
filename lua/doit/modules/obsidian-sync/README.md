@@ -18,6 +18,7 @@ require("doit").setup({
     modules = {
         ["obsidian-sync"] = {
             vault_path = "~/Recharge-Notes",
+            section_marker = "## TODO",    -- Heading where todos are inserted in daily notes
             auto_import_on_open = false,  -- Auto-import when opening daily notes
             sync_completions = true,       -- Sync completion status back to Obsidian
             default_list = "obsidian",    -- Default list for imported todos

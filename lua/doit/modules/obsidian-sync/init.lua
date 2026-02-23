@@ -16,6 +16,7 @@ M.metadata = {
 	config_schema = {
 		enabled = { type = "boolean", default = true },
 		vault_path = { type = "string", default = "~/Recharge-Notes" },
+		section_marker = { type = "string", default = "## TODO" },
 		auto_import_on_open = { type = "boolean", default = false },
 		sync_completions = { type = "boolean", default = true },
 		default_list = { type = "string", default = "obsidian" },
@@ -36,6 +37,7 @@ function M.setup(opts)
 	-- Setup module configuration
 	M.config = vim.tbl_deep_extend("force", {
 		vault_path = "~/Recharge-Notes",
+		section_marker = "## TODO",
 		auto_import_on_open = false,
 		sync_completions = true,
 		default_list = "obsidian",
@@ -512,7 +514,7 @@ function M.setup_functions()
 
 		-- find the ## TODO section and where to insert
 		for i, line in ipairs(lines) do
-			if line:match("^## TODO") then
+			if line:match("^" .. vim.pesc(M.config.section_marker)) then
 				todo_section_start = i
 			elseif todo_section_start then
 				-- look for the end of the section (--- or next ## heading)
@@ -524,7 +526,7 @@ function M.setup_functions()
 		end
 
 		if not todo_section_start then
-			vim.notify("No ## TODO section found in daily note", vim.log.levels.ERROR)
+			vim.notify("No " .. M.config.section_marker .. " section found in daily note", vim.log.levels.ERROR)
 			return false
 		end
 
@@ -756,11 +758,15 @@ end
 function M.setup_autocmds()
 	local group = vim.api.nvim_create_augroup("DoItObsidianSync", { clear = true })
 
+	local vault_expanded = vim.fn.expand(M.config.vault_path)
+	local vault_pattern = vault_expanded .. "/**/*.md"
+	local daily_pattern = vault_expanded .. "/daily/*.md"
+
 	-- Auto-import on daily note open
 	if M.config.auto_import_on_open then
 		vim.api.nvim_create_autocmd({ "BufReadPost" }, {
 			group = group,
-			pattern = "**/Recharge-Notes/daily/*.md",
+			pattern = daily_pattern,
 			callback = function(ev)
 				vim.defer_fn(function()
 					M.import_current_buffer()
@@ -772,7 +778,7 @@ function M.setup_autocmds()
 	-- Refresh references when entering Obsidian buffers
 	vim.api.nvim_create_autocmd({ "BufEnter" }, {
 		group = group,
-		pattern = "**/Recharge-Notes/**/*.md",
+		pattern = vault_pattern,
 		callback = function(ev)
 			M.refresh_buffer_refs(ev.buf)
 		end,
@@ -781,7 +787,7 @@ function M.setup_autocmds()
 	-- Setup keymaps in Obsidian buffers
 	vim.api.nvim_create_autocmd("BufEnter", {
 		group = group,
-		pattern = "**/Recharge-Notes/**/*.md",
+		pattern = vault_pattern,
 		callback = function()
 			vim.keymap.set(
 				"n",

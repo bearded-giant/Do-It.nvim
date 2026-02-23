@@ -643,6 +643,8 @@ while true; do
 
                 VAULT_PATH=$(tmux show-option -gqv "@doit-obsidian-vault")
                 VAULT_PATH="${VAULT_PATH:-$HOME/Recharge-Notes}"
+                SECTION_MARKER=$(tmux show-option -gqv "@doit-obsidian-section")
+                SECTION_MARKER="${SECTION_MARKER:-## TODO}"
                 TODAY=$(date +%Y-%m-%d)
                 DAILY_PATH="$VAULT_PATH/daily/$TODAY.md"
 
@@ -655,37 +657,26 @@ while true; do
                 TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
                 NEW_LINE="- [ ] - $TODO_TEXT <!-- doit:$TODO_ID -->"
 
-                # find ## TODO section and insert before the separator/next heading
-                INSERT_LINE=$(awk '
-                    /^## TODO/ { found=1; next }
-                    found && (/^---/ || /^## /) { print NR; found=0; exit }
-                    END { if (found) print NR+1 }
-                ' "$DAILY_PATH")
+                # single-pass: insert right after section heading
+                awk -v line="$NEW_LINE" -v marker="$SECTION_MARKER" '
+                    index($0, marker) == 1 { print; print line; inserted=1; next }
+                    { print }
+                    END { if (!inserted) print "ERROR: no " marker " section" > "/dev/stderr" }
+                ' "$DAILY_PATH" > "${DAILY_PATH}.tmp"
 
-                if [[ -z "$INSERT_LINE" ]]; then
-                    echo "No ## TODO section found in daily note"
+                if ! grep -qF "$SECTION_MARKER" "${DAILY_PATH}.tmp"; then
+                    echo "No $SECTION_MARKER section found in daily note"
+                    rm -f "${DAILY_PATH}.tmp"
                     sleep 1
                     continue
                 fi
+                mv "${DAILY_PATH}.tmp" "$DAILY_PATH"
 
-                # skip trailing blank lines above separator
-                TOTAL_LINES=$(wc -l < "$DAILY_PATH" | tr -d ' ')
-                while [[ $INSERT_LINE -gt 1 && $INSERT_LINE -le $TOTAL_LINES ]] && awk -v n="$((INSERT_LINE - 1))" 'NR==n { exit ($0 ~ /^[[:space:]]*$/ ? 0 : 1) }' "$DAILY_PATH"; do
-                    INSERT_LINE=$((INSERT_LINE - 1))
-                done
-
-                # insert using head/tail to avoid sed escaping issues
-                {
-                    head -n "$((INSERT_LINE - 1))" "$DAILY_PATH"
-                    printf '%s\n' "$NEW_LINE"
-                    tail -n +"$INSERT_LINE" "$DAILY_PATH"
-                } > "${DAILY_PATH}.tmp" && mv "${DAILY_PATH}.tmp" "$DAILY_PATH"
-
-                # set obsidian_ref on the todo
-                jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" --argjson lnum "$INSERT_LINE" '
+                # set obsidian_ref (lnum 0 — nvim refresh_buffer_refs derives real value)
+                jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" '
                     .todos |= map(
                         if .id == $id then
-                            .obsidian_ref = { file: $file, date: $date, lnum: $lnum }
+                            .obsidian_ref = { file: $file, date: $date, lnum: 0 }
                         else . end
                     ) |
                     ._metadata.updated_at = (now | floor)

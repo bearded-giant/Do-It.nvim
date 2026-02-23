@@ -87,7 +87,7 @@ make_daily_note_empty_todo() {
 ENDMD
 }
 
-# core export logic matching todo-interactive.sh
+# core export logic matching todo-interactive.sh (single-pass awk)
 # takes: TODO_ID, TODO_TEXT, DAILY_PATH, TODO_LIST_PATH
 # returns: 0 on success, 1 on error; prints messages to stdout
 run_export() {
@@ -95,6 +95,7 @@ run_export() {
     local TODO_TEXT="$2"
     local DAILY_PATH="$3"
     local TODO_LIST_PATH="$4"
+    local SECTION_MARKER="${5:-## TODO}"
     local TODAY="2026-02-22"
 
     # check if already linked
@@ -112,38 +113,33 @@ run_export() {
 
     local NEW_LINE="- [ ] - $TODO_TEXT <!-- doit:$TODO_ID -->"
 
-    # find ## TODO section and insert before the separator/next heading
-    local INSERT_LINE
-    INSERT_LINE=$(awk '
-        /^## TODO/ { found=1; next }
-        found && (/^---/ || /^## /) { print NR; found=0; exit }
-        END { if (found) print NR+1 }
-    ' "$DAILY_PATH")
+    # single-pass: insert right after section heading
+    awk -v line="$NEW_LINE" -v marker="$SECTION_MARKER" '
+        index($0, marker) == 1 { print; print line; inserted=1; next }
+        { print }
+        END { if (!inserted) print "ERROR: no " marker " section" > "/dev/stderr" }
+    ' "$DAILY_PATH" > "${DAILY_PATH}.tmp"
 
-    if [[ -z "$INSERT_LINE" ]]; then
-        echo "No ## TODO section found in daily note"
+    if ! grep -qF "$SECTION_MARKER" "${DAILY_PATH}.tmp"; then
+        echo "No $SECTION_MARKER section found in daily note"
+        rm -f "${DAILY_PATH}.tmp"
         return 1
     fi
 
-    # skip trailing blank lines above separator
-    local TOTAL_LINES
-    TOTAL_LINES=$(wc -l < "$DAILY_PATH" | tr -d ' ')
-    while [[ $INSERT_LINE -gt 1 && $INSERT_LINE -le $TOTAL_LINES ]] && awk -v n="$((INSERT_LINE - 1))" 'NR==n { exit ($0 ~ /^[[:space:]]*$/ ? 0 : 1) }' "$DAILY_PATH"; do
-        INSERT_LINE=$((INSERT_LINE - 1))
-    done
+    # check stderr sentinel for missing section
+    if ! grep -qF "$SECTION_MARKER" "$DAILY_PATH"; then
+        echo "No $SECTION_MARKER section found in daily note"
+        rm -f "${DAILY_PATH}.tmp"
+        return 1
+    fi
 
-    # insert using head/tail to avoid sed escaping issues
-    {
-        head -n "$((INSERT_LINE - 1))" "$DAILY_PATH"
-        printf '%s\n' "$NEW_LINE"
-        tail -n +"$INSERT_LINE" "$DAILY_PATH"
-    } > "${DAILY_PATH}.tmp" && mv "${DAILY_PATH}.tmp" "$DAILY_PATH"
+    mv "${DAILY_PATH}.tmp" "$DAILY_PATH"
 
-    # set obsidian_ref on the todo
-    jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" --argjson lnum "$INSERT_LINE" '
+    # set obsidian_ref (lnum 0 — nvim refresh_buffer_refs derives real value)
+    jq --arg id "$TODO_ID" --arg date "$TODAY" --arg file "$DAILY_PATH" '
         .todos |= map(
             if .id == $id then
-                .obsidian_ref = { file: $file, date: $date, lnum: $lnum }
+                .obsidian_ref = { file: $file, date: $date, lnum: 0 }
             else . end
         ) |
         ._metadata.updated_at = (now | floor)
@@ -153,72 +149,11 @@ run_export() {
     return 0
 }
 
-# -- awk section finder tests --
-
-describe "awk: find ## TODO section insert point"
-
-it "finds insert point before --- separator"
-DAILY="$TEST_TMPDIR/awk_sep.md"
-make_daily_note "$DAILY"
-INSERT=$(awk '
-    /^## TODO/ { found=1; next }
-    found && (/^---/ || /^## /) { print NR; found=0; exit }
-    END { if (found) print NR+1 }
-' "$DAILY")
-# fixture: line 9 is --- (blank lines on 2,5,8,10 push it down)
-assert_eq "9" "$INSERT" "should find --- on line 9"
-
-it "finds insert point before next ## heading"
-DAILY="$TEST_TMPDIR/awk_heading.md"
-make_daily_note_next_heading "$DAILY"
-INSERT=$(awk '
-    /^## TODO/ { found=1; next }
-    found && (/^---/ || /^## /) { print NR; found=0; exit }
-    END { if (found) print NR+1 }
-' "$DAILY")
-# fixture: ## Notes is on line 6 (blank line on 5 pushes it)
-assert_eq "6" "$INSERT" "should find ## Notes on line 6"
-
-it "returns end+1 when no terminator after ## TODO"
-DAILY="$TEST_TMPDIR/awk_noterm.md"
-make_daily_note_no_separator "$DAILY"
-INSERT=$(awk '
-    /^## TODO/ { found=1; next }
-    found && (/^---/ || /^## /) { print NR; found=0; exit }
-    END { if (found) print NR+1 }
-' "$DAILY")
-EXPECTED=$(($(wc -l < "$DAILY" | tr -d ' ') + 1))
-assert_eq "$EXPECTED" "$INSERT" "should be last line + 1"
-
-it "returns empty when no ## TODO section"
-DAILY="$TEST_TMPDIR/awk_none.md"
-cat > "$DAILY" <<'EOF'
-# Just a note
-some text
-EOF
-INSERT=$(awk '
-    /^## TODO/ { found=1; next }
-    found && (/^---/ || /^## /) { print NR; found=0; exit }
-    END { if (found) print NR+1 }
-' "$DAILY")
-assert_eq "" "$INSERT" "should be empty when no TODO section"
-
-it "returns single value (no multi-line output)"
-DAILY="$TEST_TMPDIR/awk_single.md"
-make_daily_note "$DAILY"
-INSERT=$(awk '
-    /^## TODO/ { found=1; next }
-    found && (/^---/ || /^## /) { print NR; found=0; exit }
-    END { if (found) print NR+1 }
-' "$DAILY")
-LINE_COUNT=$(echo "$INSERT" | wc -l | tr -d ' ')
-assert_eq "1" "$LINE_COUNT" "awk should output exactly one line"
-
 # -- full export tests --
 
 describe "obsidian export: basic flow"
 
-it "inserts todo into daily note before ---"
+it "inserts todo into daily note"
 DAILY="$TEST_TMPDIR/export_basic.md"
 TODOLIST="$TEST_TMPDIR/export_basic.json"
 make_daily_note "$DAILY"
@@ -226,17 +161,24 @@ make_todo_list "$TODOLIST" "abc123" "test sync"
 run_export "abc123" "test sync" "$DAILY" "$TODOLIST" > /dev/null
 assert_file_contains "$DAILY" "- [ ] - test sync <!-- doit:abc123 -->"
 
-it "inserts after existing todos, before separator"
+it "inserts immediately after ## TODO heading"
+DAILY="$TEST_TMPDIR/export_after_heading.md"
+TODOLIST="$TEST_TMPDIR/export_after_heading.json"
+make_daily_note "$DAILY"
+make_todo_list "$TODOLIST" "pos123" "positioned todo"
+run_export "pos123" "positioned todo" "$DAILY" "$TODOLIST" > /dev/null
+# the line right after ## TODO should be the new todo
+LINE_AFTER=$(awk '/^## TODO/ { getline; print; exit }' "$DAILY")
+assert_eq "- [ ] - positioned todo <!-- doit:pos123 -->" "$LINE_AFTER" "should be first line after ## TODO"
+
+it "preserves existing todos after the inserted line"
 DAILY="$TEST_TMPDIR/export_order.md"
 TODOLIST="$TEST_TMPDIR/export_order.json"
 make_daily_note "$DAILY"
 make_todo_list "$TODOLIST" "abc123" "new todo"
 run_export "abc123" "new todo" "$DAILY" "$TODOLIST" > /dev/null
-# existing task should still be there
 assert_file_contains "$DAILY" "- [ ] - existing task"
-# new todo should appear
 assert_file_contains "$DAILY" "- [ ] - new todo <!-- doit:abc123 -->"
-# separator should still be there
 assert_file_contains "$DAILY" "---"
 
 it "sets obsidian_ref on the todo json"
@@ -248,14 +190,14 @@ run_export "ref123" "check ref" "$DAILY" "$TODOLIST" > /dev/null
 REF_DATE=$(jq -r '.todos[0].obsidian_ref.date' "$TODOLIST")
 assert_eq "2026-02-22" "$REF_DATE" "obsidian_ref.date should be today"
 
-it "obsidian_ref.lnum is a number not a string"
+it "obsidian_ref.lnum is 0 (nvim derives real value)"
 DAILY="$TEST_TMPDIR/export_lnum.md"
 TODOLIST="$TEST_TMPDIR/export_lnum.json"
 make_daily_note "$DAILY"
 make_todo_list "$TODOLIST" "lnum123" "check lnum"
 run_export "lnum123" "check lnum" "$DAILY" "$TODOLIST" > /dev/null
-LNUM_TYPE=$(jq -r '.todos[0].obsidian_ref.lnum | type' "$TODOLIST")
-assert_eq "number" "$LNUM_TYPE" "lnum should be a number"
+LNUM=$(jq -r '.todos[0].obsidian_ref.lnum' "$TODOLIST")
+assert_eq "0" "$LNUM" "lnum should be 0"
 
 describe "obsidian export: prevents duplicates"
 
@@ -351,6 +293,50 @@ assert_file_contains "$DAILY" "- standup at 9"
 assert_file_contains "$DAILY" "## TODO"
 assert_file_contains "$DAILY" "## Notes"
 assert_file_contains "$DAILY" "some notes here"
+
+describe "obsidian export: configurable section marker"
+
+it "inserts todo using custom section marker"
+DAILY="$TEST_TMPDIR/export_custom_marker.md"
+TODOLIST="$TEST_TMPDIR/export_custom_marker.json"
+cat > "$DAILY" <<'ENDMD'
+# 2026-02-22
+
+## Meetings
+- standup at 9
+
+## Tasks
+- [ ] - existing task
+
+---
+
+## Notes
+some notes here
+ENDMD
+make_todo_list "$TODOLIST" "cm123" "custom marker todo"
+run_export "cm123" "custom marker todo" "$DAILY" "$TODOLIST" "## Tasks" > /dev/null
+assert_file_contains "$DAILY" "- [ ] - custom marker todo <!-- doit:cm123 -->"
+# verify it went right after ## Tasks, not somewhere random
+LINE_AFTER=$(awk '/^## Tasks/ { getline; print; exit }' "$DAILY")
+assert_eq "- [ ] - custom marker todo <!-- doit:cm123 -->" "$LINE_AFTER" "should be first line after ## Tasks"
+
+it "default marker still works when not specified"
+DAILY="$TEST_TMPDIR/export_default_marker.md"
+TODOLIST="$TEST_TMPDIR/export_default_marker.json"
+make_daily_note "$DAILY"
+make_todo_list "$TODOLIST" "dm123" "default marker todo"
+run_export "dm123" "default marker todo" "$DAILY" "$TODOLIST" > /dev/null
+assert_file_contains "$DAILY" "- [ ] - default marker todo <!-- doit:dm123 -->"
+LINE_AFTER=$(awk '/^## TODO/ { getline; print; exit }' "$DAILY")
+assert_eq "- [ ] - default marker todo <!-- doit:dm123 -->" "$LINE_AFTER" "should be first line after ## TODO"
+
+it "fails when custom marker section is missing"
+DAILY="$TEST_TMPDIR/export_missing_marker.md"
+TODOLIST="$TEST_TMPDIR/export_missing_marker.json"
+make_daily_note "$DAILY"
+make_todo_list "$TODOLIST" "mm123" "missing marker"
+OUTPUT=$(run_export "mm123" "missing marker" "$DAILY" "$TODOLIST" "## Tasks")
+assert_contains "$OUTPUT" "No ## Tasks section"
 
 # -- done --
 
