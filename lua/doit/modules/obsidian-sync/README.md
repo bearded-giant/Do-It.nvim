@@ -21,6 +21,7 @@ require("doit").setup({
             section_marker = "## TODO",    -- Heading where todos are inserted in daily notes
             daily_note = {
                 path_template = "daily/%Y-%m-%d.md",  -- strftime tokens, relative to vault_path
+                lookback_days = 7,             -- walk backwards N days if today's note missing (0 = today only)
                 -- OR for full control:
                 -- resolve = function(vault_path) return vault_path .. "/my-note.md" end
             },

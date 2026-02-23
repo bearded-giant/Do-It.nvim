@@ -41,6 +41,7 @@ function M.setup(opts)
 		section_marker = "## TODO",
 		daily_note = {
 			path_template = "daily/%Y-%m-%d.md",
+			lookback_days = 7,
 		},
 		auto_import_on_open = false,
 		sync_completions = true,
@@ -89,9 +90,8 @@ end
 
 -- Core functions setup
 function M.setup_functions()
-	-- resolve today's daily note path from config template (strftime tokens)
-	-- pass optional os.time() value to resolve a different date
-	function M.resolve_daily_path(time)
+	-- resolve a daily note path for a specific time value (no lookback)
+	function M.resolve_daily_note_path(time)
 		local daily_note = M.config.daily_note or {}
 		if daily_note.resolve and type(daily_note.resolve) == "function" then
 			return daily_note.resolve(vim.fn.expand(M.config.vault_path), time)
@@ -99,6 +99,33 @@ function M.setup_functions()
 		local template = daily_note.path_template or "daily/%Y-%m-%d.md"
 		local expanded = os.date(template, time)
 		return vim.fn.expand(M.config.vault_path) .. "/" .. expanded
+	end
+
+	-- resolve daily note path with lookback: tries today, then walks backwards
+	-- up to lookback_days. returns today's path if nothing found (for creation).
+	function M.resolve_daily_path(time)
+		local today_path = M.resolve_daily_note_path(time)
+		if vim.fn.filereadable(today_path) == 1 then
+			return today_path
+		end
+
+		local daily_note = M.config.daily_note or {}
+		local lookback = daily_note.lookback_days or 7
+		if lookback == 0 then
+			return today_path
+		end
+
+		local base_time = time or os.time()
+		for i = 1, lookback do
+			local past_time = base_time - (i * 86400)
+			local past_path = M.resolve_daily_note_path(past_time)
+			if vim.fn.filereadable(past_path) == 1 then
+				return past_path
+			end
+		end
+
+		-- nothing found, return today's path so caller gets a useful error
+		return today_path
 	end
 
 	-- Helper: Find a todo by ID across all lists

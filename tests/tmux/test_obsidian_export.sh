@@ -358,6 +358,71 @@ make_todo_list "$TODOLIST" "an123" "alt name todo"
 run_export "an123" "alt name todo" "$DAILY" "$TODOLIST" > /dev/null
 assert_file_contains "$DAILY" "- [ ] - alt name todo <!-- doit:an123 -->"
 
+describe "obsidian export: lookback resolution"
+
+# helper: resolve daily path with lookback (mirrors tmux logic)
+resolve_daily_path() {
+    local VAULT_PATH="$1"
+    local DAILY_TEMPLATE="$2"
+    local LOOKBACK_DAYS="${3:-7}"
+
+    local DAILY_PATH="$VAULT_PATH/$(date +"$DAILY_TEMPLATE")"
+    if [[ -f "$DAILY_PATH" ]]; then
+        echo "$DAILY_PATH"
+        return 0
+    fi
+
+    if [[ "$LOOKBACK_DAYS" -gt 0 ]]; then
+        for i in $(seq 1 "$LOOKBACK_DAYS"); do
+            local PAST_PATH="$VAULT_PATH/$(date -v-${i}d +"$DAILY_TEMPLATE" 2>/dev/null || date -d "-${i} days" +"$DAILY_TEMPLATE")"
+            if [[ -f "$PAST_PATH" ]]; then
+                echo "$PAST_PATH"
+                return 0
+            fi
+        done
+    fi
+
+    # nothing found, return today's path
+    echo "$DAILY_PATH"
+    return 1
+}
+
+it "resolves today's note when it exists"
+mkdir -p "$TEST_TMPDIR/lb_vault/daily"
+TODAY_FILE="$TEST_TMPDIR/lb_vault/daily/$(date +%Y-%m-%d).md"
+make_daily_note "$TODAY_FILE"
+RESOLVED=$(resolve_daily_path "$TEST_TMPDIR/lb_vault" "daily/%Y-%m-%d.md" 7)
+assert_eq "$TODAY_FILE" "$RESOLVED" "should resolve to today's note"
+
+it "falls back to yesterday when today is missing"
+mkdir -p "$TEST_TMPDIR/lb_vault2/daily"
+YESTERDAY_FILE="$TEST_TMPDIR/lb_vault2/daily/$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d '-1 day' +%Y-%m-%d).md"
+make_daily_note "$YESTERDAY_FILE"
+RESOLVED=$(resolve_daily_path "$TEST_TMPDIR/lb_vault2" "daily/%Y-%m-%d.md" 7)
+assert_eq "$YESTERDAY_FILE" "$RESOLVED" "should fall back to yesterday's note"
+
+it "returns today's path when nothing found within lookback"
+mkdir -p "$TEST_TMPDIR/lb_vault3/daily"
+# no files at all
+RESOLVED=$(resolve_daily_path "$TEST_TMPDIR/lb_vault3" "daily/%Y-%m-%d.md" 3)
+EXPECTED="$TEST_TMPDIR/lb_vault3/daily/$(date +%Y-%m-%d).md"
+assert_eq "$EXPECTED" "$RESOLVED" "should return today's path as fallback"
+
+it "skips lookback when lookback_days is 0"
+mkdir -p "$TEST_TMPDIR/lb_vault4/daily"
+YESTERDAY_FILE="$TEST_TMPDIR/lb_vault4/daily/$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d '-1 day' +%Y-%m-%d).md"
+make_daily_note "$YESTERDAY_FILE"
+RESOLVED=$(resolve_daily_path "$TEST_TMPDIR/lb_vault4" "daily/%Y-%m-%d.md" 0)
+EXPECTED="$TEST_TMPDIR/lb_vault4/daily/$(date +%Y-%m-%d).md"
+assert_eq "$EXPECTED" "$RESOLVED" "should not look back when lookback is 0"
+
+it "lookback works with custom path template"
+mkdir -p "$TEST_TMPDIR/lb_vault5/journal"
+YESTERDAY_FILE="$TEST_TMPDIR/lb_vault5/journal/$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d '-1 day' +%Y-%m-%d)-daily.md"
+make_daily_note "$YESTERDAY_FILE"
+RESOLVED=$(resolve_daily_path "$TEST_TMPDIR/lb_vault5" "journal/%Y-%m-%d-daily.md" 7)
+assert_eq "$YESTERDAY_FILE" "$RESOLVED" "should find yesterday's note with custom template"
+
 # -- done --
 
 report

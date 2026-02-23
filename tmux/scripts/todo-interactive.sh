@@ -647,11 +647,23 @@ while true; do
                 SECTION_MARKER="${SECTION_MARKER:-## TODO}"
                 DAILY_TEMPLATE=$(tmux show-option -gqv "@doit-obsidian-daily-path")
                 DAILY_TEMPLATE="${DAILY_TEMPLATE:-daily/%Y-%m-%d.md}"
+                LOOKBACK_DAYS=$(tmux show-option -gqv "@doit-obsidian-lookback")
+                LOOKBACK_DAYS="${LOOKBACK_DAYS:-7}"
                 TODAY=$(date +%Y-%m-%d)
                 DAILY_PATH="$VAULT_PATH/$(date +"$DAILY_TEMPLATE")"
 
+                if [[ ! -f "$DAILY_PATH" && "$LOOKBACK_DAYS" -gt 0 ]]; then
+                    for i in $(seq 1 "$LOOKBACK_DAYS"); do
+                        PAST_PATH="$VAULT_PATH/$(date -v-${i}d +"$DAILY_TEMPLATE" 2>/dev/null || date -d "-${i} days" +"$DAILY_TEMPLATE")"
+                        if [[ -f "$PAST_PATH" ]]; then
+                            DAILY_PATH="$PAST_PATH"
+                            break
+                        fi
+                    done
+                fi
+
                 if [[ ! -f "$DAILY_PATH" ]]; then
-                    echo "Today's daily note not found: $DAILY_PATH"
+                    echo "No daily note found (checked $((LOOKBACK_DAYS + 1)) days): $DAILY_PATH"
                     sleep 1
                     continue
                 fi
