@@ -65,4 +65,4 @@ if [[ ${#todo_text} -gt $CHAR_LIMIT ]]; then
     todo_text="${todo_text:0:$CHAR_LIMIT}..."
 fi
 
-printf '%s %s\n' "$ICON_TASK" "$todo_text"
+printf '%s\n' "$todo_text"
