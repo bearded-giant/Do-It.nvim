@@ -847,6 +847,8 @@ while true; do
 
                     # Ask if should mark as in-progress
                     echo ""
+                    # flush any buffered stdin from prior fzf interactions
+                    while read -r -t 0 2>/dev/null; do read -r -n 256 -t 0.1 2>/dev/null; done
                     echo -n "Mark as in-progress? (y/N): "
                     read -n 1 -r MARK_PROGRESS
                     echo

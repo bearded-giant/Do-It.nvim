@@ -68,16 +68,27 @@ show_todo() {
     if [[ "$todo_text_trimmed" == *"All done"* ]]; then
         icon="󰄬"
     else
-        icon=""
+        icon=""
     fi
 
+    # publish theme colors so todo-exec.sh can update dynamically
+    tmux set -gq @doit-color-active "$thm_green"
+    tmux set -gq @doit-color-pending "$thm_yellow"
+    tmux set -gq @doit-color-done "$thm_blue"
+    tmux set -gq @doit-color-none "$thm_gray"
+
+    # set initial color from current state
     case "$todo_color" in
-    "green") color="$thm_green" ;;
-    "yellow") color="$thm_yellow" ;;
-    "blue") color="$thm_blue" ;;
-    "gray") color="$thm_gray" ;;
-    *) color="$thm_fg" ;;
+    "green") tmux set -gq @doit-todo-fg "$thm_green" ;;
+    "yellow") tmux set -gq @doit-todo-fg "$thm_yellow" ;;
+    "blue") tmux set -gq @doit-todo-fg "$thm_blue" ;;
+    "gray") tmux set -gq @doit-todo-fg "$thm_gray" ;;
+    *) tmux set -gq @doit-todo-fg "$thm_fg" ;;
     esac
+
+    # use dynamic color reference -- tmux re-evaluates #{@doit-todo-fg}
+    # on each status refresh, picking up changes from todo-exec.sh
+    color="#{@doit-todo-fg}"
 
     local script_path="${SCRIPTS_DIR}/todo-exec.sh"
     text=" #(${script_path}) "
