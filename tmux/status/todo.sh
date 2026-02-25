@@ -68,7 +68,7 @@ show_todo() {
     if [[ "$todo_text_trimmed" == *"All done"* ]]; then
         icon="󰄬"
     else
-        icon=""
+        icon=""
     fi
 
     # publish theme colors so todo-exec.sh can update dynamically
@@ -76,6 +76,10 @@ show_todo() {
     tmux set -gq @doit-color-pending "$thm_yellow"
     tmux set -gq @doit-color-done "$thm_blue"
     tmux set -gq @doit-color-none "$thm_gray"
+    # priority colors match todo-interactive.sh
+    tmux set -gq @doit-color-critical "$thm_red"
+    tmux set -gq @doit-color-urgent "$thm_yellow"
+    tmux set -gq @doit-color-important "$thm_blue"
 
     # set initial color from current state
     case "$todo_color" in

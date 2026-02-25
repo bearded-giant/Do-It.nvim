@@ -6,10 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 
 TODO_LIST_PATH="$(get_active_list_path)"
-CHAR_LIMIT=25  # Character limit for todo text display
-NERD_FONT_TASK=""  # Nerd font task icon
-NERD_FONT_CHECK=""  # Alternative check icon
-NERD_FONT_TARGET=""  # Alternative target icon
+CHAR_LIMIT=25
+ICON_TASK=$'\xef\x82\xae'
+ICON_CHECK=$'\xef\x80\x8c'
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -23,40 +22,47 @@ if [[ ! -f "$TODO_LIST_PATH" ]]; then
     exit 0
 fi
 
-# Get the first in-progress todo
-todo_text=$(jq -r '.todos[] | select(.in_progress == true) | .text' "$TODO_LIST_PATH" 2>/dev/null | head -1)
+# get in-progress todo first (grab priority alongside)
+todo_json=$(jq -r '[.todos[] | select(.in_progress == true)][0] // empty | "\(.priorities // "")\t\(.text)"' "$TODO_LIST_PATH" 2>/dev/null)
 todo_status="active"
 
-# If no in-progress todo found, check for any undone todo
-if [[ -z "$todo_text" ]]; then
-    todo_text=$(jq -r '.todos | sort_by(.order_index) | .[] | select(.done == false) | .text' "$TODO_LIST_PATH" 2>/dev/null | head -1)
+if [[ -z "$todo_json" ]]; then
+    # fallback to first pending todo
+    todo_json=$(jq -r '[.todos | sort_by(.order_index) | .[] | select(.done == false)][0] // empty | "\(.priorities // "")\t\(.text)"' "$TODO_LIST_PATH" 2>/dev/null)
     todo_status="pending"
 
-    if [[ -z "$todo_text" ]]; then
-        # update status bar color to "done" theme
+    if [[ -z "$todo_json" ]]; then
         COLOR=$(tmux show -gqv @doit-color-done 2>/dev/null)
         [[ -n "$COLOR" ]] && tmux set -gq @doit-todo-fg "$COLOR"
-        echo "$NERD_FONT_CHECK All done!"
+        echo "$ICON_CHECK All done!"
         exit 0
     fi
 fi
 
-# update status bar color dynamically based on todo state
-if [[ "$todo_status" == "active" ]]; then
-    COLOR=$(tmux show -gqv @doit-color-active 2>/dev/null)
-else
-    COLOR=$(tmux show -gqv @doit-color-pending 2>/dev/null)
-fi
+todo_priority=$(printf '%s' "$todo_json" | cut -f1)
+todo_text=$(printf '%s' "$todo_json" | cut -f2-)
+
+# pick color: priority overrides status
+case "$todo_priority" in
+    critical)  COLOR=$(tmux show -gqv @doit-color-critical 2>/dev/null) ;;
+    urgent)    COLOR=$(tmux show -gqv @doit-color-urgent 2>/dev/null) ;;
+    important) COLOR=$(tmux show -gqv @doit-color-important 2>/dev/null) ;;
+    *)
+        if [[ "$todo_status" == "active" ]]; then
+            COLOR=$(tmux show -gqv @doit-color-active 2>/dev/null)
+        else
+            COLOR=$(tmux show -gqv @doit-color-pending 2>/dev/null)
+        fi
+        ;;
+esac
 [[ -n "$COLOR" ]] && tmux set -gq @doit-todo-fg "$COLOR"
 
-# Clean and truncate the text (safely handle all special characters)
-# Use parameter expansion for trimming instead of echo/sed to avoid backtick issues
-todo_text="${todo_text#"${todo_text%%[![:space:]]*}"}"  # Remove leading whitespace
-todo_text="${todo_text%"${todo_text##*[![:space:]]}"}"  # Remove trailing whitespace
+# trim whitespace
+todo_text="${todo_text#"${todo_text%%[![:space:]]*}"}"
+todo_text="${todo_text%"${todo_text##*[![:space:]]}"}"
 
 if [[ ${#todo_text} -gt $CHAR_LIMIT ]]; then
     todo_text="${todo_text:0:$CHAR_LIMIT}..."
 fi
 
-# Output with task icon using printf to safely handle all special characters
-printf '%s %s\n' "$NERD_FONT_TASK" "$todo_text"
+printf '%s %s\n' "$ICON_TASK" "$todo_text"
