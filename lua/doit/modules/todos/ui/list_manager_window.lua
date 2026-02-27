@@ -8,7 +8,9 @@ function M.setup(parent_module)
     local preview_buf_id = nil
     local preview_win_id = nil
     local selected_index = 1
-    
+    local search_query = ""
+    local displayed_lists = {}
+
     local todo_module = parent_module
     local config = todo_module.config
     local preview_enabled = config.list_manager and config.list_manager.preview_enabled ~= false
@@ -252,22 +254,47 @@ function M.setup(parent_module)
         end
         
         -- Refresh lists to get updated active list
-        local lists = todo_module.state.get_available_lists()
+        local all_lists = todo_module.state.get_available_lists()
         local active_list = todo_module.state.todo_lists.active
+
+        if search_query ~= "" then
+            displayed_lists = {}
+            local query_lower = search_query:lower()
+            for _, list in ipairs(all_lists) do
+                if list.name:lower():find(query_lower, 1, true) then
+                    table.insert(displayed_lists, list)
+                end
+            end
+        else
+            displayed_lists = all_lists
+        end
+
+        if selected_index > #displayed_lists then
+            selected_index = math.max(1, #displayed_lists)
+        end
         
         local lines = {}
         
         -- Start with Available Lists at the top
-        table.insert(lines, "  Todo Lists")
+        if search_query ~= "" then
+            table.insert(lines, "  Search: " .. search_query)
+        else
+            table.insert(lines, "  Todo Lists")
+        end
         table.insert(lines, "  ══════════════════════════════════")
         table.insert(lines, "")
-        
-        if #lists == 0 then
-            table.insert(lines, "  No todo lists found")
-            table.insert(lines, "  Press 'n' to create your first list")
+
+        if #displayed_lists == 0 then
+            if search_query ~= "" then
+                table.insert(lines, "  No matching lists")
+                table.insert(lines, "  Press Esc to clear search")
+            else
+                table.insert(lines, "  No todo lists found")
+                table.insert(lines, "  Press 'n' to create your first list")
+            end
         else
             -- Add numbered lists
-            for i, list in ipairs(lists) do
+            for i, list in ipairs(displayed_lists) do
                 if i <= 10 then
                     local num = i == 10 and "0" or tostring(i)
                     local active_marker = list.name == active_list and "[active]" or ""
@@ -299,8 +326,8 @@ function M.setup(parent_module)
         table.insert(lines, "  [1-9/0] Select   [Enter] Switch & Open")
         table.insert(lines, "  [n] New          [d] Delete")
         table.insert(lines, "  [r] Rename       [e] Export")
-        table.insert(lines, "  [i] Import       [q] Close")
-        table.insert(lines, "  [?] Show full help")
+        table.insert(lines, "  [i] Import       [/] Search")
+        table.insert(lines, "  [q] Close        [?] Show full help")
         
         -- Set buffer content
         api.nvim_buf_set_option(buf_id, "modifiable", true)
@@ -352,12 +379,12 @@ function M.setup(parent_module)
         end
         
         -- Update preview for selected list
-        if preview_enabled and #lists > 0 and selected_index <= #lists then
-            render_preview(lists[selected_index].name)
+        if preview_enabled and #displayed_lists > 0 and selected_index <= #displayed_lists then
+            render_preview(displayed_lists[selected_index].name)
         end
-        
+
         -- Move cursor to selected line
-        if #lists > 0 then
+        if #displayed_lists > 0 then
             local cursor_line = 18 + selected_index
             if cursor_line <= #lines then
                 api.nvim_win_set_cursor(win_id, {cursor_line, 0})
@@ -440,27 +467,24 @@ function M.setup(parent_module)
         -- Number keys for quick selection
         for i = 1, 9 do
             set_keymap(tostring(i), function()
-                local lists = todo_module.state.get_available_lists()
-                if i <= #lists then
+                if i <= #displayed_lists then
                     selected_index = i
                     render_lists()
                 end
             end)
         end
-        
+
         -- 0 for 10th item
         set_keymap("0", function()
-            local lists = todo_module.state.get_available_lists()
-            if 10 <= #lists then
+            if 10 <= #displayed_lists then
                 selected_index = 10
                 render_lists()
             end
         end)
-        
+
         -- Navigation (vim keys and arrow keys)
         local function move_down()
-            local lists = todo_module.state.get_available_lists()
-            if selected_index < #lists then
+            if selected_index < #displayed_lists then
                 selected_index = selected_index + 1
                 render_lists()
             end
@@ -481,17 +505,15 @@ function M.setup(parent_module)
         
         -- Confirm selection with space
         set_keymap("<Space>", function()
-            local lists = todo_module.state.get_available_lists()
-            if selected_index <= #lists then
-                switch_to_list(lists[selected_index].name)
+            if selected_index <= #displayed_lists then
+                switch_to_list(displayed_lists[selected_index].name)
             end
         end)
-        
+
         -- Switch immediately with enter
         set_keymap("<CR>", function()
-            local lists = todo_module.state.get_available_lists()
-            if selected_index <= #lists then
-                switch_to_list(lists[selected_index].name)
+            if selected_index <= #displayed_lists then
+                switch_to_list(displayed_lists[selected_index].name)
             end
         end)
         
@@ -502,9 +524,27 @@ function M.setup(parent_module)
         set_keymap("i", function() M.import_list() end)
         set_keymap("e", function() M.export_list() end)
         
+        -- Search
+        set_keymap("/", function()
+            local query = vim.fn.input("/ ")
+            if query ~= "" then
+                search_query = query
+                selected_index = 1
+            end
+            render_lists()
+        end)
+
         -- Close (set on both buffers)
         set_keymap("q", function() close_windows() end)
-        set_keymap("<Esc>", function() close_windows() end)
+        set_keymap("<Esc>", function()
+            if search_query ~= "" then
+                search_query = ""
+                selected_index = 1
+                render_lists()
+            else
+                close_windows()
+            end
+        end)
         set_preview_keymap("q", function() close_windows() end)
         set_preview_keymap("<Esc>", function() close_windows() end)
     end
@@ -538,10 +578,9 @@ function M.setup(parent_module)
     end
     
     function M.delete_list()
-        local lists = todo_module.state.get_available_lists()
-        if selected_index > #lists then return end
-        
-        local list_name = lists[selected_index].name
+        if selected_index > #displayed_lists then return end
+
+        local list_name = displayed_lists[selected_index].name
         close_windows()
         
         vim.ui.input({
@@ -568,10 +607,9 @@ function M.setup(parent_module)
     end
     
     function M.rename_list()
-        local lists = todo_module.state.get_available_lists()
-        if selected_index > #lists then return end
-        
-        local list_name = lists[selected_index].name
+        if selected_index > #displayed_lists then return end
+
+        local list_name = displayed_lists[selected_index].name
         close_windows()
         
         vim.ui.input({
@@ -639,8 +677,7 @@ function M.setup(parent_module)
     end
     
     function M.export_list()
-        local lists = todo_module.state.get_available_lists()
-        local list_name = selected_index <= #lists and lists[selected_index].name or todo_module.state.todo_lists.active
+        local list_name = selected_index <= #displayed_lists and displayed_lists[selected_index].name or todo_module.state.todo_lists.active
         
         close_windows()
         
@@ -681,6 +718,8 @@ function M.setup(parent_module)
         if win_id and api.nvim_win_is_valid(win_id) then
             close_windows()
         else
+            search_query = ""
+            selected_index = 1
             create_windows()
             set_keymaps()
             render_lists()

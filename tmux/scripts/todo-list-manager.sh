@@ -184,13 +184,13 @@ while true; do
  List Manager - Active: $CURRENT_LIST
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup
- ENTER: Switch to list
+ ENTER: Switch to list    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=60% \
         --layout=reverse \
-        --expect=n,r,d,b,enter,q \
+        --expect=n,r,d,b,enter,q,/ \
         --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
         --preview-window=right:50%:wrap)
 
@@ -215,6 +215,24 @@ while true; do
         "d")
             if [[ -n "$SELECTED_LIST" ]]; then
                 delete_list "$SELECTED_LIST"
+            fi
+            ;;
+        "/")
+            # search mode: re-launch fzf with filtering enabled
+            SEARCH_RESULT=$(echo "$LIST_DISPLAY" | fzf --ansi \
+                --header=" Type to filter, Enter to switch, Esc to cancel" \
+                --prompt="/ " \
+                --height=60% \
+                --layout=reverse \
+                --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
+                --preview-window=right:50%:wrap)
+
+            if [[ -n "$SEARCH_RESULT" ]]; then
+                SEARCH_LIST=$(echo "$SEARCH_RESULT" | sed 's/^[* ]*//' | sed 's/ (active)$//')
+                if [[ -n "$SEARCH_LIST" && "$SEARCH_LIST" != "$CURRENT_LIST" ]]; then
+                    set_active_list "$SEARCH_LIST"
+                    break
+                fi
             fi
             ;;
         "b")

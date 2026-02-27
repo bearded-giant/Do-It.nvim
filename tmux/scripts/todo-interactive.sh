@@ -329,11 +329,11 @@ while true; do
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
  v: View (select text)    y: Copy text    N: Description
- O: Send to Obsidian daily
+ O: Send to Obsidian daily    /: Search
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,? \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -876,6 +876,26 @@ while true; do
                 sleep 0.5
             fi
             ;;
+        "/")
+            # search mode: re-launch fzf with filtering enabled
+            SEARCH_RESULT=$(format_todos | fzf --ansi \
+                --header=" Type to filter, Enter to select, Esc to cancel" \
+                --prompt="/ " \
+                --no-sort \
+                --height=80% \
+                --layout=reverse \
+                --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
+                --preview-window=right:40%)
+
+            if [[ -n "$SEARCH_RESULT" ]]; then
+                SEARCH_ID=$(echo "$SEARCH_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
+                if [[ -n "$SEARCH_ID" ]]; then
+                    update_todo "$SEARCH_ID" "toggle"
+                    echo "Toggled: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                    sleep 0.5
+                fi
+            fi
+            ;;
         "r")
             echo "Refreshed"
             sleep 0.3
@@ -916,6 +936,9 @@ while true; do
             echo ""
             echo " Obsidian"
             echo "   O                Send to today's daily note"
+            echo ""
+            echo " Search"
+            echo "   /                Search/filter todos"
             echo ""
             echo " Lists"
             echo "   l                Switch lists"
