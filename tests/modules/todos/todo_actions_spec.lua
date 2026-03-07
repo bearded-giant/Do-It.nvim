@@ -74,6 +74,7 @@ describe("todo_actions", function()
                     end
                 end
             end,
+            sort_todos = function() end,
             save_to_disk = function() end,
             load_from_disk = function() end
         }
