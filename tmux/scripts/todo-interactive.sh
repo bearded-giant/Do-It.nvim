@@ -203,9 +203,17 @@ update_todo() {
     case "$action" in
         "toggle")
             jq --arg id "$todo_id" '
+                (.todos[] | select(.id == $id)) as $t |
                 .todos |= map(
                     if .id == $id then
-                        .done = (if .done then false else true end) |
+                        if .done then
+                            .done = false | .in_progress = false
+                        elif .in_progress then
+                            .in_progress = false | .done = true
+                        else
+                            .in_progress = true | .done = false
+                        end
+                    elif ($t.done == false and $t.in_progress != true) then
                         .in_progress = false
                     else . end
                 ) |
@@ -324,7 +332,7 @@ while true; do
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
  Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
 ───────────────────────────────────────────────────
- ENTER: Start    c: Complete    x: Stop    X: Revert
+ ENTER: Cycle (pending>started>done)    x: Stop    X: Revert
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
@@ -333,7 +341,7 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,c,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
+        --expect=enter,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -356,13 +364,6 @@ while true; do
     # Perform action based on key
     case "$KEY" in
         "enter"|"")
-            if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "start"
-                echo "Started: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
-                sleep 0.5
-            fi
-            ;;
-        "c")
             if [[ -n "$TODO_ID" ]]; then
                 update_todo "$TODO_ID" "toggle"
                 echo "Toggled: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
@@ -891,8 +892,8 @@ while true; do
             if [[ -n "$SEARCH_RESULT" ]]; then
                 SEARCH_ID=$(echo "$SEARCH_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
                 if [[ -n "$SEARCH_ID" ]]; then
-                    update_todo "$SEARCH_ID" "start"
-                    echo "Started: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                    update_todo "$SEARCH_ID" "toggle"
+                    echo "Toggled: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                     sleep 0.5
                 fi
             fi
@@ -913,8 +914,7 @@ while true; do
             echo "   K/J              Reorder todo (move up/down)"
             echo ""
             echo " Status Changes"
-            echo "   Enter            Start (mark in-progress)"
-            echo "   c                Complete (toggle done/pending)"
+            echo "   Enter            Cycle (pending > started > done)"
             echo "   x                Stop in-progress"
             echo "   X                Revert to pending"
             echo ""
