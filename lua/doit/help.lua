@@ -12,8 +12,8 @@ M.keymaps = {
 	},
 	todo_window = {
 		basic = {
-			{ key = "i", desc = "Add new todo" },
-			{ key = "<Space>", desc = "Toggle todo status (pending→in-progress→done)" },
+			{ key = "<CR>", desc = "Add new todo" },
+			{ key = "c", desc = "Toggle todo status (pending→in-progress→done)" },
 		{ key = "X", desc = "Revert todo to pending (not started)" },
 			{ key = "p", desc = "Set/change priority (critical/urgent/important)" },
 			{ key = "d", desc = "Delete current todo" },
@@ -28,7 +28,7 @@ M.keymaps = {
 			{ key = "C", desc = "Toggle categories window" },
 			{ key = "L", desc = "List manager - switch lists, create new lists" },
 			{ key = "m", desc = "Move current todo to another list" },
-			{ key = "c", desc = "Clear active filter" },
+			{ key = "f", desc = "Clear active filter" },
 			{ key = "/", desc = "Search todos" },
 		},
 		advanced = {
@@ -255,7 +255,7 @@ function M.get_markdown_help()
 	table.insert(lines, "  modules = {")
 	table.insert(lines, "    todos = {")
 	table.insert(lines, "      keymaps = {")
-	table.insert(lines, '        new_todo = "i",  -- Change \'n\' to \'i\' for vim-style insert')
+	table.insert(lines, '        new_todo = "n",  -- Change \'<CR>\' to \'n\' for legacy style')
 	table.insert(lines, '        toggle_todo = "<Space>",  -- Use space to toggle')
 	table.insert(lines, "        -- etc...")
 	table.insert(lines, "      }")

@@ -324,7 +324,7 @@ while true; do
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
  Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
 ───────────────────────────────────────────────────
- ENTER: Toggle    s: Start    x: Stop    X: Revert
+ ENTER: Start    c: Complete    x: Stop    X: Revert
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
@@ -333,7 +333,7 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
+        --expect=enter,c,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -357,15 +357,15 @@ while true; do
     case "$KEY" in
         "enter"|"")
             if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "toggle"
-                echo "Toggled: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                update_todo "$TODO_ID" "start"
+                echo "Started: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
             fi
             ;;
-        "s")
+        "c")
             if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "start"
-                echo "Started: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                update_todo "$TODO_ID" "toggle"
+                echo "Toggled: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
             fi
             ;;
@@ -819,7 +819,8 @@ while true; do
                           in_progress: false,
                           order_index: ($order | tonumber),
                           created_at: (now | floor),
-                          priorities: $priority                       }] |
+                          priorities: $priority
+                       }] |
                        ._metadata.updated_at = (now | floor)' \
                        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
                 else
@@ -832,7 +833,8 @@ while true; do
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
-                          created_at: (now | floor)                       }] |
+                          created_at: (now | floor)
+                       }] |
                        ._metadata.updated_at = (now | floor)' \
                        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
                 fi
@@ -840,9 +842,9 @@ while true; do
                 if [[ $? -eq 0 ]]; then
                     echo ""
                     if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
-                        echo "✓ Created [$SELECTED_PRIORITY]: $TODO_TEXT"
+                        echo "Created [$SELECTED_PRIORITY]: $TODO_TEXT"
                     else
-                        echo "✓ Created: $TODO_TEXT"
+                        echo "Created: $TODO_TEXT"
                     fi
 
                     # Ask if should mark as in-progress
@@ -854,7 +856,6 @@ while true; do
                     echo
 
                     if [[ "$MARK_PROGRESS" =~ ^[Yy]$ ]]; then
-                        # Clear other in_progress and set this one
                         jq --arg id "$TODO_ID" '
                             .todos |= map(
                                 if .id == $id then
@@ -865,7 +866,7 @@ while true; do
                             ) |
                             ._metadata.updated_at = (now | floor)
                         ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                        echo "▶ Marked as in-progress"
+                        echo "Marked as in-progress"
                     fi
                 else
                     echo "Error: Failed to create todo"
@@ -890,8 +891,8 @@ while true; do
             if [[ -n "$SEARCH_RESULT" ]]; then
                 SEARCH_ID=$(echo "$SEARCH_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
                 if [[ -n "$SEARCH_ID" ]]; then
-                    update_todo "$SEARCH_ID" "toggle"
-                    echo "Toggled: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                    update_todo "$SEARCH_ID" "start"
+                    echo "Started: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                     sleep 0.5
                 fi
             fi
@@ -912,8 +913,8 @@ while true; do
             echo "   K/J              Reorder todo (move up/down)"
             echo ""
             echo " Status Changes"
-            echo "   Enter            Toggle done/pending"
-            echo "   s                Start (mark in-progress)"
+            echo "   Enter            Start (mark in-progress)"
+            echo "   c                Complete (toggle done/pending)"
             echo "   x                Stop in-progress"
             echo "   X                Revert to pending"
             echo ""
@@ -922,7 +923,7 @@ while true; do
             echo "   p                Paste new todo from clipboard"
             echo "   e                Edit todo text"
             echo "   P                Set priority"
-            echo "   (In new/edit: Enter = save, Esc = cancel)"
+            echo "   (In edit mode: Enter = save, Esc = cancel)"
             echo ""
             echo " Delete/Undo"
             echo "   d                Delete todo (can undo)"
