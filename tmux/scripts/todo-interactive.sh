@@ -133,6 +133,12 @@ format_todos() {
     fi
 }
 
+# allow fzf reload to call this script for formatted output
+if [[ "$1" == "--format" ]]; then
+    format_todos
+    exit 0
+fi
+
 # Priority options (default first so Enter accepts it)
 PRIORITIES=("default" "critical" "urgent" "important")
 
@@ -341,7 +347,11 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,x,X,n,r,N,P,d,D,e,u,l,L,m,J,K,y,v,p,B,O,ctrl-up,ctrl-down,q,?,/ \
+        --expect=enter,x,X,n,r,N,P,d,D,e,u,l,L,m,y,v,p,B,O,q,?,/ \
+        --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
+        --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
+        --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
+        --bind "ctrl-down:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
         --no-sort \
         --height=80% \
         --layout=reverse \
@@ -447,18 +457,7 @@ while true; do
                 fi
             fi
             ;;
-        "K"|"ctrl-up")
-            if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "move_up"
-                # no sleep - immediately refresh to show new position
-            fi
-            ;;
-        "J"|"ctrl-down")
-            if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "move_down"
-                # no sleep - immediately refresh to show new position
-            fi
-            ;;
+        # K/J/ctrl-up/ctrl-down handled via fzf --bind (in-place reload, no fzf restart)
         "e")
             # Edit todo text
             if [[ -n "$TODO_ID" ]]; then
