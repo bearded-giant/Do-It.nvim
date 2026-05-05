@@ -432,7 +432,7 @@ while true; do
                 if [[ "$LONG_DESC" == true ]]; then
                     DESC_TMP=$(mktemp /tmp/todo_desc.XXXXXX)
                     [[ -n "$CURRENT_DESC" ]] && printf '%s' "$CURRENT_DESC" > "$DESC_TMP"
-                    nvim -u NONE -c "edit $DESC_TMP" -c 'set noswapfile nobackup nowritebackup wrap linebreak' -c 'nnoremap <buffer> q :wq<CR>'
+                    nvim -u NONE -c "edit $DESC_TMP" -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' -c 'nnoremap <buffer> q :wq<CR>'
                     NEW_DESC=$(cat "$DESC_TMP")
                     rm -f "$DESC_TMP"
                 else
