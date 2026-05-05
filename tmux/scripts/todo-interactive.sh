@@ -355,12 +355,12 @@ while true; do
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- v: View (select text)    y: Copy text    N: Description
+ y: Copy text    N: Edit note
  O: Send to Obsidian daily    /: Search
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,v,p,B,O,q,?,/ \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/ \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
@@ -387,7 +387,7 @@ while true; do
     # Perform action based on key
     case "$KEY" in
         "enter"|"")
-            # view item detail (notes, full text, status)
+            # view item detail in nvim (read-only, yankable)
             if [[ -n "$TODO_ID" ]]; then
                 VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
                 TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
@@ -408,12 +408,9 @@ while true; do
                         echo "── notes ───────────────────────────────"
                         echo "$VIEW_DESC"
                     fi
-                    echo ""
-                    echo "────────────────────────────────────────"
-                    echo "q to exit"
                 } > "$VIEW_TMP"
 
-                less -R "$VIEW_TMP"
+                nvim -u NONE -R -c "edit $VIEW_TMP" -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' -c 'nnoremap <buffer> q :q<CR>'
                 rm -f "$VIEW_TMP"
             fi
             ;;
@@ -436,37 +433,6 @@ while true; do
                 update_todo "$TODO_ID" "revert"
                 echo "Reverted to pending: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
-            fi
-            ;;
-        "v")
-            # view full text in less for text selection/copy
-            if [[ -n "$TODO_ID" ]]; then
-                VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
-                TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
-                VIEW_TEXT=$(echo "$TODO_OBJ" | jq -r '.text // ""')
-                VIEW_DESC=$(echo "$TODO_OBJ" | jq -r '.description // ""')
-                VIEW_PRIORITY=$(echo "$TODO_OBJ" | jq -r '.priorities // "default"')
-                VIEW_STATUS="pending"
-                echo "$TODO_OBJ" | jq -e '.in_progress == true' &>/dev/null && VIEW_STATUS="in-progress"
-                echo "$TODO_OBJ" | jq -e '.done == true' &>/dev/null && VIEW_STATUS="done"
-
-                {
-                    echo "[$VIEW_STATUS] [$VIEW_PRIORITY]"
-                    echo "────────────────────────────────────────"
-                    echo ""
-                    echo "$VIEW_TEXT"
-                    if [[ -n "$VIEW_DESC" ]]; then
-                        echo ""
-                        echo "── description ─────────────────────────"
-                        echo "$VIEW_DESC"
-                    fi
-                    echo ""
-                    echo "────────────────────────────────────────"
-                    echo "select text with mouse/keyboard, q to exit"
-                } > "$VIEW_TMP"
-
-                less -R "$VIEW_TMP"
-                rm -f "$VIEW_TMP"
             fi
             ;;
         "N")
@@ -974,8 +940,7 @@ while true; do
             echo "   u                Undo last delete"
             echo ""
             echo " View/Copy"
-            echo "   Enter            View detail (notes, status, q to exit)"
-            echo "   v                View full text (scrollable, q to exit)"
+            echo "   Enter            View detail in nvim (q to exit)"
             echo "   N                Edit note in \$EDITOR"
             echo "   y                Copy text to clipboard"
             echo ""
