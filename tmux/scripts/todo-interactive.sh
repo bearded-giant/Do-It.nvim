@@ -116,7 +116,7 @@ format_todos() {
     if [[ "$SHOW_COMPLETED" == "true" ]]; then
         jq -r '.todos |
             map(select(.done == true)) |
-            sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
+            sort_by(-(.completed_at // 0)) |
             .[] |
             (.text | split("\n")[0][0:55]) as $first_line |
             (.text | contains("\n")) as $multiline |
@@ -213,9 +213,9 @@ update_todo() {
                 .todos |= map(
                     if .id == $id then
                         if .done then
-                            .done = false | .in_progress = false
+                            .done = false | .in_progress = false | del(.completed_at)
                         elif .in_progress then
-                            .in_progress = false | .done = true
+                            .in_progress = false | .done = true | .completed_at = (now | floor)
                         else
                             .in_progress = true | .done = false
                         end
@@ -249,12 +249,25 @@ update_todo() {
                 ._metadata.updated_at = (now | floor)
             ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             ;;
+        "complete")
+            jq --arg id "$todo_id" '
+                .todos |= map(
+                    if .id == $id then
+                        .in_progress = false |
+                        .done = true |
+                        .completed_at = (now | floor)
+                    else . end
+                ) |
+                ._metadata.updated_at = (now | floor)
+            ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+            ;;
         "revert")
             jq --arg id "$todo_id" '
                 .todos |= map(
                     if .id == $id then
                         .in_progress = false |
-                        .done = false
+                        .done = false |
+                        del(.completed_at)
                     else . end
                 ) |
                 ._metadata.updated_at = (now | floor)
@@ -338,7 +351,7 @@ while true; do
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
  Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
 ───────────────────────────────────────────────────
- ENTER: Cycle (pending>started>done)    x: Stop    X: Revert
+ Enter: View detail    s: Start    x: Done    X: Revert
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
@@ -347,7 +360,7 @@ while true; do
 ───────────────────────────────────────────────────
 " \
         --prompt="" \
-        --expect=enter,x,X,n,r,N,P,d,D,e,u,l,L,m,y,v,p,B,O,q,?,/ \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,v,p,B,O,q,?,/ \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
@@ -374,16 +387,47 @@ while true; do
     # Perform action based on key
     case "$KEY" in
         "enter"|"")
+            # view item detail (notes, full text, status)
             if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "toggle"
-                echo "Toggled: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
+                TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
+                VIEW_TEXT=$(echo "$TODO_OBJ" | jq -r '.text // ""')
+                VIEW_DESC=$(echo "$TODO_OBJ" | jq -r '.description // ""')
+                VIEW_PRIORITY=$(echo "$TODO_OBJ" | jq -r '.priorities // "default"')
+                VIEW_STATUS="pending"
+                echo "$TODO_OBJ" | jq -e '.in_progress == true' &>/dev/null && VIEW_STATUS="in-progress"
+                echo "$TODO_OBJ" | jq -e '.done == true' &>/dev/null && VIEW_STATUS="done"
+
+                {
+                    echo "[$VIEW_STATUS] [$VIEW_PRIORITY]"
+                    echo "────────────────────────────────────────"
+                    echo ""
+                    echo "$VIEW_TEXT"
+                    if [[ -n "$VIEW_DESC" ]]; then
+                        echo ""
+                        echo "── notes ───────────────────────────────"
+                        echo "$VIEW_DESC"
+                    fi
+                    echo ""
+                    echo "────────────────────────────────────────"
+                    echo "q to exit"
+                } > "$VIEW_TMP"
+
+                less -R "$VIEW_TMP"
+                rm -f "$VIEW_TMP"
+            fi
+            ;;
+        "s")
+            if [[ -n "$TODO_ID" ]]; then
+                update_todo "$TODO_ID" "start"
+                echo "Started: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
             fi
             ;;
         "x")
             if [[ -n "$TODO_ID" ]]; then
-                update_todo "$TODO_ID" "stop"
-                echo "Stopped: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                update_todo "$TODO_ID" "complete"
+                echo "Done: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
                 sleep 0.5
             fi
             ;;
@@ -913,8 +957,8 @@ while true; do
             echo "   K/J              Reorder todo (move up/down)"
             echo ""
             echo " Status Changes"
-            echo "   Enter            Cycle (pending > started > done)"
-            echo "   x                Stop in-progress"
+            echo "   s                Start (pending > in-progress)"
+            echo "   x                Complete (> done)"
             echo "   X                Revert to pending"
             echo ""
             echo " Editing"
@@ -930,6 +974,7 @@ while true; do
             echo "   u                Undo last delete"
             echo ""
             echo " View/Copy"
+            echo "   Enter            View detail (notes, status, q to exit)"
             echo "   v                View full text (scrollable, q to exit)"
             echo "   N                Edit note in \$EDITOR"
             echo "   y                Copy text to clipboard"
