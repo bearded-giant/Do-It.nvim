@@ -387,7 +387,7 @@ while true; do
     # Perform action based on key
     case "$KEY" in
         "enter"|"")
-            # view item detail in nvim (read-only, yankable)
+            # view item + edit notes in nvim
             if [[ -n "$TODO_ID" ]]; then
                 VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
                 TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
@@ -398,20 +398,27 @@ while true; do
                 echo "$TODO_OBJ" | jq -e '.in_progress == true' &>/dev/null && VIEW_STATUS="in-progress"
                 echo "$TODO_OBJ" | jq -e '.done == true' &>/dev/null && VIEW_STATUS="done"
 
+                NOTES_MARKER="── notes (editable below) ──────────────"
                 {
                     echo "[$VIEW_STATUS] [$VIEW_PRIORITY]"
-                    echo "────────────────────────────────────────"
-                    echo ""
                     echo "$VIEW_TEXT"
-                    if [[ -n "$VIEW_DESC" ]]; then
-                        echo ""
-                        echo "── notes ───────────────────────────────"
-                        echo "$VIEW_DESC"
-                    fi
+                    echo "$NOTES_MARKER"
+                    [[ -n "$VIEW_DESC" ]] && echo "$VIEW_DESC"
                 } > "$VIEW_TMP"
 
-                nvim -u NONE -R -c "edit $VIEW_TMP" -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' -c 'nnoremap <buffer> q :q<CR>'
+                HEADER_LINES=3
+                nvim -u NONE -c "edit $VIEW_TMP" \
+                    -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' \
+                    -c "1,${HEADER_LINES}setlocal readonly nomodifiable" \
+                    -c "normal! ${HEADER_LINES}jG" \
+                    -c 'nnoremap <buffer> q :wq<CR>'
+
+                NEW_DESC=$(tail -n +$((HEADER_LINES + 1)) "$VIEW_TMP")
                 rm -f "$VIEW_TMP"
+                jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
+                    .todos |= map(if .id == $id then .description = $desc else . end) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             fi
             ;;
         "s")
