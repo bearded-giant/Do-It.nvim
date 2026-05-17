@@ -378,6 +378,62 @@ For other themes, use the status script directly:
 set -g status-right "#(~/.tmux/plugins/do-it.nvim/tmux/scripts/todo-status.sh)"
 ```
 
+## MCP Server (Claude Code Integration)
+
+Do-it.nvim includes an MCP server that exposes your todo lists to [Claude Code](https://claude.ai/code) and other MCP-compatible tools. This lets you read, create, update, and search todos without leaving your AI coding session.
+
+### Setup
+
+```bash
+cd mcp && npm install
+```
+
+Add to your Claude Code `settings.json` under `mcpServers`:
+
+```json
+{
+  "doit": {
+    "command": "node",
+    "args": ["/path/to/do-it.nvim/mcp/server.js"]
+  }
+}
+```
+
+If you configured a custom storage path in your do-it.nvim setup (via `modules.todos.storage.save_path`), set `DOIT_DATA_DIR` to match:
+
+```json
+{
+  "doit": {
+    "command": "node",
+    "args": ["/path/to/do-it.nvim/mcp/server.js"],
+    "env": {
+      "DOIT_DATA_DIR": "/your/custom/data/path"
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_todos` | List items from a list, filter by pending/done/in_progress |
+| `add_todo` | Create a new todo with optional notes |
+| `update_todo` | Edit text, description, or toggle status |
+| `delete_todo` | Remove an item (kept in deleted_todos for undo) |
+| `list_lists` | Show all lists with pending/total counts |
+| `switch_list` | Change the active list |
+| `search_todos` | Search across all lists by text |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOIT_DATA_DIR` | `~/.local/share/nvim/doit` | Data directory path |
+| `DOIT_ACTIVE_LIST` | (from session.json) | Override active list name |
+
+The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
+
 ## Contributing
 
 See the [developer documentation](./docs/) for:
