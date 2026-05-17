@@ -37,6 +37,21 @@ COLOR_BLUE=$'\e[1;34m'
 COLOR_PURPLE=$'\e[38;5;141m'
 COLOR_DIM=$'\e[2m'
 
+UNDO_TYPE=""
+UNDO_ID=""
+UNDO_PREV_DONE=""
+UNDO_PREV_IN_PROGRESS=""
+UNDO_LABEL=""
+
+snapshot_for_undo() {
+    local todo_id="$1" action="$2"
+    UNDO_TYPE="$action"
+    UNDO_ID="$todo_id"
+    UNDO_PREV_DONE=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .done' "$TODO_LIST_PATH")
+    UNDO_PREV_IN_PROGRESS=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .in_progress // false' "$TODO_LIST_PATH")
+    UNDO_LABEL=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
+}
+
 # config: show completed items (default true)
 SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
 SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
@@ -423,22 +438,25 @@ while true; do
             ;;
         "s")
             if [[ -n "$TODO_ID" ]]; then
+                snapshot_for_undo "$TODO_ID" "start"
                 update_todo "$TODO_ID" "start"
-                echo "Started: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                echo "Started: $UNDO_LABEL (u to undo)"
                 sleep 0.5
             fi
             ;;
         "x")
             if [[ -n "$TODO_ID" ]]; then
+                snapshot_for_undo "$TODO_ID" "complete"
                 update_todo "$TODO_ID" "complete"
-                echo "Done: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                echo "Done: $UNDO_LABEL (u to undo)"
                 sleep 0.5
             fi
             ;;
         "X")
             if [[ -n "$TODO_ID" ]]; then
+                snapshot_for_undo "$TODO_ID" "revert"
                 update_todo "$TODO_ID" "revert"
-                echo "Reverted to pending: $(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                echo "Reverted to pending: $UNDO_LABEL (u to undo)"
                 sleep 0.5
             fi
             ;;
@@ -514,13 +532,16 @@ while true; do
                 read -n 1 -r CONFIRM
                 echo
                 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+                    UNDO_TYPE="delete"
+                    UNDO_ID="$TODO_ID"
+                    UNDO_LABEL="$TODO_TEXT"
                     jq --arg id "$TODO_ID" '
                         (.todos[] | select(.id == $id)) as $deleted |
                         .todos |= map(select(.id != $id)) |
                         ._metadata.deleted_todos = ([$deleted] + (._metadata.deleted_todos // []))[0:10] |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                    echo "Deleted (press 'u' to undo)"
+                    echo "Deleted (u to undo)"
                     sleep 0.5
                 fi
             fi
@@ -548,20 +569,35 @@ while true; do
             fi
             ;;
         "u")
-            # Undo last delete
-            HAS_DELETED=$(jq -r '._metadata.deleted_todos[0].id // empty' "$TODO_LIST_PATH")
-            if [[ -n "$HAS_DELETED" ]]; then
-                RESTORED_TEXT=$(jq -r '._metadata.deleted_todos[0].text' "$TODO_LIST_PATH")
-                jq '
-                    ._metadata.deleted_todos[0] as $restore |
-                    .todos += [$restore] |
-                    ._metadata.deleted_todos = ._metadata.deleted_todos[1:] |
-                    ._metadata.updated_at = (now | floor)
-                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                echo "Restored: $RESTORED_TEXT"
+            if [[ -z "$UNDO_TYPE" ]]; then
+                echo "Nothing to undo"
+                sleep 0.5
+            elif [[ "$UNDO_TYPE" == "delete" ]]; then
+                HAS_DELETED=$(jq -r '._metadata.deleted_todos[0].id // empty' "$TODO_LIST_PATH")
+                if [[ -n "$HAS_DELETED" ]]; then
+                    RESTORED_TEXT=$(jq -r '._metadata.deleted_todos[0].text' "$TODO_LIST_PATH")
+                    jq '
+                        ._metadata.deleted_todos[0] as $restore |
+                        .todos += [$restore] |
+                        ._metadata.deleted_todos = ._metadata.deleted_todos[1:] |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Restored: $RESTORED_TEXT"
+                fi
+                UNDO_TYPE=""
                 sleep 0.5
             else
-                echo "Nothing to undo"
+                jq --arg id "$UNDO_ID" --argjson done "$UNDO_PREV_DONE" --argjson ip "$UNDO_PREV_IN_PROGRESS" '
+                    .todos |= map(
+                        if .id == $id then
+                            .done = $done | .in_progress = $ip |
+                            if $done then . else del(.completed_at) end
+                        else . end
+                    ) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                echo "Undid $UNDO_TYPE: $UNDO_LABEL"
+                UNDO_TYPE=""
                 sleep 0.5
             fi
             ;;
@@ -944,7 +980,7 @@ while true; do
             echo " Delete/Undo"
             echo "   d                Delete todo (can undo)"
             echo "   D                Delete all completed"
-            echo "   u                Undo last delete"
+            echo "   u                Undo last action"
             echo ""
             echo " View/Copy"
             echo "   Enter            View detail in nvim (q to exit)"
