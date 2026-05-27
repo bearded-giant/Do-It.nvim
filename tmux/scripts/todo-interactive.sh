@@ -81,8 +81,18 @@ export TODO_LIST_PATH
 format_todos() {
     # tracks the previous priority group so we can emit a blank line on change
     local prev_group=""
-    local hr_line
-    hr_line=$(printf '─%.0s' $(seq 1 64))
+
+    # text column scales with the list pane (~60% of popup; preview takes 40%)
+    # read /dev/tty (popup pty) since stdout is piped into fzf, which breaks tput
+    local term_cols list_w text_w hr_line
+    term_cols=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
+    [[ -z "$term_cols" || "$term_cols" -lt 1 ]] && term_cols=$(tput cols 2>/dev/null)
+    [[ -z "$term_cols" || "$term_cols" -lt 1 ]] && term_cols=120
+    list_w=$(( term_cols * 60 / 100 ))
+    text_w=$(( list_w - 30 ))
+    (( text_w < 40 )) && text_w=40
+    (( text_w > 200 )) && text_w=200
+    hr_line=$(printf '─%.0s' $(seq 1 $(( text_w + 24 ))))
 
     # First print in-progress todos
     while IFS='|' read -r id status priority text multiline obs; do
@@ -97,16 +107,16 @@ format_todos() {
         [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         # Append ID at end (dimmed) for reliable extraction
         case "$priority" in
-            "critical")  printf "%s%s%s! %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s> %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s%s! %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s%s> %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r '.todos |
+    done < <(jq -r --argjson tw "$text_w" '.todos |
         map(select(.in_progress == true)) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
-        (.text | split("\n")[0][0:55]) as $first_line |
+        (.text | split("\n")[0][0:$tw]) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
@@ -122,16 +132,16 @@ format_todos() {
         obs_icon=""
         [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         case "$priority" in
-            "critical")  printf "%s%s! %-55s%s%s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s> %-55s%s%s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s  %-55s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "critical")  printf "%s%s! %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_RED" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "urgent")    printf "%s%s> %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            "important") printf "%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            *)           printf "%s  %-${text_w}s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r '.todos |
+    done < <(jq -r --argjson tw "$text_w" '.todos |
         map(select(.done == false and .in_progress != true)) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
-        (.text | split("\n")[0][0:55]) as $first_line |
+        (.text | split("\n")[0][0:$tw]) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
@@ -150,12 +160,12 @@ format_todos() {
             [[ "$multiline" == "true" ]] && suffix=" ..."
             obs_icon=""
             [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
-            printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        done < <(jq -r '.todos |
+            printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
+        done < <(jq -r --argjson tw "$text_w" '.todos |
             map(select(.done == true)) |
             sort_by(-(.completed_at // 0)) |
             .[] |
-            (.text | split("\n")[0][0:55]) as $first_line |
+            (.text | split("\n")[0][0:$tw]) as $first_line |
             (.text | contains("\n")) as $multiline |
             (if .obsidian_ref then "true" else "false" end) as $obs |
             "\(.id)|✓|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
