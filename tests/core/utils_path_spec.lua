@@ -44,8 +44,8 @@ describe("core utils path", function()
 
     describe("exists", function()
         it("should return true for existing file", function()
-            -- CLAUDE.md always exists in the repo root
-            assert.is_true(path.exists("CLAUDE.md"))
+            -- README.md is tracked and always present in the repo root (CLAUDE.md is gitignored)
+            assert.is_true(path.exists("README.md"))
         end)
 
         it("should return false for non-existent file", function()
