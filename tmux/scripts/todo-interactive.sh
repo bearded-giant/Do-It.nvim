@@ -388,16 +388,22 @@ while true; do
     clear
     # Show todos and prompt for selection
     done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
+    # header divider sized to the list pane (~50% of popup; preview takes the other 50%)
+    hdr_cols=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
+    [[ -z "$hdr_cols" || "$hdr_cols" -lt 1 ]] && hdr_cols=$(tput cols 2>/dev/null)
+    [[ -z "$hdr_cols" || "$hdr_cols" -lt 1 ]] && hdr_cols=120
+    hdr_hr=$(printf '─%.0s' $(seq 1 $(( hdr_cols * 50 / 100 ))))
     SELECTION=$(format_todos | fzf --ansi --disabled --header="
  Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
-───────────────────────────────────────────────────
+${hdr_hr}
  Enter: View detail    s: Start    x: Done    X: Revert
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
  y: Copy text    N: Edit note
  O: Send to Obsidian daily    /: Search
-───────────────────────────────────────────────────
+${hdr_hr}
+
 " \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/ \
@@ -406,7 +412,7 @@ while true; do
         --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
         --bind "ctrl-down:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
         --no-sort \
-        --height=80% \
+        --height=97% \
         --layout=reverse \
         --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
         --preview-window=right:50%)
