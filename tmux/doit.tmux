@@ -21,6 +21,13 @@ default_key="d"
 doit_key=$(tmux show-option -gqv "@doit-key")
 doit_key="${doit_key:-$default_key}"
 
+# Interactive manager popup dimensions (override with @doit-interactive-popup-w / -h)
+# Accepts tmux size syntax: absolute cells (120) or terminal-relative (80%)
+interactive_w=$(tmux show-option -gqv "@doit-interactive-popup-w")
+interactive_w="${interactive_w:-80%}"
+interactive_h=$(tmux show-option -gqv "@doit-interactive-popup-h")
+interactive_h="${interactive_h:-80%}"
+
 # Set up the doit menu key table
 tmux bind-key -T prefix "$doit_key" switch-client -T doit-menu
 
@@ -28,7 +35,7 @@ tmux bind-key -T prefix "$doit_key" switch-client -T doit-menu
 tmux bind-key -T doit-menu t display-popup -E -w 75 -h 38 "$SCRIPTS_DIR/todo-popup.sh"
 
 # Interactive manager with fzf (prefix + d + i)
-tmux bind-key -T doit-menu i display-popup -E -w 120 -h 45 "$SCRIPTS_DIR/todo-interactive.sh"
+tmux bind-key -T doit-menu i display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh"
 
 # Toggle current todo done/undone (prefix + d + x)
 tmux bind-key -T doit-menu x run-shell "$SCRIPTS_DIR/todo-toggle.sh"
@@ -53,12 +60,17 @@ tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-lis
 # set -g @doit-note-popup-w "80"
 # set -g @doit-note-popup-h "20"
 
+# Interactive manager popup dimensions (default: 80% x 80%)
+# Accepts absolute cells or terminal-relative percentages
+# set -g @doit-interactive-popup-w "80%"
+# set -g @doit-interactive-popup-h "80%"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")
 if [[ "$alt_bindings" != "off" ]]; then
     tmux bind-key -n M-T display-popup -E -w 75 -h 38 "$SCRIPTS_DIR/todo-popup.sh"
-    tmux bind-key -n M-I display-popup -E -w 120 -h 45 "$SCRIPTS_DIR/todo-interactive.sh"
+    tmux bind-key -n M-I display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh"
     tmux bind-key -n M-X run-shell "$SCRIPTS_DIR/todo-toggle.sh"
     tmux bind-key -n M-N display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
     tmux bind-key -n M-L display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"

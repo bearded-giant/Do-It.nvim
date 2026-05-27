@@ -362,6 +362,11 @@ set -g @doit-alt-bindings "off"
 
 # Use $EDITOR (nvim, vim) for create/edit instead of inline input
 set -g @doit-use-editor "true"
+
+# Interactive manager popup size (default: 80% x 80%)
+# Accepts absolute cells ("120") or terminal-relative percentages ("80%")
+set -g @doit-interactive-popup-w "80%"
+set -g @doit-interactive-popup-h "80%"
 ```
 
 ### Status Bar Integration

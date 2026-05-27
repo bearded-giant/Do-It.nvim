@@ -210,6 +210,16 @@ Note popup dimensions (default: 80x20): >tmux
 Controls the width and height of the popup opened by `p` (view note)
 in the interactive manager.
 
+Interactive manager popup dimensions (default: 80% x 80%): >tmux
+    set -g @doit-interactive-popup-w "80%"
+    set -g @doit-interactive-popup-h "80%"
+<
+Controls the size of the fzf interactive manager popup (prefix + d + i,
+or Alt+Shift+I). Accepts tmux size syntax: absolute cells ("120") or
+terminal-relative percentages ("80%"). Percentages scale with the
+terminal, so they keep a consistent feel across laptop and ultrawide
+displays.
+
 Environment Variables:~
 
 The plugin sets these environment variables automatically:
