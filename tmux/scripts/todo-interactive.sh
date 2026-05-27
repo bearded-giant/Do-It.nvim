@@ -455,7 +455,6 @@ ${hdr_hr}
                 HEADER_LINES=3
                 nvim -u NONE -c "edit $VIEW_TMP" \
                     -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' \
-                    -c "1,${HEADER_LINES}setlocal readonly nomodifiable" \
                     -c "normal! ${HEADER_LINES}jG" \
                     -c 'nnoremap <buffer> q :wq<CR>'
 
