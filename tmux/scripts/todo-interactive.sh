@@ -97,7 +97,7 @@ format_todos() {
     # First print in-progress todos
     while IFS='|' read -r id status priority text multiline obs; do
         # blank line between distinct priority groups
-        local group="ip-${priority:-default}"
+        local group="${priority:-default}"
         [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
         prev_group="$group"
         # Add ... for multi-line items
@@ -124,7 +124,7 @@ format_todos() {
 
     # Then print not started todos
     while IFS='|' read -r id status priority text multiline obs; do
-        local group="pd-${priority:-default}"
+        local group="${priority:-default}"
         [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
         prev_group="$group"
         suffix=""
