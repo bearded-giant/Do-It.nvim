@@ -216,6 +216,153 @@ local function prompt_import(on_render)
 	prompt_io("import", on_render)
 end
 
+-- normalize priority field (may be string or legacy table) to a string or nil
+local function todo_priority_name(todo)
+	local p = todo.priorities
+	if type(p) == "string" and p ~= "" then
+		return p
+	elseif type(p) == "table" and #p > 0 then
+		return p[1]
+	end
+	return nil
+end
+
+-- leading priority marker glyph (2 chars, keeps column alignment). Matches tmux view.
+local function priority_marker(todo)
+	if todo.done then
+		return "  "
+	end
+	local p = todo_priority_name(todo)
+	if p == "critical" then
+		return "! "
+	elseif p == "urgent" then
+		return "> "
+	elseif p == "important" then
+		return "* "
+	end
+	return "  "
+end
+
+local function divider_width()
+	if win_id and vim.api.nvim_win_is_valid(win_id) then
+		local ok, w = pcall(vim.api.nvim_win_get_width, win_id)
+		if ok and w and w > 4 then
+			return w - 2
+		end
+	end
+	return 50
+end
+
+-- Single source of truth for the rendered layout. Both render_todos (draws +
+-- highlights) and todo_actions.get_real_todo_index (cursor -> todo) consume this,
+-- so group separators never desync the cursor mapping.
+-- Returns an ordered list of rows, one per buffer line:
+--   { display = <string>, kind = "blank"|"filter"|"divider"|"todo",
+--     todo = <todo|nil>, todo_index = <int|nil>, is_first = <bool>, is_description = <bool> }
+function M.build_render_rows()
+	state = ensure_state_loaded()
+	state.sort_todos()
+
+	local rows = {}
+	local function push(display, meta)
+		meta = meta or {}
+		meta.display = display
+		meta.kind = meta.kind or "blank"
+		rows[#rows + 1] = meta
+	end
+
+	push("")
+	if state.active_filter then
+		push("")
+		push("  Filtered by tag: #" .. state.active_filter, { kind = "filter" })
+	end
+	if state.active_category then
+		push("")
+		local category_name = state.active_category
+		local module = get_todo_module()
+		if module and module.state and module.state.categories_by_id
+			and module.state.categories_by_id[state.active_category] then
+			category_name = module.state.categories_by_id[state.active_category].name
+		end
+		push("  Filtered by category: " .. category_name, { kind = "filter" })
+	end
+
+	local show_completed = true
+	local show_descriptions = false
+	if config.options and config.options.modules and config.options.modules.todos then
+		if config.options.modules.todos.show_completed == false then
+			show_completed = false
+		end
+		if config.options.modules.todos.show_descriptions == true then
+			show_descriptions = true
+		end
+	end
+
+	local prev_group = nil
+	local done_started = false
+	for i, todo in ipairs(state.todos) do
+		if todo.done and not show_completed then
+			goto continue
+		end
+
+		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+		local show_by_category = true
+		if state.active_category then
+			local module = get_todo_module()
+			if module and module.state and module.state.get_todo_category then
+				local todo_category_id = module.state.get_todo_category(todo.id)
+				show_by_category = (todo_category_id == state.active_category) or
+								  (state.active_category == "uncategorized" and
+								   (todo_category_id == "uncategorized" or not todo_category_id))
+			else
+				show_by_category = (todo.category == state.active_category) or
+								  (state.active_category == "Uncategorized" and
+								   (not todo.category or todo.category == ""))
+			end
+		end
+
+		if show_by_tag and show_by_category then
+			-- group separators (mirror tmux): blank line between priority groups,
+			-- blank + divider + blank before the completed block
+			if todo.done then
+				if not done_started then
+					done_started = true
+					push("")
+					push(string.rep("─", divider_width()), { kind = "divider" })
+					push("")
+				end
+			else
+				local section = todo.in_progress and "ip" or "pd"
+				local group = section .. ":" .. (todo_priority_name(todo) or "default")
+				if prev_group and group ~= prev_group then
+					push("")
+				end
+				prev_group = group
+			end
+
+			local marker = priority_marker(todo)
+			local formatted = M.format_todo_line(todo)
+			local text_lines = vim.split(formatted, "\n", { plain = true })
+			for j, text_line in ipairs(text_lines) do
+				if j == 1 then
+					push(marker .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = true })
+				else
+					push("    " .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = false })
+				end
+			end
+			if show_descriptions and todo.description and todo.description ~= "" then
+				local desc_lines = vim.split(todo.description, "\n", { plain = true })
+				for _, desc_line in ipairs(desc_lines) do
+					push("      " .. desc_line, { kind = "todo", todo = todo, todo_index = i, is_description = true })
+				end
+			end
+		end
+		::continue::
+	end
+	push("")
+	return rows
+end
+
 function M.render_todos()
 	if not buf_id or not vim.api.nvim_buf_is_valid(buf_id) then
 		return
@@ -244,97 +391,27 @@ function M.render_todos()
 	local ns_id = highlights.get_namespace_id()
 	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
 
-	state.sort_todos()
+	local rows = M.build_render_rows()
+	M._rendered_rows = rows
 
-	local lines = { "" }
-	if state.active_filter then
-		table.insert(lines, "")
-		table.insert(lines, "  Filtered by tag: #" .. state.active_filter)
+	local lines = {}
+	for _, r in ipairs(rows) do
+		lines[#lines + 1] = r.display
 	end
-	
-	if state.active_category then
-		table.insert(lines, "")
-		
-		local category_name = state.active_category
-		local module = get_todo_module()
-		if module and module.state and module.state.categories_by_id 
-			and module.state.categories_by_id[state.active_category] then
-			category_name = module.state.categories_by_id[state.active_category].name
-		end
-		
-		table.insert(lines, "  Filtered by category: " .. category_name)
-	end
-
-	local show_completed = true
-	local show_descriptions = true
-	if config.options and config.options.modules and config.options.modules.todos then
-		if config.options.modules.todos.show_completed == false then
-			show_completed = false
-		end
-		if config.options.modules.todos.show_descriptions == false then
-			show_descriptions = false
-		end
-	end
-
-	local todo_line_map = {}
-	for _, todo in ipairs(state.todos) do
-		if todo.done and not show_completed then
-			goto continue
-		end
-
-		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-		local show_by_category = true
-
-		if state.active_category then
-			local module = get_todo_module()
-			if module and module.state and module.state.get_todo_category then
-				local todo_category_id = module.state.get_todo_category(todo.id)
-				show_by_category = (todo_category_id == state.active_category) or
-								  (state.active_category == "uncategorized" and
-								   (todo_category_id == "uncategorized" or not todo_category_id))
-			else
-				show_by_category = (todo.category == state.active_category) or
-								  (state.active_category == "Uncategorized" and
-								   (not todo.category or todo.category == ""))
-			end
-		end
-
-		if show_by_tag and show_by_category then
-			local formatted = M.format_todo_line(todo)
-			local text_lines = vim.split(formatted, "\n", { plain = true })
-			for i, text_line in ipairs(text_lines) do
-				local line_idx = #lines + 1
-				if i == 1 then
-					table.insert(lines, "  " .. text_line)
-					todo_line_map[line_idx] = { todo = todo, is_first = true }
-				else
-					table.insert(lines, "    " .. text_line)
-					todo_line_map[line_idx] = { todo = todo, is_first = false }
-				end
-			end
-			if show_descriptions and todo.description and todo.description ~= "" then
-				local desc_lines = vim.split(todo.description, "\n", { plain = true })
-				for _, desc_line in ipairs(desc_lines) do
-					local line_idx = #lines + 1
-					table.insert(lines, "      " .. desc_line)
-					todo_line_map[line_idx] = { todo = todo, is_description = true }
-				end
-			end
-		end
-		::continue::
-	end
-	table.insert(lines, "")
-
 	vim.api.nvim_buf_set_lines(buf_id, 0, -1, false, lines)
 
 	-- Now highlight each line
-	for i, line in ipairs(lines) do
+	for i, row in ipairs(rows) do
 		local line_nr = i - 1
-		local todo_info = todo_line_map[i]
+		local line = row.display
 
-		if todo_info then
-			local todo = todo_info.todo
-			if todo_info.is_description then
+		if row.kind == "filter" then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "WarningMsg", line_nr, 0, -1)
+		elseif row.kind == "divider" then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
+		elseif row.todo then
+			local todo = row.todo
+			if row.is_description then
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Comment", line_nr, 0, -1)
 			elseif todo.done then
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
@@ -600,6 +677,83 @@ function M.calculate_line_offset()
 	return offset
 end
 
+-- Resolve the todo under the cursor via the render rows (group-separator safe).
+function M.get_todo_at_cursor()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return nil
+	end
+	local line_nr = vim.api.nvim_win_get_cursor(win_id)[1]
+	local rows = M._rendered_rows or M.build_render_rows()
+	local row = rows[line_nr]
+	if row and row.todo then
+		return row.todo
+	end
+	return nil
+end
+
+-- On-demand detail popup: full text + description + status/priority/obsidian.
+-- Mirrors the tmux preview_todo pane (do-it.nvim shows it on a key instead of a split).
+function M.open_todo_details()
+	local todo = M.get_todo_at_cursor()
+	if not todo then
+		vim.notify("No todo under cursor", vim.log.levels.WARN)
+		return
+	end
+
+	local status = todo.in_progress and "In Progress" or (todo.done and "Done" or "Pending")
+	local priority = todo_priority_name(todo) or "none"
+
+	local lines = {}
+	lines[#lines + 1] = "Status:   " .. status
+	lines[#lines + 1] = "Priority: " .. priority
+	if todo.obsidian_ref then
+		lines[#lines + 1] = "Obsidian: " .. ((todo.obsidian_ref.date) or "linked")
+	end
+	lines[#lines + 1] = string.rep("─", 40)
+	for _, l in ipairs(vim.split(todo.text or "", "\n", { plain = true })) do
+		lines[#lines + 1] = l
+	end
+	if todo.description and todo.description ~= "" then
+		lines[#lines + 1] = ""
+		lines[#lines + 1] = "Description:"
+		for _, l in ipairs(vim.split(todo.description, "\n", { plain = true })) do
+			lines[#lines + 1] = l
+		end
+	end
+
+	local width = 0
+	for _, l in ipairs(lines) do
+		width = math.max(width, vim.fn.strdisplaywidth(l))
+	end
+	width = math.min(math.max(width + 2, 40), math.floor(vim.o.columns * 0.8))
+	local height = math.min(#lines, math.floor(vim.o.lines * 0.8))
+
+	local pbuf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
+	vim.api.nvim_buf_set_option(pbuf, "modifiable", false)
+	vim.api.nvim_buf_set_option(pbuf, "bufhidden", "wipe")
+
+	local pwin = vim.api.nvim_open_win(pbuf, true, {
+		relative = "editor",
+		row = math.floor((vim.o.lines - height) / 2),
+		col = math.floor((vim.o.columns - width) / 2),
+		width = width,
+		height = height,
+		style = "minimal",
+		border = "rounded",
+		title = " detail ",
+		title_pos = "center",
+	})
+
+	for _, key in ipairs({ "q", "<Esc>" }) do
+		vim.keymap.set("n", key, function()
+			if vim.api.nvim_win_is_valid(pwin) then
+				vim.api.nvim_win_close(pwin, true)
+			end
+		end, { buffer = pbuf, nowait = true })
+	end
+end
+
 local function create_window()
 	-- Ensure state is loaded before creating window
 	state = ensure_state_loaded()
@@ -826,6 +980,7 @@ local function create_window()
 			remove_time_estimation = "R",
 			reorder_todo = "r",
 			open_linked_note = "o",
+			view_detail = "K",
 			open_todo_scratchpad = "<leader>p",
 			toggle_list_manager = "L",
 			import_todos = "I",
@@ -992,6 +1147,11 @@ local function create_window()
 	setup_keymap("open_linked_note", function()
 		M.open_linked_note()
 	end)
+
+	-- Detail popup for the todo under the cursor
+	setup_keymap("view_detail", function()
+		M.open_todo_details()
+	end)
 	
 	-- Add keymap for linking to notes
 	vim.keymap.set("n", "N", function()
@@ -1113,8 +1273,7 @@ function M.open_linked_note()
 
 	local cursor_pos = vim.api.nvim_win_get_cursor(win_id)
 	local line_nr = cursor_pos[1]
-	local todo_index = line_nr - M.calculate_line_offset()
-	local todo = state.todos[todo_index]
+	local todo = M.get_todo_at_cursor()
 
 	if not todo then
 		vim.notify("No todo selected", vim.log.levels.WARN)

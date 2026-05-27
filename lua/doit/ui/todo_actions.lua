@@ -83,47 +83,55 @@ local function find_bullet_line_for_cursor(buf_id, line_num)
 	return nil
 end
 
+-- normalize priority field (string or legacy table) to a string or nil
+local function priority_name(todo)
+	local p = todo.priorities
+	if type(p) == "string" and p ~= "" then
+		return p
+	elseif type(p) == "table" and #p > 0 then
+		return p[1]
+	end
+	return nil
+end
+
+-- Maps a cursor line to a todo index. MUST mirror main_window.build_render_rows()
+-- layout exactly: blank top line, filter headers, blank line between priority
+-- groups, and blank+divider+blank before the completed block. Priority markers
+-- replace the leading indent (no extra lines), so they don't affect counting.
 local function get_real_todo_index(line_num, filter)
 	ensure_state_loaded()
-
-	-- state may have been reloaded from disk in unsorted order;
-	-- re-sort to match the rendered display order
 	state.sort_todos()
 
-	-- Calculate header offset
 	local line_offset = 1  -- blank line at top
 	if state.active_filter then
-		line_offset = line_offset + 2  -- blank line + filter text
+		line_offset = line_offset + 2
 	end
 	if state.active_category then
-		line_offset = line_offset + 2  -- blank line + category text
+		line_offset = line_offset + 2
 	end
 
-	-- Check show_completed and show_descriptions config (must match rendering logic)
 	local show_completed = true
-	local show_descriptions = true
+	local show_descriptions = false
 	if config.options and config.options.modules and config.options.modules.todos then
 		if config.options.modules.todos.show_completed == false then
 			show_completed = false
 		end
-		if config.options.modules.todos.show_descriptions == false then
-			show_descriptions = false
+		if config.options.modules.todos.show_descriptions == true then
+			show_descriptions = true
 		end
 	end
 
-	-- First todo starts at line_offset + 1 (after all headers)
 	local current_line = line_offset + 1
+	local prev_group = nil
+	local done_started = false
 
 	for i, todo in ipairs(state.todos) do
-		-- Skip completed todos if show_completed is false (must match rendering)
 		if todo.done and not show_completed then
 			goto continue
 		end
 
 		local show_by_tag = not filter or todo.text:match("#" .. filter)
 		local show_by_category = true
-
-		-- Check category filter
 		if state.active_category then
 			local module = get_todo_module()
 			if module and module.state and module.state.get_todo_category then
@@ -139,18 +147,28 @@ local function get_real_todo_index(line_num, filter)
 		end
 
 		if show_by_tag and show_by_category then
-			local text_lines = vim.split(todo.text, "\n", { plain = true })
-			local num_lines = #text_lines
-			if show_descriptions and todo.description and todo.description ~= "" then
-				local desc_lines = vim.split(todo.description, "\n", { plain = true })
-				num_lines = num_lines + #desc_lines
+			-- separator lines (must match build_render_rows)
+			if todo.done then
+				if not done_started then
+					done_started = true
+					current_line = current_line + 3  -- blank + divider + blank
+				end
+			else
+				local group = (todo.in_progress and "ip" or "pd") .. ":" .. (priority_name(todo) or "default")
+				if prev_group and group ~= prev_group then
+					current_line = current_line + 1  -- blank between groups
+				end
+				prev_group = group
 			end
 
-			-- Check if line_num falls within this todo's line range (including description)
+			local num_lines = #vim.split(todo.text, "\n", { plain = true })
+			if show_descriptions and todo.description and todo.description ~= "" then
+				num_lines = num_lines + #vim.split(todo.description, "\n", { plain = true })
+			end
+
 			if line_num >= current_line and line_num < current_line + num_lines then
 				return i
 			end
-
 			current_line = current_line + num_lines
 		end
 		::continue::

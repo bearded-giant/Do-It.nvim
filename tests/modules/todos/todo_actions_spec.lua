@@ -95,9 +95,31 @@ describe("todo_actions", function()
         end
         vim.api.nvim_win_set_cursor = function(win, pos) end  -- Mock cursor set
         vim.api.nvim_buf_get_lines = function(buf, start, end_, strict)
-            -- Return mock buffer lines based on current state
+            -- Mirror main_window.build_render_rows layout so cursor mapping tests are faithful:
+            -- blank top, blank between priority groups, blank+divider+blank before done block.
+            local function prio(todo)
+                local p = todo.priorities
+                if type(p) == "string" and p ~= "" then return p end
+                return nil
+            end
             local lines = { "" }  -- blank line at top
+            local prev_group = nil
+            local done_started = false
             for _, todo in ipairs(mock_state.todos) do
+                if todo.done then
+                    if not done_started then
+                        done_started = true
+                        table.insert(lines, "")
+                        table.insert(lines, "────────")
+                        table.insert(lines, "")
+                    end
+                else
+                    local group = (todo.in_progress and "ip" or "pd") .. ":" .. (prio(todo) or "default")
+                    if prev_group and group ~= prev_group then
+                        table.insert(lines, "")
+                    end
+                    prev_group = group
+                end
                 local text_lines = vim.split(todo.text, "\n", { plain = true })
                 for i, line in ipairs(text_lines) do
                     if i == 1 then
@@ -326,6 +348,47 @@ describe("todo_actions", function()
             -- Second todo should be deleted
             assert.are.equal(1, #mock_state.todos)
             assert.are.equal("First\nline two", mock_state.todos[1].text)
+        end)
+
+        it("should account for priority-group separators and the done divider", function()
+            -- layout (must match build_render_rows):
+            --   line1 blank
+            --   line2 critical (group pd:critical)
+            --   line3 blank   (group change -> pd:important)
+            --   line4 important
+            --   line5 blank, line6 divider, line7 blank  (before done block)
+            --   line8 done
+            mock_state.todos = {
+                { id = "1", text = "Crit", done = false, in_progress = false, priorities = "critical" },
+                { id = "2", text = "Imp", done = false, in_progress = false, priorities = "important" },
+                { id = "3", text = "Old", done = true, in_progress = false },
+            }
+
+            vim.api.nvim_win_get_cursor = function() return { 4, 0 } end
+            todo_actions.delete_todo(mock_win_id, function() end)
+            assert.are.equal(2, #mock_state.todos)
+            assert.is_nil((function()
+                for _, t in ipairs(mock_state.todos) do
+                    if t.text == "Imp" then return t end
+                end
+            end)())
+        end)
+
+        it("should map the cursor to a done todo past the divider", function()
+            mock_state.todos = {
+                { id = "1", text = "Crit", done = false, in_progress = false, priorities = "critical" },
+                { id = "2", text = "Imp", done = false, in_progress = false, priorities = "important" },
+                { id = "3", text = "Old", done = true, in_progress = false },
+            }
+
+            vim.api.nvim_win_get_cursor = function() return { 8, 0 } end
+            todo_actions.delete_todo(mock_win_id, function() end)
+            assert.are.equal(2, #mock_state.todos)
+            assert.is_nil((function()
+                for _, t in ipairs(mock_state.todos) do
+                    if t.text == "Old" then return t end
+                end
+            end)())
         end)
     end)
 end)

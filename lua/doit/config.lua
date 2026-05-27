@@ -37,7 +37,7 @@ M.defaults = {
 		todos = {
 			enabled = true,
 			show_completed = true,
-			show_descriptions = true,
+			show_descriptions = false,
 			default_list = "daily",
 			ui = {
 				window = {
@@ -78,15 +78,15 @@ M.defaults = {
 			formatting = {
 				pending = {
 					icon = "○",
-					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date" },
 				},
 				in_progress = {
 					icon = "◐",
-					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date" },
 				},
 				done = {
 					icon = "✓",
-					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date", "relative_time" },
+					format = { "notes_icon", "obsidian_icon", "icon", "text", "ect", "due_date" },
 				},
 			},
 			priorities = {
@@ -153,6 +153,7 @@ M.defaults = {
 				move_todo_up = "k",
 				move_todo_down = "j",
 				open_linked_note = "o",
+				view_detail = "K",
 				move_todo_to_list = "m",
 				export_to_daily = "O",
 			},
