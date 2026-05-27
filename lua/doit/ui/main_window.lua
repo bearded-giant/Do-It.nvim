@@ -558,10 +558,11 @@ function M.format_todo_line(todo)
 		end
 	end
 
+	-- note/detail indicator: linked note (note_id) vs inline notes/description (K to view)
 	local notes_icon = ""
 	if todo.note_id then
 		notes_icon = config.options.notes and config.options.notes.linked_icon or "🔗"
-	elseif todo.notes and todo.notes ~= "" then
+	elseif (todo.notes and todo.notes ~= "") or (todo.description and todo.description ~= "") then
 		notes_icon = config.options.notes and config.options.notes.icon or "✎"
 	end
 

@@ -36,6 +36,7 @@ M.keymaps = {
 			{ key = "r", desc = "Reorder current todo (use j/k to move)" },
 			{ key = "T", desc = "Add time estimation" },
 			{ key = "R", desc = "Remove time estimation" },
+			{ key = "K", desc = "View todo detail (full text + description)" },
 			{ key = "o", desc = "Open linked note" },
 			{ key = "<leader>p", desc = "Open scratchpad for todo" },
 		},
