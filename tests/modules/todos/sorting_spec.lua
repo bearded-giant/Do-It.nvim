@@ -41,16 +41,47 @@ describe("todos sorting", function()
             assert.are.equal("Pending", state.todos[2].text)
         end)
 
-        it("should sort by priority score within same status", function()
+        it("should sort by priority rank within same status", function()
             state.todos = {
-                { text = "Low", done = false, in_progress = false, _priority_weight = 1, timestamp = 1 },
-                { text = "High", done = false, in_progress = false, _priority_weight = 10, timestamp = 2 },
+                { text = "None", done = false, in_progress = false, timestamp = 1 },
+                { text = "Critical", done = false, in_progress = false, priorities = "critical", timestamp = 2 },
             }
 
             sorting.sort_todos()
 
-            assert.are.equal("High", state.todos[1].text)
-            assert.are.equal("Low", state.todos[2].text)
+            assert.are.equal("Critical", state.todos[1].text)
+            assert.are.equal("None", state.todos[2].text)
+        end)
+
+        it("should order critical > urgent > important > none (tmux parity)", function()
+            -- regression guard: nvim list order must match the tmux view.
+            -- pending items ranked by priority string, independent of weighted config.
+            state.todos = {
+                { text = "none", done = false, in_progress = false, timestamp = 1 },
+                { text = "important", done = false, in_progress = false, priorities = "important", timestamp = 2 },
+                { text = "critical", done = false, in_progress = false, priorities = "critical", timestamp = 3 },
+                { text = "urgent", done = false, in_progress = false, priorities = "urgent", timestamp = 4 },
+            }
+
+            sorting.sort_todos()
+
+            assert.are.equal("critical", state.todos[1].text)
+            assert.are.equal("urgent", state.todos[2].text)
+            assert.are.equal("important", state.todos[3].text)
+            assert.are.equal("none", state.todos[4].text)
+        end)
+
+        it("should keep in_progress ahead of higher-priority pending (tmux parity)", function()
+            -- in_progress leads the list even when a pending item outranks it
+            state.todos = {
+                { text = "pending critical", done = false, in_progress = false, priorities = "critical", timestamp = 1 },
+                { text = "active none", done = false, in_progress = true, timestamp = 2 },
+            }
+
+            sorting.sort_todos()
+
+            assert.are.equal("active none", state.todos[1].text)
+            assert.are.equal("pending critical", state.todos[2].text)
         end)
 
         it("should sort by order_index as tiebreaker", function()
