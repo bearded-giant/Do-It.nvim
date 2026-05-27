@@ -82,13 +82,13 @@ format_todos() {
     # tracks the previous priority group so we can emit a blank line on change
     local prev_group=""
 
-    # text column scales with the list pane (~60% of popup; preview takes 40%)
+    # text column scales with the list pane (~50% of popup; preview takes 50%)
     # read /dev/tty (popup pty) since stdout is piped into fzf, which breaks tput
     local term_cols list_w text_w hr_line
     term_cols=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
     [[ -z "$term_cols" || "$term_cols" -lt 1 ]] && term_cols=$(tput cols 2>/dev/null)
     [[ -z "$term_cols" || "$term_cols" -lt 1 ]] && term_cols=120
-    list_w=$(( term_cols * 60 / 100 ))
+    list_w=$(( term_cols * 50 / 100 ))
     text_w=$(( list_w - 30 ))
     (( text_w < 40 )) && text_w=40
     (( text_w > 200 )) && text_w=200
@@ -409,7 +409,7 @@ while true; do
         --height=80% \
         --layout=reverse \
         --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
-        --preview-window=right:40%)
+        --preview-window=right:50%)
 
     # Parse the selection
     KEY=$(echo "$SELECTION" | head -1)
@@ -964,7 +964,7 @@ while true; do
                 --height=80% \
                 --layout=reverse \
                 --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
-                --preview-window=right:40%)
+                --preview-window=right:50%)
 
             if [[ -n "$SEARCH_RESULT" ]]; then
                 SEARCH_ID=$(echo "$SEARCH_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
