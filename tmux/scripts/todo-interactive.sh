@@ -79,17 +79,17 @@ export TODO_LIST_PATH
 # Format: hidden ID at end for extraction, visible: status + priority indicator + first line of text
 # Shows ... indicator for multi-line items
 format_todos() {
+    # tracks the previous priority group so we can emit a blank line on change
+    local prev_group=""
+    local hr_line
+    hr_line=$(printf '─%.0s' $(seq 1 64))
+
     # First print in-progress todos
-    jq -r '.todos |
-        map(select(.in_progress == true)) |
-        sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
-        .[] |
-        (.text | split("\n")[0][0:55]) as $first_line |
-        (.text | contains("\n")) as $multiline |
-        (if .obsidian_ref then "true" else "false" end) as $obs |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
-    ' "$TODO_LIST_PATH" |
     while IFS='|' read -r id status priority text multiline obs; do
+        # blank line between distinct priority groups
+        local group="ip-${priority:-default}"
+        [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
+        prev_group="$group"
         # Add ... for multi-line items
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
@@ -102,19 +102,21 @@ format_todos() {
             "important") printf "%s%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done
-
-    # Then print not started todos
-    jq -r '.todos |
-        map(select(.done == false and .in_progress != true)) |
+    done < <(jq -r '.todos |
+        map(select(.in_progress == true)) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:55]) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
-    ' "$TODO_LIST_PATH" |
+    ' "$TODO_LIST_PATH")
+
+    # Then print not started todos
     while IFS='|' read -r id status priority text multiline obs; do
+        local group="pd-${priority:-default}"
+        [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
+        prev_group="$group"
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
         obs_icon=""
@@ -125,11 +127,31 @@ format_todos() {
             "important") printf "%s%s* %-55s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s  %-55s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done
+    done < <(jq -r '.todos |
+        map(select(.done == false and .in_progress != true)) |
+        sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
+        .[] |
+        (.text | split("\n")[0][0:55]) as $first_line |
+        (.text | contains("\n")) as $multiline |
+        (if .obsidian_ref then "true" else "false" end) as $obs |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
+    ' "$TODO_LIST_PATH")
 
     # Finally print completed todos (if show_completed is enabled)
     if [[ "$SHOW_COMPLETED" == "true" ]]; then
-        jq -r '.todos |
+        local first_done="true"
+        while IFS='|' read -r id status priority text multiline obs; do
+            # blank / horizontal rule / blank between last pending item and completed
+            if [[ "$first_done" == "true" ]]; then
+                first_done="false"
+                [[ -n "$prev_group" ]] && printf "\n%s%s%s\n\n" "$COLOR_DIM" "$hr_line" "$COLOR_RESET"
+            fi
+            suffix=""
+            [[ "$multiline" == "true" ]] && suffix=" ..."
+            obs_icon=""
+            [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
+            printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
+        done < <(jq -r '.todos |
             map(select(.done == true)) |
             sort_by(-(.completed_at // 0)) |
             .[] |
@@ -137,14 +159,7 @@ format_todos() {
             (.text | contains("\n")) as $multiline |
             (if .obsidian_ref then "true" else "false" end) as $obs |
             "\(.id)|✓|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
-        ' "$TODO_LIST_PATH" |
-        while IFS='|' read -r id status priority text multiline obs; do
-            suffix=""
-            [[ "$multiline" == "true" ]] && suffix=" ..."
-            obs_icon=""
-            [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
-            printf "%s%s  %-55s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        done
+        ' "$TODO_LIST_PATH")
     fi
 }
 
