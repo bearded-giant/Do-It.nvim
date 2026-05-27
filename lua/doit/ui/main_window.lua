@@ -455,6 +455,14 @@ function M.render_todos()
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "ErrorMsg", line_nr, start_idx - 1, start_idx + 8)
 			end
 
+			-- Notes marker (dim so it doesn't break the title scan)
+			do
+				local s = line:find("%- %[NOTES%]")
+				if s then
+					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Comment", line_nr, s - 1, s - 1 + #"- [NOTES]")
+				end
+			end
+
 			-- Timestamp highlight
 			if config.options.timestamp and config.options.timestamp.enabled then
 				local timestamp_pattern = "@[%w%s]+ago"
@@ -506,45 +514,45 @@ function M.format_todo_line(todo)
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			}
 		}
 	end
 
 	local formatting = config.options.formatting
-	
+
 	-- Still missing format keys? Create at least pending and done
 	if not formatting.pending then
 		formatting.pending = {
 			icon = "○",
-			format = { "obsidian_icon", "icon", "text", "relative_time" }
+			format = { "icon", "text", "notes_marker", "relative_time" }
 		}
 	end
 	if not formatting.done then
 		formatting.done = {
 			icon = "✓",
-			format = { "obsidian_icon", "icon", "text", "relative_time" }
+			format = { "icon", "text", "notes_marker", "relative_time" }
 		}
 	end
 	if not formatting.in_progress then
 		formatting.in_progress = {
 			icon = "◐",
-			format = { "obsidian_icon", "icon", "text", "relative_time" }
+			format = { "icon", "text", "notes_marker", "relative_time" }
 		}
 	end
 
 	local format = todo.done and formatting.done.format or 
 	               (todo.in_progress and formatting.in_progress.format or formatting.pending.format)
 	if not format then
-		format = { "obsidian_icon", "icon", "text", "ect", "relative_time" } -- fallback
+		format = { "icon", "text", "ect", "notes_marker", "relative_time" } -- fallback
 	end
 
 	-- Visual indicator if this todo is being reordered
@@ -629,13 +637,18 @@ function M.format_todo_line(todo)
 			end
 		elseif part == "text" then
 			table.insert(components, todo.text)
+		elseif part == "notes_marker" then
+			-- text marker (no icon) when the todo carries a note or description; K to view
+			if todo.note_id or (todo.notes and todo.notes ~= "") or (todo.description and todo.description ~= "") then
+				table.insert(components, "- [NOTES]")
+			end
 		elseif part == "notes_icon" then
 			table.insert(components, notes_icon)
 		elseif part == "obsidian_icon" then
 			table.insert(components, obsidian_icon)
 		elseif part == "relative_time" then
 			if todo.created_at and config.options.timestamp and config.options.timestamp.enabled then
-				table.insert(components, "@" .. format_relative_time(todo.created_at))
+				table.insert(components, "- @" .. format_relative_time(todo.created_at))
 			end
 		elseif part == "due_date" then
 			local dd = format_due_date()
@@ -788,15 +801,15 @@ local function create_window()
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "notes_icon", "obsidian_icon", "icon", "text", "due_date", "ect", "relative_time" }
+				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
 			}
 		}
 	end

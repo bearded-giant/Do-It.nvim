@@ -43,15 +43,15 @@ M.defaults = {
             formatting = {
                 pending = {
                     icon = "○",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+                    format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" },
                 },
                 in_progress = {
                     icon = "◐",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+                    format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" },
                 },
                 done = {
                     icon = "✓",
-                    format = { "notes_icon", "icon", "text", "due_date", "ect", "relative_time" },
+                    format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" },
                 },
             },
             keymaps = {
