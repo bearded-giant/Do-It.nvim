@@ -638,8 +638,10 @@ function M.format_todo_line(todo)
 		elseif part == "text" then
 			table.insert(components, todo.text)
 		elseif part == "notes_marker" then
-			-- text marker (no icon) when the todo carries a note or description; K to view
-			if todo.note_id or (todo.notes and todo.notes ~= "") or (todo.description and todo.description ~= "") then
+			-- text marker (no icon) when the todo carries a note, description, or
+			-- obsidian sync ref; K to view the detail
+			if todo.note_id or (todo.notes and todo.notes ~= "")
+				or (todo.description and todo.description ~= "") or todo.obsidian_ref then
 				table.insert(components, "- [NOTES]")
 			end
 		elseif part == "notes_icon" then
