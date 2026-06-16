@@ -47,6 +47,11 @@ priority_header_label() {
     esac
 }
 
+# two-column help row: left field padded to a fixed width, right field appended
+help_row() {
+    printf "  %-42s%s\n" "$1" "$2"
+}
+
 UNDO_TYPE=""
 UNDO_ID=""
 UNDO_PREV_DONE=""
@@ -419,13 +424,7 @@ while true; do
     # Show todos and prompt for selection
     done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
     SELECTION=$(format_todos | fzf --ansi --disabled \
-        --header=" Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)" \
-        --footer-border=rounded \
-        --footer-label=" [?] for help " \
-        --footer=" s: Start   x: Done   X: Revert   n: New   p: Paste new
- e: Edit   P: Priority   K/J: Reorder   d: Delete   D: Clear done
- u: Undo   m: Move to list   l: Switch list   L: List manager
- y: Copy text   N: Edit note   g: List notes   /: Search   ?: Help" \
+        --header=" Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
@@ -1017,54 +1016,31 @@ while true; do
             sleep 0.3
             ;;
         "?")
-            # Show help
+            # Help: two columns, functional categories, no scroll
             clear
-            echo ""
-            echo " Todo Manager - Help"
-            echo " ─────────────────────────────────────────"
-            echo ""
-            echo " Navigation"
-            echo "   j/k or arrows    Move up/down in list"
-            echo "   K/J              Reorder todo (move up/down)"
-            echo ""
-            echo " Status Changes"
-            echo "   s                Start (pending > in-progress)"
-            echo "   x                Complete (> done)"
-            echo "   X                Revert to pending"
-            echo ""
-            echo " Editing"
-            echo "   n                New todo"
-            echo "   p                Paste new todo from clipboard"
-            echo "   e                Edit todo text"
-            echo "   P                Set priority"
-            echo "   (In edit mode: Enter = save, Esc = cancel)"
-            echo ""
-            echo " Delete/Undo"
-            echo "   d                Delete todo (can undo)"
-            echo "   D                Delete all completed"
-            echo "   u                Undo last action"
-            echo ""
-            echo " View/Copy"
-            echo "   Enter            View detail in nvim (q to exit)"
-            echo "   N                Edit note (description) in \$EDITOR"
-            echo "   y                Copy text to clipboard"
-            echo ""
-            echo " List Notes"
-            echo "   g                List notes modal (n: new, e: edit, d: delete)"
-            echo ""
-            echo " Obsidian"
-            echo "   O                Send to today's daily note"
-            echo ""
-            echo " Search"
-            echo "   /                Search/filter todos"
-            echo ""
-            echo " Lists"
-            echo "   l                Switch lists"
-            echo "   L                List manager (create/rename/delete)"
-            echo "   m                Move todo to another list"
-            echo ""
-            echo " ─────────────────────────────────────────"
-            echo " Press any key to return..."
+            hr=$(printf '─%.0s' $(seq 1 76))
+            printf "\n  %sTodo Manager — Help%s\n" "$COLOR_HEADER" "$COLOR_RESET"
+            printf "  %s\n\n" "$hr"
+            help_row "NAVIGATION"                       "EDIT"
+            help_row "  j / k    Move up / down"         "  n      New todo"
+            help_row "  K / J    Reorder up / down"      "  p      Paste new (clipboard)"
+            help_row ""                                  "  e      Edit todo text"
+            help_row "STATUS"                            "  P      Set priority"
+            help_row "  s        Start (in-progress)"    "  d      Delete todo"
+            help_row "  x        Complete (done)"        "  D      Clear all completed"
+            help_row "  X        Revert to pending"      "  u      Undo last delete"
+            printf "\n"
+            help_row "NOTES"                             "ORGANIZE"
+            help_row "  N        Edit note (description)" "  m      Move todo to list"
+            help_row "  g        List notes (modal)"      "  l      Switch list"
+            help_row ""                                  "  L      List manager"
+            help_row "VIEW / MISC"                       "  /      Search / filter"
+            help_row "  Enter    View detail (nvim)"      ""
+            help_row "  y        Copy text"              "OBSIDIAN"
+            help_row "  ?        This help"              "  O      Send to daily note"
+            help_row "  q        Quit"                   ""
+            printf "\n  %s\n" "$hr"
+            printf "  Press any key to return...\n"
             read -n 1 -s
             ;;
     esac
