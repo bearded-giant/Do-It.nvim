@@ -110,8 +110,18 @@ Editing~
     n                  New todo
     e                  Edit todo text
     P                  Set priority
+    g                  Open list notes modal (create/edit/delete notes)
 
     In new/edit mode: Enter to save, Esc to cancel
+
+List Notes~
+    The list has a "Notes" section between the active and completed todos,
+    showing scratch notes saved as part of the list (shared with the nvim UI).
+    Press `g` (or select a note row) to open the notes modal, where:
+        n                  New note (title prompt, then body in $EDITOR)
+        e                  Edit selected note
+        d                  Delete selected note
+        q                  Back to the todo list
 
 View/Copy~
     p                  View full note (scrollable popup, q to exit)

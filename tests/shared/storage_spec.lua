@@ -149,4 +149,64 @@ describe("storage", function()
 
 		vim.fn.json_encode = original_json_encode
 	end)
+
+	describe("list notes", function()
+		before_each(function()
+			doit_state.todo_lists = doit_state.todo_lists or {}
+			doit_state.todo_lists.active = "daily"
+			doit_state.todo_lists.metadata = { created_at = 1, updated_at = 1 }
+			doit_state.todo_lists.notes = {}
+			doit_state.todos = {}
+			_G.io.open = function(path, mode) return mock_file end
+		end)
+
+		it("save_to_disk persists the notes array alongside todos", function()
+			doit_state.todos = { { id = "t1", text = "task", done = false } }
+			doit_state.todo_lists.notes = {
+				{ id = "n1", title = "Note one", body = "body", created_at = 1, updated_at = 1 },
+			}
+
+			doit_state.save_to_disk()
+
+			local decoded = vim.fn.json_decode(mock_file.content)
+			assert.are.equal(1, #decoded.notes, "notes should be persisted")
+			assert.are.equal("Note one", decoded.notes[1].title)
+			assert.are.equal(1, #decoded.todos, "todos should still be persisted")
+		end)
+
+		it("add_note appends a note and writes it to disk", function()
+			doit_state.add_note("Title", "Body")
+
+			assert.are.equal(1, #doit_state.todo_lists.notes)
+			local decoded = vim.fn.json_decode(mock_file.content)
+			assert.are.equal("Title", decoded.notes[1].title)
+			assert.are.equal("Body", decoded.notes[1].body)
+			assert.is_not_nil(decoded.notes[1].id)
+		end)
+
+		it("update_note changes only the target note", function()
+			doit_state.todo_lists.notes = {
+				{ id = "a", title = "A", body = "" },
+				{ id = "b", title = "B", body = "" },
+			}
+
+			doit_state.update_note("a", "A2", "body2")
+
+			assert.are.equal("A2", doit_state.todo_lists.notes[1].title)
+			assert.are.equal("body2", doit_state.todo_lists.notes[1].body)
+			assert.are.equal("B", doit_state.todo_lists.notes[2].title)
+		end)
+
+		it("delete_note removes only the target note", function()
+			doit_state.todo_lists.notes = {
+				{ id = "a", title = "A", body = "" },
+				{ id = "b", title = "B", body = "" },
+			}
+
+			doit_state.delete_note("b")
+
+			assert.are.equal(1, #doit_state.todo_lists.notes)
+			assert.are.equal("a", doit_state.todo_lists.notes[1].id)
+		end)
+	end)
 end)

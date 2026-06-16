@@ -94,20 +94,22 @@ local function priority_name(todo)
 	return nil
 end
 
--- Maps a cursor line to a todo index. MUST mirror main_window.build_render_rows()
--- layout exactly: blank top line, filter headers, blank line between priority
--- groups, and blank+divider+blank before the completed block. Priority markers
--- replace the leading indent (no extra lines), so they don't affect counting.
-local function get_real_todo_index(line_num, filter)
+-- Resolves a cursor line to either a todo index or a note object. MUST mirror
+-- main_window.build_render_rows() exactly: blank top, filter headers, named
+-- priority headers for the pending block (blank before each except the first),
+-- a blank between in-progress priority groups, the always-shown Notes section
+-- (blank + "Notes" header + note rows or "(no notes)") emitted before the done
+-- divider (or after the loop when there are no done todos), and blank+divider+
+-- blank before the completed block.
+local function resolve_at_line(line_num)
 	ensure_state_loaded()
 	state.sort_todos()
 
-	local line_offset = 1  -- blank line at top
-	if state.active_filter then
-		line_offset = line_offset + 2
-	end
-	if state.active_category then
-		line_offset = line_offset + 2
+	local notes = {}
+	if state.get_notes then
+		notes = state.get_notes()
+	elseif state.todo_lists and state.todo_lists.notes then
+		notes = state.todo_lists.notes
 	end
 
 	local show_completed = true
@@ -121,16 +123,38 @@ local function get_real_todo_index(line_num, filter)
 		end
 	end
 
-	local current_line = line_offset + 1
+	local cur = 2  -- line 1 is the top blank; content starts at line 2
+	if state.active_filter then cur = cur + 2 end
+	if state.active_category then cur = cur + 2 end
+
 	local prev_group = nil
 	local done_started = false
+	local notes_emitted = false
+
+	-- walks the notes section; returns a note if line_num lands on one
+	local function walk_notes()
+		notes_emitted = true
+		cur = cur + 1  -- blank before Notes
+		cur = cur + 1  -- "Notes" header
+		if #notes == 0 then
+			cur = cur + 1  -- "(no notes)"
+		else
+			for _, note in ipairs(notes) do
+				if line_num == cur then
+					return note
+				end
+				cur = cur + 1
+			end
+		end
+		return nil
+	end
 
 	for i, todo in ipairs(state.todos) do
 		if todo.done and not show_completed then
 			goto continue
 		end
 
-		local show_by_tag = not filter or todo.text:match("#" .. filter)
+		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
 		local show_by_category = true
 		if state.active_category then
 			local module = get_todo_module()
@@ -147,16 +171,25 @@ local function get_real_todo_index(line_num, filter)
 		end
 
 		if show_by_tag and show_by_category then
-			-- separator lines (must match build_render_rows)
 			if todo.done then
 				if not done_started then
 					done_started = true
-					current_line = current_line + 3  -- blank + divider + blank
+					if not notes_emitted then
+						local n = walk_notes()
+						if n then return nil, n end
+					end
+					cur = cur + 3  -- blank + divider + blank
 				end
 			else
-				local group = (todo.in_progress and "ip" or "pd") .. ":" .. (priority_name(todo) or "default")
-				if prev_group and group ~= prev_group then
-					current_line = current_line + 1  -- blank between groups
+				local section = todo.in_progress and "ip" or "pd"
+				local group = section .. ":" .. (priority_name(todo) or "default")
+				if group ~= prev_group then
+					if section == "pd" then
+						if prev_group then cur = cur + 1 end  -- blank between groups
+						cur = cur + 1  -- priority header
+					elseif prev_group then
+						cur = cur + 1  -- blank between in-progress groups
+					end
 				end
 				prev_group = group
 			end
@@ -166,14 +199,34 @@ local function get_real_todo_index(line_num, filter)
 				num_lines = num_lines + #vim.split(todo.description, "\n", { plain = true })
 			end
 
-			if line_num >= current_line and line_num < current_line + num_lines then
-				return i
+			if line_num >= cur and line_num < cur + num_lines then
+				return i, nil
 			end
-			current_line = current_line + num_lines
+			cur = cur + num_lines
 		end
 		::continue::
 	end
-	return nil
+
+	if not notes_emitted then
+		local n = walk_notes()
+		if n then return nil, n end
+	end
+	return nil, nil
+end
+
+local function get_real_todo_index(line_num)
+	local idx = resolve_at_line(line_num)
+	return idx
+end
+
+-- Returns the note object on the cursor's exact line, or nil.
+function M.get_note_at_cursor(win_id)
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return nil
+	end
+	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
+	local _, note = resolve_at_line(line_num)
+	return note
 end
 
 local function maybe_render(on_render)
@@ -362,6 +415,71 @@ function M.new_todo(on_render)
 			vim.cmd("echo ''")
 		end
 	})
+end
+
+-- List-scoped scratch notes ------------------------------------------------
+
+local function prompt_note(title_default, body_default, on_done)
+	vim.ui.input({ prompt = "Note title: ", default = title_default or "" }, function(title)
+		if title == nil then
+			return
+		end
+		multiline_input.create({
+			prompt = "Note body",
+			default = body_default or "",
+			on_submit = function(body)
+				vim.cmd("echo ''")
+				on_done(title, body or "")
+			end,
+			on_cancel = function()
+				vim.cmd("echo ''")
+			end,
+		})
+	end)
+end
+
+function M.new_note(on_render)
+	ensure_state_loaded()
+	prompt_note(nil, nil, function(title, body)
+		if (title == "" or not title) and (body == "" or not body) then
+			return
+		end
+		if state.add_note then
+			state.add_note(title, body)
+		end
+		maybe_render(on_render)
+	end)
+end
+
+function M.edit_note(win_id, on_render)
+	ensure_state_loaded()
+	local note = M.get_note_at_cursor(win_id)
+	if not note then
+		return
+	end
+	prompt_note(note.title, note.body, function(title, body)
+		if state.update_note then
+			state.update_note(note.id, title, body)
+		end
+		maybe_render(on_render)
+	end)
+end
+
+function M.delete_note(win_id, on_render)
+	ensure_state_loaded()
+	local note = M.get_note_at_cursor(win_id)
+	if not note then
+		return
+	end
+	local label = (note.title and note.title ~= "") and note.title or "(untitled)"
+	vim.ui.input({ prompt = "Delete note '" .. label .. "'? (y/N): " }, function(answer)
+		if answer and answer:lower() == "y" then
+			if state.delete_note then
+				state.delete_note(note.id)
+			end
+			maybe_render(on_render)
+		end
+	end)
 end
 
 function M.toggle_todo(win_id, on_render)

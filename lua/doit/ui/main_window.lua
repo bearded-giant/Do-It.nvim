@@ -298,6 +298,38 @@ function M.build_render_rows()
 		end
 	end
 
+	local PRIORITY_HEADERS = {
+		critical = "Critical",
+		urgent = "Urgent",
+		important = "Important",
+		default = "Default",
+	}
+
+	local notes_emitted = false
+	local function emit_notes_section()
+		notes_emitted = true
+		local notes = {}
+		if state.get_notes then
+			notes = state.get_notes()
+		elseif state.todo_lists and state.todo_lists.notes then
+			notes = state.todo_lists.notes
+		end
+		push("")
+		push("  Notes", { kind = "note_header" })
+		if #notes == 0 then
+			push("    (no notes)", { kind = "note_empty" })
+		else
+			for ni, note in ipairs(notes) do
+				local title = note.title
+				if not title or title == "" then
+					local first = note.body and vim.split(note.body, "\n", { plain = true })[1]
+					title = (first and first ~= "" and first) or "(untitled)"
+				end
+				push("    • " .. title, { kind = "note", note = note, note_index = ni })
+			end
+		end
+	end
+
 	local prev_group = nil
 	local done_started = false
 	for i, todo in ipairs(state.todos) do
@@ -327,15 +359,26 @@ function M.build_render_rows()
 			if todo.done then
 				if not done_started then
 					done_started = true
+					if not notes_emitted then
+						emit_notes_section()
+					end
 					push("")
 					push(string.rep("─", divider_width()), { kind = "divider" })
 					push("")
 				end
 			else
 				local section = todo.in_progress and "ip" or "pd"
-				local group = section .. ":" .. (todo_priority_name(todo) or "default")
-				if prev_group and group ~= prev_group then
-					push("")
+				local prio = todo_priority_name(todo) or "default"
+				local group = section .. ":" .. prio
+				if group ~= prev_group then
+					if section == "pd" then
+						if prev_group then
+							push("")
+						end
+						push("  " .. (PRIORITY_HEADERS[prio] or "Default"), { kind = "priority_header" })
+					elseif prev_group then
+						push("")
+					end
 				end
 				prev_group = group
 			end
@@ -358,6 +401,9 @@ function M.build_render_rows()
 			end
 		end
 		::continue::
+	end
+	if not notes_emitted then
+		emit_notes_section()
 	end
 	push("")
 	return rows
@@ -409,6 +455,12 @@ function M.render_todos()
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "WarningMsg", line_nr, 0, -1)
 		elseif row.kind == "divider" then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
+		elseif row.kind == "priority_header" or row.kind == "note_header" then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Title", line_nr, 0, -1)
+		elseif row.kind == "note_empty" then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Comment", line_nr, 0, -1)
+		elseif row.kind == "note" then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Normal", line_nr, 0, -1)
 		elseif row.todo then
 			local todo = row.todo
 			if row.is_description then
@@ -1007,6 +1059,7 @@ local function create_window()
 			move_todo_down = "j",
 			move_todo_to_list = "m",
 			export_to_daily = "O",
+			new_note = "gn",
 		}
 
 		-- Try to get key from config, fall back to default
@@ -1047,6 +1100,12 @@ local function create_window()
 		end)
 	end)
 
+	setup_keymap("new_note", function()
+		todo_actions.new_note(function()
+			M.render_todos()
+		end)
+	end)
+
 	setup_keymap("toggle_todo", function()
 		todo_actions.toggle_todo(win_id, function()
 			M.render_todos()
@@ -1060,9 +1119,15 @@ local function create_window()
 	end)
 
 	setup_keymap("delete_todo", function()
-		todo_actions.delete_todo(win_id, function()
-			M.render_todos()
-		end)
+		if todo_actions.get_note_at_cursor(win_id) then
+			todo_actions.delete_note(win_id, function()
+				M.render_todos()
+			end)
+		else
+			todo_actions.delete_todo(win_id, function()
+				M.render_todos()
+			end)
+		end
 	end)
 
 	setup_keymap("delete_completed", function()
@@ -1112,9 +1177,15 @@ local function create_window()
 	end)
 
 	setup_keymap("edit_todo", function()
-		todo_actions.edit_todo(win_id, function()
-			M.render_todos()
-		end)
+		if todo_actions.get_note_at_cursor(win_id) then
+			todo_actions.edit_note(win_id, function()
+				M.render_todos()
+			end)
+		else
+			todo_actions.edit_todo(win_id, function()
+				M.render_todos()
+			end)
+		end
 	end)
 
 	setup_keymap("edit_description", function()

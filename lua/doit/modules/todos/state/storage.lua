@@ -157,7 +157,8 @@ function storage.setup(M)
                 created_at = os.time(),
                 updated_at = os.time()
             },
-            todos = todos
+            todos = todos,
+            notes = {}
         }
         
         local file = io.open(list_path, "w")
@@ -210,6 +211,7 @@ function storage.setup(M)
                         created_at = os.time(),
                         updated_at = os.time()
                     }
+                    M.todo_lists.notes = data.notes or {}
                     
                     local needs_migration = false
                     
@@ -266,9 +268,10 @@ function storage.setup(M)
         
         -- If loading failed, initialize with empty list
         M.todos = {}
+        M.todo_lists.notes = {}
         M.todo_lists.active = list_name
         config.active_list = list_name
-        
+
         return false, "Failed to load list or list is empty"
     end
     
@@ -408,7 +411,8 @@ function storage.setup(M)
         -- Prepare data structure
         local data = {
             _metadata = metadata,
-            todos = M.todos
+            todos = M.todos,
+            notes = M.todo_lists.notes or {}
         }
         
         -- Save to file
@@ -419,6 +423,52 @@ function storage.setup(M)
             return true
         end
         
+        return false
+    end
+
+    -- List-scoped scratch notes (stored in the active list's JSON top-level `notes`)
+    storage.get_notes = function()
+        M.todo_lists.notes = M.todo_lists.notes or {}
+        return M.todo_lists.notes
+    end
+
+    storage.add_note = function(title, body)
+        local notes = storage.get_notes()
+        local now = os.time()
+        local note = {
+            id = tostring(now) .. "_" .. math.random(1000000, 9999999),
+            title = title or "",
+            body = body or "",
+            created_at = now,
+            updated_at = now,
+        }
+        table.insert(notes, note)
+        storage.save_to_disk()
+        return note
+    end
+
+    storage.update_note = function(note_id, title, body)
+        for _, note in ipairs(storage.get_notes()) do
+            if note.id == note_id then
+                if title ~= nil then note.title = title end
+                if body ~= nil then note.body = body end
+                note.updated_at = os.time()
+                storage.save_to_disk()
+                return true
+            end
+        end
+        return false
+    end
+
+    storage.delete_note = function(note_id)
+        local notes = storage.get_notes()
+        for i, note in ipairs(notes) do
+            if note.id == note_id then
+                table.remove(notes, i)
+                storage.save_to_disk()
+                return true
+            end
+        end
         return false
     end
 

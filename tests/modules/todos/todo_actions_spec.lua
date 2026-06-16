@@ -96,27 +96,54 @@ describe("todo_actions", function()
         vim.api.nvim_win_set_cursor = function(win, pos) end  -- Mock cursor set
         vim.api.nvim_buf_get_lines = function(buf, start, end_, strict)
             -- Mirror main_window.build_render_rows layout so cursor mapping tests are faithful:
-            -- blank top, blank between priority groups, blank+divider+blank before done block.
+            -- blank top; named priority headers for the pending block (blank before each
+            -- except the first); blank between in-progress groups; always-shown Notes
+            -- section (blank + "Notes" + note rows or "(no notes)") before the done block;
+            -- blank+divider+blank before completed.
             local function prio(todo)
                 local p = todo.priorities
                 if type(p) == "string" and p ~= "" then return p end
                 return nil
             end
+            local HEADER = { critical = "Critical", urgent = "Urgent", important = "Important", default = "Default" }
+            local notes = (mock_state.todo_lists and mock_state.todo_lists.notes) or {}
             local lines = { "" }  -- blank line at top
             local prev_group = nil
             local done_started = false
+            local notes_emitted = false
+            local function emit_notes()
+                notes_emitted = true
+                table.insert(lines, "")
+                table.insert(lines, "Notes")
+                if #notes == 0 then
+                    table.insert(lines, "  (no notes)")
+                else
+                    for _, note in ipairs(notes) do
+                        local title = note.title
+                        if not title or title == "" then title = "(untitled)" end
+                        table.insert(lines, "  • " .. title)
+                    end
+                end
+            end
             for _, todo in ipairs(mock_state.todos) do
                 if todo.done then
                     if not done_started then
                         done_started = true
+                        if not notes_emitted then emit_notes() end
                         table.insert(lines, "")
                         table.insert(lines, "────────")
                         table.insert(lines, "")
                     end
                 else
-                    local group = (todo.in_progress and "ip" or "pd") .. ":" .. (prio(todo) or "default")
-                    if prev_group and group ~= prev_group then
-                        table.insert(lines, "")
+                    local section = (todo.in_progress and "ip" or "pd")
+                    local group = section .. ":" .. (prio(todo) or "default")
+                    if group ~= prev_group then
+                        if section == "pd" then
+                            if prev_group then table.insert(lines, "") end
+                            table.insert(lines, HEADER[prio(todo) or "default"] or "Default")
+                        elseif prev_group then
+                            table.insert(lines, "")
+                        end
                     end
                     prev_group = group
                 end
@@ -129,6 +156,7 @@ describe("todo_actions", function()
                     end
                 end
             end
+            if not notes_emitted then emit_notes() end
             table.insert(lines, "")  -- blank line at bottom
 
             -- Handle slicing
@@ -185,8 +213,8 @@ describe("todo_actions", function()
 
             -- Line 2 should map to index 1 (line 1 is blank)
             local lines = vim.api.nvim_buf_get_lines(mock_buf_id, 0, -1, false)
-            assert.are.equal(3, #lines)  -- blank, todo, blank
-            assert.truthy(lines[2]:match("Single line todo"))
+            assert.are.equal(7, #lines)  -- blank, Default header, todo, blank, Notes, (no notes), blank
+            assert.truthy(lines[3]:match("Single line todo"))
         end)
 
         it("should handle two-line todos", function()
@@ -195,9 +223,9 @@ describe("todo_actions", function()
             }
 
             local lines = vim.api.nvim_buf_get_lines(mock_buf_id, 0, -1, false)
-            assert.are.equal(4, #lines)  -- blank, line1, line2, blank
-            assert.truthy(lines[2]:match("First line"))
-            assert.truthy(lines[3]:match("Second line"))
+            assert.are.equal(8, #lines)  -- blank, Default, line1, line2, blank, Notes, (no notes), blank
+            assert.truthy(lines[3]:match("First line"))
+            assert.truthy(lines[4]:match("Second line"))
         end)
 
         it("should handle multiple multiline todos", function()
@@ -208,8 +236,8 @@ describe("todo_actions", function()
             }
 
             local lines = vim.api.nvim_buf_get_lines(mock_buf_id, 0, -1, false)
-            -- blank(1) + todo1(2) + todo2(1) + todo3(3) + blank(1) = 8
-            assert.are.equal(8, #lines)
+            -- blank(1) + Default header(1) + todo1(2) + todo2(1) + todo3(3) + notes section(3) + blank(1) = 12
+            assert.are.equal(12, #lines)
         end)
     end)
 
@@ -225,9 +253,9 @@ describe("todo_actions", function()
             -- Mock cursor on line 2 (first line of first todo)
             vim.api.nvim_win_get_cursor = function() return { 2, 0 } end
 
-            -- The bullet line for line 2 should be line 2 itself
+            -- The first todo's bullet is line 3 (line 2 is the Default priority header)
             local lines = vim.api.nvim_buf_get_lines(mock_buf_id, 0, -1, false)
-            assert.truthy(lines[2]:match("○"))  -- Has bullet
+            assert.truthy(lines[3]:match("○"))  -- Has bullet
         end)
 
         it("should find bullet line from continuation line", function()
@@ -235,8 +263,8 @@ describe("todo_actions", function()
             vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
 
             local lines = vim.api.nvim_buf_get_lines(mock_buf_id, 0, -1, false)
-            assert.falsy(lines[3]:match("○"))  -- No bullet on continuation
-            assert.truthy(lines[2]:match("○"))  -- Bullet is on line 2
+            assert.falsy(lines[4]:match("○"))  -- No bullet on continuation
+            assert.truthy(lines[3]:match("○"))  -- Bullet is on line 3
         end)
     end)
 
@@ -246,7 +274,7 @@ describe("todo_actions", function()
                 { id = "1", text = "Todo to delete", done = false, in_progress = false }
             }
 
-            vim.api.nvim_win_get_cursor = function() return { 2, 0 } end
+            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
 
             todo_actions.delete_todo(mock_win_id, function() end)
 
@@ -259,8 +287,8 @@ describe("todo_actions", function()
                 { id = "1", text = "First line\nSecond line", done = false, in_progress = false }
             }
 
-            -- Cursor on bullet line (line 2)
-            vim.api.nvim_win_get_cursor = function() return { 2, 0 } end
+            -- Cursor on bullet line (line 3, after the Default header)
+            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
 
             todo_actions.delete_todo(mock_win_id, function() end)
 
@@ -273,8 +301,8 @@ describe("todo_actions", function()
                 { id = "1", text = "First line\nSecond line", done = false, in_progress = false }
             }
 
-            -- Cursor on continuation line (line 3)
-            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
+            -- Cursor on continuation line (line 4, after the Default header)
+            vim.api.nvim_win_get_cursor = function() return { 4, 0 } end
 
             todo_actions.delete_todo(mock_win_id, function() end)
 
@@ -290,7 +318,7 @@ describe("todo_actions", function()
             }
             mock_state.save_to_disk = function() end
 
-            vim.api.nvim_win_get_cursor = function() return { 2, 0 } end
+            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
 
             todo_actions.toggle_todo(mock_win_id, function() end)
 
@@ -305,8 +333,8 @@ describe("todo_actions", function()
             }
             mock_state.save_to_disk = function() end
 
-            -- Cursor on continuation line (line 3)
-            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
+            -- Cursor on continuation line (line 4, after the Default header)
+            vim.api.nvim_win_get_cursor = function() return { 4, 0 } end
 
             todo_actions.toggle_todo(mock_win_id, function() end)
 
@@ -323,9 +351,9 @@ describe("todo_actions", function()
                 { id = "2", text = "Second", done = false, in_progress = false }
             }
 
-            -- Line 2 (after blank line) should be index 1
+            -- Line 3 (after top blank + Default header) is the first todo
             -- This is tested indirectly through delete/toggle operations
-            vim.api.nvim_win_get_cursor = function() return { 2, 0 } end
+            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
 
             todo_actions.delete_todo(mock_win_id, function() end)
 
@@ -340,8 +368,8 @@ describe("todo_actions", function()
                 { id = "2", text = "Second", done = false, in_progress = false }
             }
 
-            -- Line 4 should map to todo index 2 (lines: blank, todo1-line1, todo1-line2, todo2)
-            vim.api.nvim_win_get_cursor = function() return { 4, 0 } end
+            -- Line 5 maps to todo index 2 (lines: blank, Default, todo1-l1, todo1-l2, todo2)
+            vim.api.nvim_win_get_cursor = function() return { 5, 0 } end
 
             todo_actions.delete_todo(mock_win_id, function() end)
 
@@ -353,18 +381,18 @@ describe("todo_actions", function()
         it("should account for priority-group separators and the done divider", function()
             -- layout (must match build_render_rows):
             --   line1 blank
-            --   line2 critical (group pd:critical)
-            --   line3 blank   (group change -> pd:important)
-            --   line4 important
-            --   line5 blank, line6 divider, line7 blank  (before done block)
-            --   line8 done
+            --   line2 "Critical" header, line3 Crit
+            --   line4 blank, line5 "Important" header, line6 Imp
+            --   line7 blank, line8 "Notes", line9 (no notes)
+            --   line10 blank, line11 divider, line12 blank
+            --   line13 Old (done)
             mock_state.todos = {
                 { id = "1", text = "Crit", done = false, in_progress = false, priorities = "critical" },
                 { id = "2", text = "Imp", done = false, in_progress = false, priorities = "important" },
                 { id = "3", text = "Old", done = true, in_progress = false },
             }
 
-            vim.api.nvim_win_get_cursor = function() return { 4, 0 } end
+            vim.api.nvim_win_get_cursor = function() return { 6, 0 } end
             todo_actions.delete_todo(mock_win_id, function() end)
             assert.are.equal(2, #mock_state.todos)
             assert.is_nil((function()
@@ -381,7 +409,7 @@ describe("todo_actions", function()
                 { id = "3", text = "Old", done = true, in_progress = false },
             }
 
-            vim.api.nvim_win_get_cursor = function() return { 8, 0 } end
+            vim.api.nvim_win_get_cursor = function() return { 13, 0 } end
             todo_actions.delete_todo(mock_win_id, function() end)
             assert.are.equal(2, #mock_state.todos)
             assert.is_nil((function()
@@ -389,6 +417,33 @@ describe("todo_actions", function()
                     if t.text == "Old" then return t end
                 end
             end)())
+        end)
+    end)
+
+    describe("get_note_at_cursor", function()
+        -- layout: 1 blank, 2 Default, 3 "○ Task", 4 blank, 5 "Notes", 6 "• My note", 7 blank
+        before_each(function()
+            mock_state.todos = {
+                { id = "1", text = "Task", done = false, in_progress = false },
+            }
+            mock_state.todo_lists = { notes = { { id = "n1", title = "My note", body = "b" } } }
+        end)
+
+        it("returns the note when the cursor is on a note row", function()
+            vim.api.nvim_win_get_cursor = function() return { 6, 0 } end
+            local note = todo_actions.get_note_at_cursor(mock_win_id)
+            assert.is_not_nil(note)
+            assert.are.equal("n1", note.id)
+        end)
+
+        it("returns nil when the cursor is on a todo row", function()
+            vim.api.nvim_win_get_cursor = function() return { 3, 0 } end
+            assert.is_nil(todo_actions.get_note_at_cursor(mock_win_id))
+        end)
+
+        it("returns nil when the cursor is on the Notes header", function()
+            vim.api.nvim_win_get_cursor = function() return { 5, 0 } end
+            assert.is_nil(todo_actions.get_note_at_cursor(mock_win_id))
         end)
     end)
 end)

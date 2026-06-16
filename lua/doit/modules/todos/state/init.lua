@@ -68,6 +68,12 @@ function M.setup(parent_module)
     M.get_available_lists = storage.get_available_lists
     M.move_todo_to_list = storage.move_todo_to_list
 
+    -- List-scoped notes
+    M.get_notes = storage.get_notes
+    M.add_note = storage.add_note
+    M.update_note = storage.update_note
+    M.delete_note = storage.delete_note
+
     return M
 end
 

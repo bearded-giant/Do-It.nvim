@@ -36,6 +36,16 @@ COLOR_YELLOW=$'\e[1;33m'
 COLOR_BLUE=$'\e[1;34m'
 COLOR_PURPLE=$'\e[38;5;141m'
 COLOR_DIM=$'\e[2m'
+COLOR_HEADER=$'\e[1;36m'
+
+priority_header_label() {
+    case "$1" in
+        critical)  echo "Critical" ;;
+        urgent)    echo "Urgent" ;;
+        important) echo "Important" ;;
+        *)         echo "Default" ;;
+    esac
+}
 
 UNDO_TYPE=""
 UNDO_ID=""
@@ -81,6 +91,8 @@ export TODO_LIST_PATH
 format_todos() {
     # tracks the previous priority group so we can emit a blank line on change
     local prev_group=""
+    local prev_pd_group=""
+    local any_rows=""
 
     # text column scales with the list pane (~50% of popup; preview takes 50%)
     # read /dev/tty (popup pty) since stdout is piped into fzf, which breaks tput
@@ -100,6 +112,7 @@ format_todos() {
         local group="${priority:-default}"
         [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
         prev_group="$group"
+        any_rows=1
         # Add ... for multi-line items
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
@@ -122,11 +135,16 @@ format_todos() {
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
     ' "$TODO_LIST_PATH")
 
-    # Then print not started todos
+    # Then print not started todos, grouped under named priority headers
     while IFS='|' read -r id status priority text multiline obs; do
         local group="${priority:-default}"
-        [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
+        if [[ "$group" != "$prev_pd_group" ]]; then
+            [[ -n "$any_rows" ]] && echo ""
+            printf "%s%s%s\n" "$COLOR_HEADER" "$(priority_header_label "$priority")" "$COLOR_RESET"
+            prev_pd_group="$group"
+        fi
         prev_group="$group"
+        any_rows=1
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
         obs_icon=""
@@ -147,14 +165,26 @@ format_todos() {
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
     ' "$TODO_LIST_PATH")
 
+    # Notes section (always shown) between pending and completed
+    echo ""
+    printf "%s%s%s\n" "$COLOR_HEADER" "Notes" "$COLOR_RESET"
+    local note_rows=0
+    while IFS='|' read -r nid ntitle; do
+        note_rows=$((note_rows + 1))
+        printf "  %s• %-${text_w}s%s %s[note_%s]%s\n" "$COLOR_PURPLE" "$ntitle" "$COLOR_RESET" "$COLOR_DIM" "$nid" "$COLOR_RESET"
+    done < <(jq -r --argjson tw "$text_w" '(.notes // []) | .[] |
+        (if (.title // "") == "" then ((.body // "") | split("\n")[0]) else (.title) end)[0:$tw] as $t |
+        "\(.id)|\($t)"' "$TODO_LIST_PATH")
+    [[ "$note_rows" -eq 0 ]] && printf "  %s(no notes)%s\n" "$COLOR_DIM" "$COLOR_RESET"
+
     # Finally print completed todos (if show_completed is enabled)
     if [[ "$SHOW_COMPLETED" == "true" ]]; then
         local first_done="true"
         while IFS='|' read -r id status priority text multiline obs; do
-            # blank / horizontal rule / blank between last pending item and completed
+            # blank / horizontal rule / blank between notes and completed
             if [[ "$first_done" == "true" ]]; then
                 first_done="false"
-                [[ -n "$prev_group" ]] && printf "\n%s%s%s\n\n" "$COLOR_DIM" "$hr_line" "$COLOR_RESET"
+                printf "\n%s%s%s\n\n" "$COLOR_DIM" "$hr_line" "$COLOR_RESET"
             fi
             suffix=""
             [[ "$multiline" == "true" ]] && suffix=" ..."
@@ -400,13 +430,13 @@ ${hdr_hr}
  n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
  d: Delete    D: Clear done    u: Undo    m: Move to list
  l: Switch list    L: List manager (new/rename/delete)
- y: Copy text    N: Edit note
+ y: Copy text    N: Edit note    g: List notes
  O: Send to Obsidian daily    /: Search
 ${hdr_hr}
 
 " \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/ \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
@@ -429,6 +459,17 @@ ${hdr_hr}
     # Extract the todo ID from the bracketed ID at end of line [id]
     # Strip ANSI codes first since COLOR_RESET follows the ID
     TODO_ID=$(echo "$TODO_LINE" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
+
+    # List-scoped note rows are tagged [note_<id>]; route them to the notes modal
+    NOTE_ID=""
+    if [[ "$TODO_ID" == note_* ]]; then
+        NOTE_ID="${TODO_ID#note_}"
+        TODO_ID=""
+    fi
+    if [[ "$KEY" == "g" ]] || { [[ -n "$NOTE_ID" ]] && [[ "$KEY" =~ ^(enter|e|d|n)$ ]]; }; then
+        "$SCRIPT_DIR/todo-notes.sh"
+        continue
+    fi
 
     # Perform action based on key
     case "$KEY" in

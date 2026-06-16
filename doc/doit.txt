@@ -268,8 +268,9 @@ Main Window~
     <leader>dn   Toggle project notes window
     n           Add new to-do
     x           Toggle to-do status
-    d           Delete current to-do
+    d           Delete current to-do (or list note, on a note row)
     D           Delete all completed
+    gn          Add a list note (scratch note in the Notes section)
     q           Close window
     H           Add due date
     r           Remove due date
@@ -280,7 +281,7 @@ Main Window~
     m           Move to-do to another list
     t           Toggle tags window
     c           Clear active tag filter
-    e           Edit to-do
+    e           Edit to-do (or list note, on a note row)
     p           Edit priorities
     u           Undo deletion
     /           Search to-dos
