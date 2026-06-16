@@ -418,23 +418,14 @@ while true; do
     clear
     # Show todos and prompt for selection
     done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
-    # header divider sized to the list pane (~50% of popup; preview takes the other 50%)
-    hdr_cols=$(stty size </dev/tty 2>/dev/null | awk '{print $2}')
-    [[ -z "$hdr_cols" || "$hdr_cols" -lt 1 ]] && hdr_cols=$(tput cols 2>/dev/null)
-    [[ -z "$hdr_cols" || "$hdr_cols" -lt 1 ]] && hdr_cols=120
-    hdr_hr=$(printf '─%.0s' $(seq 1 $(( hdr_cols * 50 / 100 ))))
-    SELECTION=$(format_todos | fzf --ansi --disabled --header="
- Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)
-${hdr_hr}
- Enter: View detail    s: Start    x: Done    X: Revert
- n: New    p: Paste new    e: Edit    P: Priority    K/J: Reorder
- d: Delete    D: Clear done    u: Undo    m: Move to list
- l: Switch list    L: List manager (new/rename/delete)
- y: Copy text    N: Edit note    g: List notes
- O: Send to Obsidian daily    /: Search
-${hdr_hr}
-
-" \
+    SELECTION=$(format_todos | fzf --ansi --disabled \
+        --header=" Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)" \
+        --footer-border=rounded \
+        --footer-label=" [?] for help " \
+        --footer=" s: Start   x: Done   X: Revert   n: New   p: Paste new
+ e: Edit   P: Priority   K/J: Reorder   d: Delete   D: Clear done
+ u: Undo   m: Move to list   l: Switch list   L: List manager
+ y: Copy text   N: Edit note   g: List notes   /: Search   ?: Help" \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
@@ -1055,8 +1046,11 @@ ${hdr_hr}
             echo ""
             echo " View/Copy"
             echo "   Enter            View detail in nvim (q to exit)"
-            echo "   N                Edit note in \$EDITOR"
+            echo "   N                Edit note (description) in \$EDITOR"
             echo "   y                Copy text to clipboard"
+            echo ""
+            echo " List Notes"
+            echo "   g                List notes modal (n: new, e: edit, d: delete)"
             echo ""
             echo " Obsidian"
             echo "   O                Send to today's daily note"
