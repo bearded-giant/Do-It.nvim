@@ -25,6 +25,14 @@ export TODO_LIST_PATH
 
 new_note_id() { echo "$(date +%s)_$RANDOM"; }
 
+clip() {
+    if command -v pbcopy &>/dev/null; then pbcopy
+    elif command -v xclip &>/dev/null; then xclip -selection clipboard
+    elif command -v xsel &>/dev/null; then xsel --clipboard
+    else return 1
+    fi
+}
+
 # atomic jq read-modify-write of the list file
 write_list() {
     local tmp="${TODO_LIST_PATH}.tmp"
@@ -90,10 +98,10 @@ while true; do
     SELECTION=$(format_notes | fzf --ansi --disabled \
         --header="
  Notes — ${ACTIVE_LIST_NAME}
- n: New    e: Edit    d: Delete    q: Back
+ n: New    e: Edit    d: Delete    y: Copy    q: Back
 " \
         --prompt="" \
-        --expect=enter,n,e,d,q \
+        --expect=enter,n,e,d,y,q \
         --no-sort \
         --height=97% \
         --layout=reverse \
@@ -130,6 +138,16 @@ while true; do
             write_list --arg id "$NID" --arg t "$NEW_T" --arg b "$NEW_B" '
                 .notes |= map(if .id == $id then .title = $t | .body = $b | .updated_at = (now | floor) else . end) |
                 ._metadata.updated_at = (now | floor)'
+            ;;
+        "y")
+            [[ -z "$NID" ]] && continue
+            # copy the note body (fallback to title) to the system clipboard
+            COPY=$(jq -r --arg id "$NID" '(.notes // [])[] | select(.id == $id) | if (.body // "") != "" then .body else (.title // "") end' "$TODO_LIST_PATH")
+            if [[ -n "$COPY" ]] && printf '%s' "$COPY" | clip; then
+                clear; echo " Copied note to clipboard"; sleep 0.5
+            else
+                clear; echo " Nothing to copy (or no clipboard tool)"; sleep 0.8
+            fi
             ;;
         "d")
             [[ -z "$NID" ]] && continue
