@@ -423,7 +423,16 @@ while true; do
     clear
     # Show todos and prompt for selection
     done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
-    SELECTION=$(format_todos | fzf --ansi --disabled \
+    LIST=$(format_todos)
+    # park the cursor on a just-created/edited todo when one is queued
+    START_BIND=()
+    if [[ -n "$CURSOR_TARGET" ]]; then
+        TARGET_LN=$(printf '%s\n' "$LIST" | sed 's/\x1b\[[0-9;]*m//g' | grep -nF "[$CURSOR_TARGET]" | head -1 | cut -d: -f1)
+        [[ -n "$TARGET_LN" ]] && START_BIND=(--bind "start:pos($TARGET_LN)")
+        CURSOR_TARGET=""
+    fi
+    SELECTION=$(printf '%s\n' "$LIST" | fzf --ansi --disabled \
+        "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
@@ -954,6 +963,8 @@ while true; do
                 fi
 
                 if [[ $? -eq 0 ]]; then
+                    # park cursor on the new todo when the list redraws
+                    CURSOR_TARGET="$TODO_ID"
                     echo ""
                     if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
                         echo "Created [$SELECTED_PRIORITY]: $TODO_TEXT"
