@@ -36,7 +36,9 @@ write_list() {
     fi
 }
 
-# single-line input via fzf; returns 130 on cancel (esc)
+# single-line input via fzf; returns 130 only on cancel (esc/ctrl-c).
+# NB: fzf exits non-zero (1/2) when accepting a query against an empty item
+# list — that is normal here, NOT a cancel. Only 130 means the user aborted.
 input_line() {
     local prefill="$1" header="$2" result status
     result=$(true | fzf --print-query --query="$prefill" \
@@ -44,21 +46,23 @@ input_line() {
         --header="$header" \
         --bind 'enter:accept' --bind 'esc:abort')
     status=$?
-    [[ $status -ne 0 ]] && return 130
+    [[ $status -eq 130 ]] && return 130
     echo "$result" | head -1
 }
 
-# multi-line body editor (temp file + editor)
+# multi-line body editor (temp file + editor). The editor's UI MUST go to the
+# terminal, but this function runs inside $(...) so its stdout is a pipe — force
+# the editor's stdin/stdout to /dev/tty so it renders, then emit the file body.
 edit_body() {
     local prefill="$1" tmp
     tmp=$(mktemp /tmp/doit_note.XXXXXX)
     [[ -n "$prefill" ]] && printf '%s' "$prefill" > "$tmp"
     if [[ "$USE_EDITOR" == true ]]; then
-        ${EDITOR:-nvim} "$tmp"
+        ${EDITOR:-nvim} "$tmp" </dev/tty >/dev/tty
     else
         nvim -u NONE -c "edit $tmp" \
             -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' \
-            -c 'nnoremap <buffer> q :wq<CR>'
+            -c 'nnoremap <buffer> q :wq<CR>' </dev/tty >/dev/tty
     fi
     cat "$tmp"
     rm -f "$tmp"
