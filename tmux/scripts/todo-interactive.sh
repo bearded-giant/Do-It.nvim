@@ -900,6 +900,8 @@ while true; do
             fi
 
             if [[ $? -eq 0 ]]; then
+                # park cursor on the pasted todo when the list redraws
+                CURSOR_TARGET="$TODO_ID"
                 SHORT=$(echo "$TODO_TEXT" | head -1 | cut -c1-40)
                 echo "✓ Created from clipboard: $SHORT"
                 sleep 0.5
