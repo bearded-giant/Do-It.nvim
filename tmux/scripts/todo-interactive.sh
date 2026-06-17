@@ -440,6 +440,8 @@ while true; do
         --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
         --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
         --bind "ctrl-down:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
+        --bind "[:transform:$SCRIPT_DIR/section-jump.sh down {n}" \
+        --bind "]:transform:$SCRIPT_DIR/section-jump.sh up {n}" \
         --no-sort \
         --height=97% \
         --layout=reverse \
@@ -1037,7 +1039,7 @@ while true; do
             help_row "NAVIGATION"                       "EDIT"
             help_row "  j / k    Move up / down"         "  n      New todo"
             help_row "  K / J    Reorder up / down"      "  p      Paste new (clipboard)"
-            help_row ""                                  "  e      Edit todo text"
+            help_row "  [ / ]    Jump section down / up" "  e      Edit todo text"
             help_row "STATUS"                            "  P      Set priority"
             help_row "  s        Start (in-progress)"    "  d      Delete todo"
             help_row "  x        Complete (done)"        "  D      Clear all completed"
