@@ -1,6 +1,18 @@
 local M = {}
 
-M.version = "2.0.0"
+local function read_version()
+	local src = debug.getinfo(1, "S").source:sub(2)
+	local root = vim.fn.fnamemodify(src, ":h:h:h")
+	local f = io.open(root .. "/VERSION", "r")
+	if not f then
+		return "2.0.0"
+	end
+	local v = f:read("*l")
+	f:close()
+	return v and (v:gsub("%s+", "")) or "2.0.0"
+end
+
+M.version = read_version()
 
 function M.setup(opts)
 	opts = opts or {}

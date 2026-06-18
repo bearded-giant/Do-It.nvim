@@ -5,6 +5,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 
+DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
+
 # always read from session.json, not cached env var
 unset DOIT_ACTIVE_LIST
 TODO_LIST_PATH="$(get_active_list_path)"
@@ -433,7 +435,7 @@ while true; do
     fi
     SELECTION=$(printf '%s\n' "$LIST" | fzf --ansi --disabled \
         "${START_BIND[@]}" \
-        --header=" Todo Manager - ${ACTIVE_LIST_NAME}  (done: $done_count)   ·   [?] help"$'\n' \
+        --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help"$'\n' \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
