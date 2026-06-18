@@ -8,24 +8,29 @@ SESSION_FILE="$DOIT_DATA_DIR/session.json"
 LISTS_DIR="$DOIT_DATA_DIR/lists"
 
 get_active_list_name() {
-    # check env var first
-    if [[ -n "$DOIT_ACTIVE_LIST" ]]; then
-        echo "$DOIT_ACTIVE_LIST"
-        return
-    fi
+    local list_name=""
 
-    # read from session.json
-    if [[ -f "$SESSION_FILE" ]] && command -v jq &> /dev/null; then
-        local list_name
+    # check env var first, then session.json
+    if [[ -n "$DOIT_ACTIVE_LIST" ]]; then
+        list_name="$DOIT_ACTIVE_LIST"
+    elif [[ -f "$SESSION_FILE" ]] && command -v jq &> /dev/null; then
         list_name=$(jq -r '.active_list // "daily"' "$SESSION_FILE" 2>/dev/null)
-        if [[ -n "$list_name" && "$list_name" != "null" ]]; then
-            echo "$list_name"
-            return
+    fi
+    [[ -z "$list_name" || "$list_name" == "null" ]] && list_name="daily"
+
+    # active list deleted out from under us? fall back so the UI still opens
+    # instead of resolving to a missing file and exiting
+    if [[ ! -f "$LISTS_DIR/${list_name}.json" ]]; then
+        if [[ -f "$LISTS_DIR/daily.json" ]]; then
+            list_name="daily"
+        else
+            local first
+            first=$(ls -1 "$LISTS_DIR"/*.json 2>/dev/null | head -1)
+            [[ -n "$first" ]] && list_name=$(basename "$first" .json)
         fi
     fi
 
-    # default fallback
-    echo "daily"
+    echo "$list_name"
 }
 
 get_active_list_path() {
