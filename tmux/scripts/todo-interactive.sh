@@ -113,6 +113,9 @@ format_todos() {
     (( text_w > 200 )) && text_w=200
     hr_line=$(printf '─%.0s' $(seq 1 $(( text_w + 24 ))))
 
+    # leading blank row: visual gap under the fzf header (cursor defaults past it)
+    echo ""
+
     # First print in-progress todos
     while IFS='|' read -r id status priority text multiline obs; do
         # blank line between distinct priority groups
@@ -426,8 +429,9 @@ while true; do
     # Show todos and prompt for selection
     done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
     LIST=$(format_todos)
-    # park the cursor on a just-created/edited todo when one is queued
-    START_BIND=()
+    # park the cursor on a just-created/edited todo when one is queued;
+    # default past the leading blank row to the first real line
+    START_BIND=(--bind "start:pos(2)")
     if [[ -n "$CURSOR_TARGET" ]]; then
         TARGET_LN=$(printf '%s\n' "$LIST" | sed 's/\x1b\[[0-9;]*m//g' | grep -nF "[$CURSOR_TARGET]" | head -1 | cut -d: -f1)
         [[ -n "$TARGET_LN" ]] && START_BIND=(--bind "start:pos($TARGET_LN)")
@@ -435,7 +439,7 @@ while true; do
     fi
     SELECTION=$(printf '%s\n' "$LIST" | fzf --ansi --disabled \
         "${START_BIND[@]}" \
-        --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help"$'\n' \
+        --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
         --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
