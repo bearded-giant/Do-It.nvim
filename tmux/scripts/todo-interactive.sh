@@ -77,7 +77,15 @@ SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 preview_todo() {
     local line="$1"
     local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
-    if [[ -n "$todo_id" ]]; then
+    if [[ "$todo_id" == note_* ]]; then
+        jq -r --arg id "${todo_id#note_}" '
+            (.notes // [])[] | select(.id == $id) |
+            "Note" +
+            "\n────────────────────────────────" +
+            "\n" + (if (.title // "") != "" then .title + "\n\n" else "" end) +
+            (.body // "")
+        ' "$TODO_LIST_PATH" 2>/dev/null
+    elif [[ -n "$todo_id" ]]; then
         jq -r --arg id "$todo_id" '
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
