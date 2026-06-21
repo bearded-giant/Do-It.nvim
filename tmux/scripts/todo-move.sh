@@ -42,10 +42,11 @@ if [[ -n "$TODO_ID" && "$TODO_ID" != note_* ]]; then
 fi
 
 # locate the (possibly moved) row in the freshly formatted list so fzf can
-# re-anchor the cursor on it after reload
+# re-anchor the cursor on it. reload-sync (not reload) so pos() runs AFTER the
+# list reloads -- async reload resets the cursor to the top, dropping pos().
 [[ -z "$TODO_ID" ]] && exit 0
 N=$("$SCRIPT_DIR/todo-interactive.sh" --format \
     | sed 's/\x1b\[[0-9;]*m//g' \
     | grep -nF "[$TODO_ID]" | head -1 | cut -d: -f1)
 [[ -z "$N" ]] && exit 0
-echo "reload($SCRIPT_DIR/todo-interactive.sh --format)+pos($N)"
+echo "reload-sync($SCRIPT_DIR/todo-interactive.sh --format)+pos($N)"
