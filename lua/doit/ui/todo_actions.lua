@@ -1169,354 +1169,156 @@ function M.reorder_todo(win_id, on_render)
 		return
 	end
 
-	local cursor = vim.api.nvim_win_get_cursor(win_id)
-	local line_num = cursor[1]
-
 	local buf_id = vim.api.nvim_win_get_buf(win_id)
-
-	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
-	if not bullet_line then
+	local start_index = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
+	if not start_index then
+		vim.notify("Place the cursor on a to-do to reorder", vim.log.levels.WARN)
 		return
 	end
 
-	-- Now use bullet_line instead of line_num for the rest
-	line_num = bullet_line
+	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
+	local reorder_key = (config.options.keymaps and config.options.keymaps.reorder_todo) or "r"
 
-	-- Calculate offset based on filters (consistent with move_todo)
-	local line_offset = 1 -- default offset for blank line at top
-	if state.active_filter then
-		line_offset = line_offset + 2 -- add 2 for filter header
-	end
-	if state.active_category then
-		line_offset = line_offset + 2 -- add 2 for category header
+	-- group key mirrors the rendered grouping: in-progress flag + priority name.
+	-- reorder only swaps within a group so it matches "set rank within a grouping".
+	local function group_key(todo)
+		return tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
 	end
 
-	-- Get the current todo index
-	local todo_index = line_num - line_offset
-	if todo_index < 1 or todo_index > #state.todos then
-		return
+	-- passes the active tag/category filter (mirrors resolve_at_line)
+	local function is_visible(todo)
+		if state.active_filter and not todo.text:match("#" .. state.active_filter) then
+			return false
+		end
+		if not state.active_category then
+			return true
+		end
+		local module = get_todo_module()
+		if module and module.state and module.state.get_todo_category then
+			local cid = module.state.get_todo_category(todo.id)
+			return (cid == state.active_category)
+				or (state.active_category == "uncategorized" and (cid == "uncategorized" or not cid))
+		end
+		return (todo.category == state.active_category)
+			or (state.active_category == "Uncategorized" and (not todo.category or todo.category == ""))
 	end
 
-	vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-
-	-- Determine the actual index in todos array if using filter
-	local real_index
-	if state.active_filter or state.active_category then
-		local visible_count = 0
-		for i, todo in ipairs(state.todos) do
-			local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-			local show_by_category = true
-			
-			if state.active_category then
-				local module = get_todo_module()
-				if module and module.state and module.state.get_todo_category then
-					local todo_category_id = module.state.get_todo_category(todo.id)
-					show_by_category = (todo_category_id == state.active_category) or
-									  (state.active_category == "uncategorized" and 
-									   (todo_category_id == "uncategorized" or not todo_category_id))
-				else
-					show_by_category = (todo.category == state.active_category) or
-									  (state.active_category == "Uncategorized" and 
-									   (not todo.category or todo.category == ""))
-				end
-			end
-			
-			if show_by_tag and show_by_category then
-				visible_count = visible_count + 1
-				if visible_count == todo_index then
-					real_index = i
-					break
-				end
+	-- buffer line (1-based) of a todo's first row in the current render.
+	-- ponytail: O(lines) scan per call via resolve_at_line; lists are small.
+	local function line_for_index(idx)
+		for l = 1, vim.api.nvim_buf_line_count(buf_id) do
+			if get_real_todo_index(l) == idx then
+				return l
 			end
 		end
-	else
-		real_index = todo_index
+		return nil
 	end
 
-	state.reordering_todo_index = real_index
+	local function highlight(line_num)
+		vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
+		if line_num then
+			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", line_num - 1, 0, -1)
+		end
+	end
 
-	-- Highlight the current line
-	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
-	vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
-	vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", line_num - 1, 0, -1)
+	state.reordering_todo_index = start_index
+	highlight(line_for_index(start_index))
 
-	local reorder_key = config.options.keymaps.reorder_todo
+	local function do_move(direction)
+		local idx = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
+		if not idx then
+			return
+		end
+		local me = state.todos[idx]
+		if not me or me.done then
+			return
+		end
 
-	local old_r_keymap = vim.fn.maparg(reorder_key, "n", false, true)
+		-- nearest visible neighbor in `direction`; only swap if it shares the group
+		local step = (direction == "down") and 1 or -1
+		local target
+		local i = idx + step
+		while i >= 1 and i <= #state.todos do
+			local cand = state.todos[i]
+			if cand and not cand.done and is_visible(cand) then
+				if group_key(cand) == group_key(me) then
+					target = i
+				end
+				break
+			end
+			i = i + step
+		end
+		if not target then
+			return
+		end
+
+		local other = state.todos[target]
+		me.order_index, other.order_index = (other.order_index or target), (me.order_index or idx)
+		state.sort_todos()
+		state.save_to_disk()
+
+		local new_index
+		for k, t in ipairs(state.todos) do
+			if t == me then
+				new_index = k
+				break
+			end
+		end
+		state.reordering_todo_index = new_index
+		if on_render then
+			on_render()
+		end
+
+		local new_line = new_index and line_for_index(new_index)
+		if new_line then
+			vim.api.nvim_win_set_cursor(win_id, { new_line, 0 })
+			highlight(new_line)
+		end
+	end
 
 	local function exit_reorder_mode()
-		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-		vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
-
+		highlight(nil)
 		state.reordering_todo_index = nil
 
-		-- Safely remove keymaps with pcall to prevent errors if mapping doesn't exist
-		local function safe_del_keymap(key)
-			pcall(function()
-				vim.keymap.del("n", key, { buffer = buf_id })
-			end)
+		-- normalize order_index to dense array positions so future inserts stay ordered
+		for k, t in ipairs(state.todos) do
+			t.order_index = k
 		end
+		state.save_to_disk()
 
+		local function safe_del_keymap(key)
+			pcall(vim.keymap.del, "n", key, { buffer = buf_id })
+		end
 		safe_del_keymap("<Down>")
 		safe_del_keymap("<Up>")
 		safe_del_keymap("j")
 		safe_del_keymap("k")
-		safe_del_keymap(reorder_key)
 		safe_del_keymap("<Esc>")
 
-		-- Always restore the reorder keybinding to ensure it can be re-entered
-		pcall(function()
-			vim.keymap.set("n", reorder_key, function()
-				M.reorder_todo(win_id, on_render)
-			end, { buffer = buf_id, nowait = true })
-		end)
+		pcall(vim.keymap.set, "n", reorder_key, function()
+			M.reorder_todo(win_id, on_render)
+		end, { buffer = buf_id, nowait = true })
 
+		if on_render then
+			on_render()
+		end
 		if config.options.development_mode then
 			vim.notify("Reordering mode exited and saved", vim.log.levels.INFO)
 		end
 	end
 
-	local function update_order_indices()
-		-- Reset all todos' order_index property to match their position in the array
-		for i, todo in ipairs(state.todos) do
-			todo.order_index = i
-		end
-		state.save_to_disk()
+	local function map_move(lhs, direction)
+		vim.keymap.set("n", lhs, function()
+			do_move(direction)
+		end, { buffer = buf_id, nowait = true })
 	end
+	map_move("j", "down")
+	map_move("<Down>", "down")
+	map_move("k", "up")
+	map_move("<Up>", "up")
 
-	local function move_todo(buf_id, win_id, line_num, ns_id, direction, on_render)
-		vim.api.nvim_buf_set_option(buf_id, "modifiable", true)
-
-		-- Calculate offset based on filters
-		local line_offset = 1 -- default offset for blank line at top
-		if state.active_filter then
-			line_offset = line_offset + 2 -- add 2 for filter header
-		end
-		if state.active_category then
-			line_offset = line_offset + 2 -- add 2 for category header
-		end
-
-		local current_index = line_num - line_offset
-
-		if direction == "up" and current_index <= 1 then
-			return
-		end
-
-		-- Get the real index in state.todos
-		local real_index
-		if state.active_filter or state.active_category then
-			local visible_count = 0
-			for i, todo in ipairs(state.todos) do
-				local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-				local show_by_category = true
-				
-				if state.active_category then
-					local module = get_todo_module()
-					if module and module.state and module.state.get_todo_category then
-						local todo_category_id = module.state.get_todo_category(todo.id)
-						show_by_category = (todo_category_id == state.active_category) or
-										  (state.active_category == "uncategorized" and 
-										   (todo_category_id == "uncategorized" or not todo_category_id))
-					else
-						show_by_category = (todo.category == state.active_category) or
-										  (state.active_category == "Uncategorized" and 
-										   (not todo.category or todo.category == ""))
-					end
-				end
-				
-				if show_by_tag and show_by_category then
-					visible_count = visible_count + 1
-					if visible_count == current_index then
-						real_index = i
-						break
-					end
-				end
-			end
-		else
-			real_index = current_index
-		end
-
-		-- Additional validation
-		if not real_index then
-			return
-		end
-		if direction == "down" and real_index >= #state.todos then
-			return
-		end
-		if direction == "up" and real_index <= 1 then
-			return
-		end
-
-		-- Store the current todo for tracking
-		local current_todo = state.todos[real_index]
-
-		-- Find next/previous todo within filter
-		local target_index
-		if direction == "down" then
-			for i = real_index + 1, #state.todos do
-				local show_by_tag = not state.active_filter or state.todos[i].text:match("#" .. state.active_filter)
-				local show_by_category = true
-				
-				if state.active_category then
-					local module = get_todo_module()
-					if module and module.state and module.state.get_todo_category then
-						local todo_category_id = module.state.get_todo_category(state.todos[i].id)
-						show_by_category = (todo_category_id == state.active_category) or
-										  (state.active_category == "uncategorized" and 
-										   (todo_category_id == "uncategorized" or not todo_category_id))
-					else
-						show_by_category = (state.todos[i].category == state.active_category) or
-										  (state.active_category == "Uncategorized" and 
-										   (not state.todos[i].category or state.todos[i].category == ""))
-					end
-				end
-				
-				if show_by_tag and show_by_category then
-					target_index = i
-					break
-				end
-			end
-
-			if not target_index then
-				return -- No visible todo to swap with
-			end
-		else -- up
-			for i = real_index - 1, 1, -1 do
-				local show_by_tag = not state.active_filter or state.todos[i].text:match("#" .. state.active_filter)
-				local show_by_category = true
-				
-				if state.active_category then
-					local module = get_todo_module()
-					if module and module.state and module.state.get_todo_category then
-						local todo_category_id = module.state.get_todo_category(state.todos[i].id)
-						show_by_category = (todo_category_id == state.active_category) or
-										  (state.active_category == "uncategorized" and 
-										   (todo_category_id == "uncategorized" or not todo_category_id))
-					else
-						show_by_category = (state.todos[i].category == state.active_category) or
-										  (state.active_category == "Uncategorized" and 
-										   (not state.todos[i].category or state.todos[i].category == ""))
-					end
-				end
-				
-				if show_by_tag and show_by_category then
-					target_index = i
-					break
-				end
-			end
-
-			if not target_index then
-				return -- No visible todo to swap with
-			end
-		end
-
-		-- Swap order indices for reordering
-		local current_order = state.todos[real_index].order_index or real_index
-		local target_order = state.todos[target_index].order_index or target_index
-
-		-- Swap the order indices
-		state.todos[real_index].order_index = target_order
-		state.todos[target_index].order_index = current_order
-
-		state.sort_todos()
-
-		-- Find the new position of our todo after sorting
-		local new_position
-		for i, todo in ipairs(state.todos) do
-			if todo == current_todo then
-				new_position = i
-				break
-			end
-		end
-
-		if not new_position then
-			return -- Something went wrong, couldn't find the todo
-		end
-
-		state.reordering_todo_index = new_position
-
-		if on_render then
-			on_render()
-		end
-
-		-- Update cursor position to follow the moved todo
-		local new_line_num = 0
-
-		if state.active_filter or state.active_category then
-			-- Recalculate the cursor position when filtered
-			local visible_count = 0
-			for i, todo in ipairs(state.todos) do
-				local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-				local show_by_category = true
-				
-				if state.active_category then
-					local module = get_todo_module()
-					if module and module.state and module.state.get_todo_category then
-						local todo_category_id = module.state.get_todo_category(todo.id)
-						show_by_category = (todo_category_id == state.active_category) or
-										  (state.active_category == "uncategorized" and 
-										   (todo_category_id == "uncategorized" or not todo_category_id))
-					else
-						show_by_category = (todo.category == state.active_category) or
-										  (state.active_category == "Uncategorized" and 
-										   (not todo.category or todo.category == ""))
-					end
-				end
-				
-				if show_by_tag and show_by_category then
-					visible_count = visible_count + 1
-					if i == new_position then
-						new_line_num = visible_count + line_offset
-						break
-					end
-				end
-			end
-		else
-			-- Unfiltered view is simpler
-			new_line_num = new_position + line_offset
-		end
-
-		if new_line_num > 0 then
-			vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
-			vim.api.nvim_buf_clear_namespace(buf_id, ns_id, 0, -1)
-			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "IncSearch", new_line_num - 1, 0, -1)
-		end
-	end
-
-	-- Arrow keys for movement
-	vim.keymap.set("n", "<Down>", function()
-		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "down", on_render)
-	end, { buffer = buf_id, nowait = true })
-
-	vim.keymap.set("n", "<Up>", function()
-		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "up", on_render)
-	end, { buffer = buf_id, nowait = true })
-
-	-- Also support j/k vim keys for movement
-	vim.keymap.set("n", "j", function()
-		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "down", on_render)
-	end, { buffer = buf_id, nowait = true })
-
-	vim.keymap.set("n", "k", function()
-		move_todo(buf_id, win_id, vim.api.nvim_win_get_cursor(win_id)[1], ns_id, "up", on_render)
-	end, { buffer = buf_id, nowait = true })
-
-	local reorder_key = config.options.keymaps and config.options.keymaps.reorder_todo or "r"
-	vim.keymap.set("n", reorder_key, function()
-		update_order_indices()
-		exit_reorder_mode()
-		if on_render then
-			on_render()
-		end
-	end, { buffer = buf_id, nowait = true })
-
-	vim.keymap.set("n", "<Esc>", function()
-		update_order_indices()
-		exit_reorder_mode()
-		if on_render then
-			on_render()
-		end
-	end, { buffer = buf_id, nowait = true })
+	vim.keymap.set("n", reorder_key, exit_reorder_mode, { buffer = buf_id, nowait = true })
+	vim.keymap.set("n", "<Esc>", exit_reorder_mode, { buffer = buf_id, nowait = true })
 end
 
 -- Export helper functions for use in other modules

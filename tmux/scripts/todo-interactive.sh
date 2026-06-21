@@ -450,10 +450,10 @@ while true; do
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
         --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
-        --bind "K:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
-        --bind "ctrl-up:execute-silent($SCRIPT_DIR/todo-move.sh up {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+up" \
-        --bind "J:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
-        --bind "ctrl-down:execute-silent($SCRIPT_DIR/todo-move.sh down {})+reload($SCRIPT_DIR/todo-interactive.sh --format)+down" \
+        --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
+        --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
+        --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
+        --bind "ctrl-down:transform:$SCRIPT_DIR/todo-move.sh down {}" \
         --bind "[:transform:$SCRIPT_DIR/section-jump.sh down {n}" \
         --bind "]:transform:$SCRIPT_DIR/section-jump.sh up {n}" \
         --no-sort \
