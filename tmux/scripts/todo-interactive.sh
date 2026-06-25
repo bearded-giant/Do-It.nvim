@@ -431,6 +431,32 @@ update_todo() {
     esac
 }
 
+# open a list-scoped note in nvim (title on line 1, body below the marker) so the
+# user can read/select/edit the text; writes title + body back on save
+open_note_editor() {
+    local note_id="$1"
+    local tmp title body new_title new_body
+    tmp=$(mktemp /tmp/doit_note_view.XXXXXX)
+    title=$(jq -r --arg id "$note_id" '(.notes // [])[] | select(.id == $id) | .title // ""' "$TODO_LIST_PATH")
+    body=$(jq -r --arg id "$note_id" '(.notes // [])[] | select(.id == $id) | .body // ""' "$TODO_LIST_PATH")
+    {
+        echo "$title"
+        echo "── note body (editable below) ───────────"
+        printf '%s\n' "$body"
+    } > "$tmp"
+    nvim -u NONE -c "edit $tmp" \
+        -c 'set noswapfile nobackup nowritebackup wrap linebreak clipboard=unnamedplus' \
+        -c 'normal! 3G' \
+        -c 'nnoremap <buffer> q :wq<CR>'
+    new_title=$(sed -n '1p' "$tmp")
+    new_body=$(tail -n +3 "$tmp")
+    rm -f "$tmp"
+    jq --arg id "$note_id" --arg t "$new_title" --arg b "$new_body" '
+        .notes |= map(if .id == $id then .title = $t | .body = $b | .updated_at = (now | floor) else . end) |
+        ._metadata.updated_at = (now | floor)
+    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+}
+
 # Main interactive loop
 while true; do
     clear
@@ -466,8 +492,8 @@ while true; do
     KEY=$(echo "$SELECTION" | head -1)
     TODO_LINE=$(echo "$SELECTION" | tail -1)
 
-    # Exit on q or escape
-    if [[ "$KEY" == "q" ]] || [[ -z "$TODO_LINE" ]]; then
+    # Esc / ctrl-c (no key, empty line) quits the manager. q goes back to Lists.
+    if [[ -z "$KEY" && -z "$TODO_LINE" ]]; then
         break
     fi
 
@@ -475,13 +501,15 @@ while true; do
     # Strip ANSI codes first since COLOR_RESET follows the ID
     TODO_ID=$(echo "$TODO_LINE" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
 
-    # List-scoped note rows are tagged [note_<id>]; route them to the notes modal
+    # List-scoped note rows are tagged [note_<id>]; split the note id out so the
+    # per-note actions (enter/e/d/y) in the case below can target it directly
     NOTE_ID=""
     if [[ "$TODO_ID" == note_* ]]; then
         NOTE_ID="${TODO_ID#note_}"
         TODO_ID=""
     fi
-    if [[ "$KEY" == "g" ]] || { [[ -n "$NOTE_ID" ]] && [[ "$KEY" =~ ^(enter|e|d|n)$ ]]; }; then
+    # g browses the full notes list (CRUD modal); selecting a note row opens it
+    if [[ "$KEY" == "g" ]]; then
         "$SCRIPT_DIR/todo-notes.sh"
         continue
     fi
@@ -489,6 +517,11 @@ while true; do
     # Perform action based on key
     case "$KEY" in
         "enter"|"")
+            # note row -> open that note in nvim (read/select/edit text)
+            if [[ -n "$NOTE_ID" ]]; then
+                open_note_editor "$NOTE_ID"
+                continue
+            fi
             # view item + edit notes in nvim
             if [[ -n "$TODO_ID" ]]; then
                 VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
@@ -580,6 +613,11 @@ while true; do
             ;;
         # K/J/ctrl-up/ctrl-down handled via fzf --bind (in-place reload, no fzf restart)
         "e")
+            # note row -> open that note in nvim
+            if [[ -n "$NOTE_ID" ]]; then
+                open_note_editor "$NOTE_ID"
+                continue
+            fi
             # Edit todo text
             if [[ -n "$TODO_ID" ]]; then
                 CURRENT_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
@@ -611,6 +649,22 @@ while true; do
             fi
             ;;
         "d")
+            # note row -> delete that note directly
+            if [[ -n "$NOTE_ID" ]]; then
+                NOTE_LBL=$(jq -r --arg id "$NOTE_ID" '(.notes // [])[] | select(.id == $id) | (if (.title // "") != "" then .title else ((.body // "") | split("\n")[0]) end)' "$TODO_LIST_PATH")
+                echo -n "Delete note '$NOTE_LBL'? (y/N): "
+                read -n 1 -r CONFIRM
+                echo
+                if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+                    jq --arg id "$NOTE_ID" '
+                        .notes |= map(select(.id != $id)) |
+                        ._metadata.updated_at = (now | floor)
+                    ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
+                    echo "Deleted note"
+                    sleep 0.5
+                fi
+                continue
+            fi
             # Soft delete - move to deleted_todos for undo
             if [[ -n "$TODO_ID" ]]; then
                 TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
@@ -697,8 +751,8 @@ while true; do
             ACTIVE_LIST_NAME="$(get_active_list_name)"
             export TODO_LIST_PATH
             ;;
-        "L")
-            # Open list manager
+        "L"|"q")
+            # L / q: go back to Lists (list manager). Esc quits the manager.
             "$SCRIPT_DIR/todo-list-manager.sh"
             # Clear cached env var so we read fresh from session.json
             unset DOIT_ACTIVE_LIST
@@ -749,24 +803,27 @@ while true; do
             fi
             ;;
         "y")
-            # copy todo text to system clipboard
-            if [[ -n "$TODO_ID" ]]; then
+            # copy todo text (or note body) to system clipboard
+            COPY_TEXT=""
+            if [[ -n "$NOTE_ID" ]]; then
+                COPY_TEXT=$(jq -r --arg id "$NOTE_ID" '(.notes // [])[] | select(.id == $id) | if (.body // "") != "" then .body else (.title // "") end' "$TODO_LIST_PATH" 2>/dev/null)
+            elif [[ -n "$TODO_ID" ]]; then
                 COPY_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH" 2>/dev/null)
-                if [[ -n "$COPY_TEXT" ]]; then
-                    if command -v pbcopy &>/dev/null; then
-                        printf '%s' "$COPY_TEXT" | pbcopy
-                    elif command -v xclip &>/dev/null; then
-                        printf '%s' "$COPY_TEXT" | xclip -selection clipboard
-                    elif command -v xsel &>/dev/null; then
-                        printf '%s' "$COPY_TEXT" | xsel --clipboard
-                    else
-                        echo "No clipboard tool found (pbcopy/xclip/xsel)"
-                        sleep 1
-                        continue
-                    fi
-                    echo "Copied to clipboard"
-                    sleep 0.5
+            fi
+            if [[ -n "$COPY_TEXT" ]]; then
+                if command -v pbcopy &>/dev/null; then
+                    printf '%s' "$COPY_TEXT" | pbcopy
+                elif command -v xclip &>/dev/null; then
+                    printf '%s' "$COPY_TEXT" | xclip -selection clipboard
+                elif command -v xsel &>/dev/null; then
+                    printf '%s' "$COPY_TEXT" | xsel --clipboard
+                else
+                    echo "No clipboard tool found (pbcopy/xclip/xsel)"
+                    sleep 1
+                    continue
                 fi
+                echo "Copied to clipboard"
+                sleep 0.5
             fi
             ;;
         "O")
@@ -1062,12 +1119,13 @@ while true; do
             help_row "NOTES"                             "ORGANIZE"
             help_row "  N        Edit note (description)" "  m      Move todo to list"
             help_row "  g        List notes (modal)"      "  l      Switch list"
-            help_row ""                                  "  L      List manager"
+            help_row "  on note: Enter/e open · d del · y copy" "  L    List manager"
             help_row "VIEW / MISC"                       "  /      Search / filter"
-            help_row "  Enter    View detail (nvim)"      ""
+            help_row "  Enter    Open item / note (nvim)" ""
             help_row "  y        Copy text"              "OBSIDIAN"
-            help_row "  ?        This help"              "  O      Send to daily note"
-            help_row "  q        Quit"                   ""
+            help_row "  q        Back (Lists)"           "  O      Send to daily note"
+            help_row "  Esc      Quit"                   ""
+            help_row "  ?        This help"              ""
             printf "\n  %s\n" "$hr"
             printf "  Press any key to return...\n"
             read -n 1 -s
