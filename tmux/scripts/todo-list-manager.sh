@@ -183,14 +183,14 @@ while true; do
         --header="
  List Manager - Active: $CURRENT_LIST
 ─────────────────────────────────────────
- n: New    r: Rename    d: Delete    b: Backup
+ n: New    r: Rename    d: Delete    b: Backup    y: Copy name
  ENTER: Switch to list    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=60% \
         --layout=reverse \
-        --expect=n,r,d,b,enter,q,/ \
+        --expect=n,r,d,b,y,enter,q,/ \
         --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
         --preview-window=right:50%:wrap)
 
@@ -233,6 +233,23 @@ while true; do
                     set_active_list "$SEARCH_LIST"
                     break
                 fi
+            fi
+            ;;
+        "y")
+            if [[ -n "$SELECTED_LIST" ]]; then
+                if command -v pbcopy &>/dev/null; then
+                    printf '%s' "$SELECTED_LIST" | pbcopy
+                elif command -v xclip &>/dev/null; then
+                    printf '%s' "$SELECTED_LIST" | xclip -selection clipboard
+                elif command -v xsel &>/dev/null; then
+                    printf '%s' "$SELECTED_LIST" | xsel --clipboard
+                else
+                    echo "${COLOR_RED}No clipboard tool found (pbcopy/xclip/xsel)${COLOR_RESET}"
+                    sleep 1
+                    continue
+                fi
+                echo "${COLOR_GREEN}Copied list name: $SELECTED_LIST${COLOR_RESET}"
+                sleep 0.5
             fi
             ;;
         "b")
