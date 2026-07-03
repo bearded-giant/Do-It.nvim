@@ -475,7 +475,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,p,B,O,q,?,/,g \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,Y,p,B,O,q,?,/,g \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -826,6 +826,22 @@ while true; do
                 sleep 0.5
             fi
             ;;
+        "Y")
+            # copy the active list name to system clipboard
+            if command -v pbcopy &>/dev/null; then
+                printf '%s' "$ACTIVE_LIST_NAME" | pbcopy
+            elif command -v xclip &>/dev/null; then
+                printf '%s' "$ACTIVE_LIST_NAME" | xclip -selection clipboard
+            elif command -v xsel &>/dev/null; then
+                printf '%s' "$ACTIVE_LIST_NAME" | xsel --clipboard
+            else
+                echo "No clipboard tool found (pbcopy/xclip/xsel)"
+                sleep 1
+                continue
+            fi
+            echo "Copied list name: $ACTIVE_LIST_NAME"
+            sleep 0.5
+            ;;
         "O")
             # send todo to obsidian daily note
             if [[ -n "$TODO_ID" ]]; then
@@ -1123,7 +1139,8 @@ while true; do
             help_row "VIEW / MISC"                       "  /      Search / filter"
             help_row "  Enter    Open item / note (nvim)" ""
             help_row "  y        Copy text"              "OBSIDIAN"
-            help_row "  q        Back (Lists)"           "  O      Send to daily note"
+            help_row "  Y        Copy list name"         "  O      Send to daily note"
+            help_row "  q        Back (Lists)"           ""
             help_row "  Esc      Quit"                   ""
             help_row "  ?        This help"              ""
             printf "\n  %s\n" "$hr"
