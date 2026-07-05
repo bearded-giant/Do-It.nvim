@@ -90,6 +90,44 @@ function presentChoices(matches, context, actionHint) {
     };
 }
 
+function formatNoteLine(n) {
+    return `${n.title}  [id:${n.id}]`;
+}
+
+function presentNoteChoices(matches, context, actionHint) {
+    const lines = matches.map((n, i) => `${i + 1}. ${formatNoteLine(n)}`);
+    return {
+        content: [{
+            type: "text",
+            text: `${context}:\n\n${lines.join("\n")}\n\n${actionHint}`,
+        }],
+    };
+}
+
+// resolve a list note by id or fuzzy query on title/body
+function resolveNote(data, listName, { id, query }) {
+    const notes = data.notes || [];
+
+    if (id) {
+        const note = notes.find(n => n.id === id);
+        if (!note) throw new Error(`Note "${id}" not found in list "${listName}"`);
+        return { note };
+    }
+
+    if (query) {
+        const words = query.toLowerCase().split(/\s+/);
+        const matches = notes.filter(n => {
+            const hay = `${n.title} ${n.body || ""}`.toLowerCase();
+            return words.every(w => hay.includes(w));
+        });
+        if (matches.length === 0) return { noMatch: `No notes matching "${query}" on "${listName}".` };
+        if (matches.length === 1) return { note: matches[0] };
+        return { matches };
+    }
+
+    return { noMatch: "Provide an id or query to identify the note." };
+}
+
 // resolve a todo by id, query, or fallback filter — returns { todo, ambiguous? response }
 function resolveTodo(data, listName, { id, query, fallbackFilter }) {
     const todos = data.todos || [];
@@ -155,6 +193,14 @@ Behavior:
 - "make a todo from this file" / "take X.md and make a todo" → add_todo with text summarizing the file, and description containing the full file path as a markdown link: [filename](absolute/path/to/file.md). If the file has a title (h1), use that as the todo text. Otherwise use a short summary.
 - "add that as a note to X todo" → add_note with the file path or content as the note
 
+List notes: each list also has standalone scratch notes (title + body), parallel to the todo items — NOT attached to any todo. add_note = note ON a todo item; the note tools below manage list-level notes.
+- "show notes" / "what notes are on X list" → list_notes (list_todos also shows note titles)
+- "read the X note" / "open that note" → get_note with query
+- "save this as a note" / "new note: ..." → create_note with title + body
+- "add this to the X note" → update_note with mode="append"
+- "rewrite the X note" / "rename the note" → update_note (mode="replace" default)
+- "delete the X note" → delete_note with query
+
 The list parameter is optional on all tools — omit it to use the active list. Only pass list when the user names a specific list.
 
 All tools that act on a single todo support fuzzy text matching via the 'query' parameter — the user does not need to know the exact todo text or ID.`,
@@ -196,10 +242,16 @@ server.tool(
             return line;
         });
 
+        const notes = data.notes || [];
+        let text = `List: ${name} (${todos.length} items)\n\n${lines.join("\n") || "(empty)"}`;
+        if (notes.length) {
+            text += `\n\nNotes (${notes.length}):\n${notes.map(n => `- ${formatNoteLine(n)}`).join("\n")}`;
+        }
+
         return {
             content: [{
                 type: "text",
-                text: `List: ${name} (${todos.length} items)\n\n${lines.join("\n") || "(empty)"}`,
+                text,
             }],
         };
     }
@@ -538,6 +590,167 @@ server.tool(
             content: [{
                 type: "text",
                 text: `Cleared ${done.length} completed items from "${name}".`,
+            }],
+        };
+    }
+);
+
+// --- LIST NOTES (list-scoped scratch notes, parallel to todos — not todo descriptions) ---
+
+server.tool(
+    "list_notes",
+    "List the list-scoped scratch notes on a do-it list (top-level notes array, separate from todo item descriptions). Returns titles + ids; use get_note for a full body.",
+    {
+        list: z.string().optional().describe("List name (default: active list)"),
+    },
+    async ({ list }) => {
+        const { name, data } = loadList(list);
+        const notes = data.notes || [];
+        const lines = notes.map(n => `- ${formatNoteLine(n)}`);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Notes on "${name}" (${notes.length}):\n\n${lines.join("\n") || "(none)"}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "get_note",
+    "Read the full body of one list note. Find by id or fuzzy query on title/body.",
+    {
+        id: z.string().optional().describe("Note ID."),
+        query: z.string().optional().describe("Fuzzy text match on title/body (all words must appear)."),
+        list: z.string().optional().describe("List name (default: active list)"),
+    },
+    async ({ id, query, list }) => {
+        const { name, data } = loadList(list);
+        const result = resolveNote(data, name, { id, query });
+
+        if (result.noMatch) {
+            return { content: [{ type: "text", text: result.noMatch }] };
+        }
+        if (result.matches) {
+            return presentNoteChoices(result.matches, `Multiple notes match on "${name}"`, "Ask the user which note, then call get_note with the chosen ID.");
+        }
+
+        const n = result.note;
+        return {
+            content: [{
+                type: "text",
+                text: `# ${n.title}  [id:${n.id}]\n\n${n.body || "(empty body)"}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "create_note",
+    "Create a new list-scoped scratch note on a do-it list (standalone, not attached to any todo — to note on a todo item use add_note).",
+    {
+        title: z.string().describe("Note title (single line, shown in list rows)"),
+        body: z.string().optional().describe("Note body (may contain newlines)"),
+        list: z.string().optional().describe("List name (default: active list)"),
+    },
+    async ({ title, body, list }) => {
+        const { name, filepath, data } = loadList(list);
+        const now = Math.floor(Date.now() / 1000);
+        const note = {
+            id: generateId(),
+            title,
+            body: body || "",
+            created_at: now,
+            updated_at: now,
+        };
+        data.notes = data.notes || [];
+        data.notes.push(note);
+        saveList(filepath, data);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Created note on "${name}": ${formatNoteLine(note)}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "update_note",
+    "Update a list note's title and/or body. Find by id or fuzzy query. Body mode: 'replace' (default) overwrites, 'append' adds to existing body.",
+    {
+        id: z.string().optional().describe("Note ID."),
+        query: z.string().optional().describe("Fuzzy text match on title/body (all words must appear)."),
+        list: z.string().optional().describe("List name (default: active list)"),
+        title: z.string().optional().describe("New title"),
+        body: z.string().optional().describe("New/additional body text"),
+        mode: z.enum(["replace", "append"]).optional().describe("'replace' (default) overwrites body, 'append' adds to it"),
+    },
+    async ({ id, query, list, title, body, mode = "replace" }) => {
+        const { name, filepath, data } = loadList(list);
+        const result = resolveNote(data, name, { id, query });
+
+        if (result.noMatch) {
+            return { content: [{ type: "text", text: result.noMatch }] };
+        }
+        if (result.matches) {
+            return presentNoteChoices(result.matches, `Multiple notes match on "${name}"`, "Ask the user which note to update, then call update_note with the chosen ID.");
+        }
+
+        const note = result.note;
+        if (title !== undefined) note.title = title;
+        if (body !== undefined) {
+            if (mode === "append" && note.body) {
+                note.body = note.body.trimEnd() + "\n\n" + body;
+            } else {
+                note.body = body;
+            }
+        }
+        note.updated_at = Math.floor(Date.now() / 1000);
+        saveList(filepath, data);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Updated note on "${name}": ${formatNoteLine(note)}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "delete_note",
+    "Delete a list note. Find by id or fuzzy query. Moves to _metadata.deleted_notes (last 10 kept).",
+    {
+        id: z.string().optional().describe("Note ID."),
+        query: z.string().optional().describe("Fuzzy text match on title/body (all words must appear)."),
+        list: z.string().optional().describe("List name (default: active list)"),
+    },
+    async ({ id, query, list }) => {
+        const { name, filepath, data } = loadList(list);
+        const result = resolveNote(data, name, { id, query });
+
+        if (result.noMatch) {
+            return { content: [{ type: "text", text: result.noMatch }] };
+        }
+        if (result.matches) {
+            return presentNoteChoices(result.matches, `Multiple notes match on "${name}"`, "Ask the user which note to delete, then call delete_note with the chosen ID.");
+        }
+
+        const idx = data.notes.findIndex(n => n.id === result.note.id);
+        const [removed] = data.notes.splice(idx, 1);
+        data._metadata = data._metadata || {};
+        data._metadata.deleted_notes = data._metadata.deleted_notes || [];
+        data._metadata.deleted_notes.unshift(removed);
+        data._metadata.deleted_notes = data._metadata.deleted_notes.slice(0, 10);
+        saveList(filepath, data);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Deleted note from "${name}": ${removed.title}`,
             }],
         };
     }
