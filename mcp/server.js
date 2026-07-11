@@ -60,20 +60,19 @@ function generateId() {
     return `${ts}_${rand}`;
 }
 
-// Drop the machine-managed "last updated" footer so re-saving refreshes the
-// stamp instead of stacking footers.
+// Drop the machine-managed footer so re-saving refreshes the stamp instead of
+// stacking. Matches either verb so older "last updated" stamps are stripped too.
 function stripFooter(desc) {
-    return (desc || "").replace(/\n*----------\nlast updated:[\s\S]*$/, "");
+    return (desc || "").replace(/\n*----------\nlast (updated|modified):[\s\S]*$/, "");
 }
 
-// Re-append the footer with current local time. Empty body stays empty.
+// Append a fresh footer. Body may be empty (footer-only) — every todo carries a stamp.
 function stampDescription(desc) {
     const body = stripFooter(desc).replace(/\s+$/, "");
-    if (body === "") return "";
     const d = new Date();
     const p = n => String(n).padStart(2, "0");
     const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}: ${p(d.getHours())}:${p(d.getMinutes())}`;
-    return `${body}\n\n\n----------\nlast updated: ${stamp}`;
+    return `${body}\n\n\n----------\nlast modified: ${stamp}`;
 }
 
 function getMaxOrder(todos) {
@@ -331,7 +330,7 @@ server.tool(
             order_index: getMaxOrder(data.todos || []) + 1,
             created_at: Math.floor(Date.now() / 1000),
         };
-        if (description) newTodo.description = stampDescription(description);
+        newTodo.description = stampDescription(description || "");
         if (priority) newTodo.priorities = priority;
 
         data.todos = data.todos || [];

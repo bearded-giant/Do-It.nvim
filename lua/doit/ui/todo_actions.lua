@@ -4,20 +4,7 @@ local config = require("doit.config")
 local calendar = require("doit.calendar")
 local multiline_input = require("doit.core.ui.multiline_input")
 
--- Drop the machine-managed "last updated" footer so editing shows body only
--- and re-saving refreshes the stamp instead of stacking footers.
-local function strip_footer(desc)
-    return (desc or ""):gsub("\n*%-%-%-%-%-%-%-%-%-%-\nlast updated:.*$", "")
-end
-
--- Re-append the footer with current local time. Empty body stays empty.
-local function stamp_description(desc)
-    desc = strip_footer(desc):gsub("%s+$", "")
-    if desc == "" then
-        return ""
-    end
-    return desc .. "\n\n\n----------\nlast updated: " .. os.date("%Y-%m-%d: %H:%M")
-end
+local footer = require("doit.core.utils.footer")
 
 -- Lazy loading of todo module and state
 local todo_module = nil
@@ -953,10 +940,10 @@ function M.edit_description(win_id, on_render)
 
 	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
 	if todo_index then
-		local current_desc = strip_footer(state.todos[todo_index].description or "")
+		local current_desc = footer.strip(state.todos[todo_index].description or "")
 		vim.ui.input({ prompt = "Description: ", default = current_desc }, function(input)
 			if input == nil then return end
-			state.todos[todo_index].description = stamp_description(input)
+			state.todos[todo_index].description = footer.stamp(input)
 			state.save_to_disk()
 			maybe_render(on_render)
 		end)

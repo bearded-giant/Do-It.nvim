@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-footer.sh"
 
 DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
@@ -286,20 +287,6 @@ input_text() {
         echo "$result"
         return 0
     fi
-}
-
-# Drop the machine-managed "last updated" footer so editing shows body only
-# and re-saving refreshes the stamp instead of stacking footers.
-strip_footer() {
-    awk 'BEGIN{RS="\0"} {sub(/\n*----------\nlast updated:[^\n]*\n*$/,""); printf "%s",$0}' <<< "$1"
-}
-
-# Re-append the footer with current local time. Empty body stays empty (no stamp).
-stamp_description() {
-    local desc
-    desc=$(strip_footer "$1")
-    [[ -z "$desc" ]] && return
-    printf '%s\n\n\n----------\nlast updated: %s' "$desc" "$(date '+%Y-%m-%d: %H:%M')"
 }
 
 # Function to update todo status
@@ -976,6 +963,7 @@ while true; do
                    --arg text "$TODO_TEXT" \
                    --arg order "$NEW_ORDER" \
                    --arg priority "$SELECTED_PRIORITY" \
+                   --arg desc "$(stamp_description "")" \
                    '.todos += [{
                       id: $id,
                       text: $text,
@@ -983,6 +971,7 @@ while true; do
                       in_progress: false,
                       order_index: ($order | tonumber),
                       created_at: (now | floor),
+                      description: $desc,
                       priorities: $priority
                    }] |
                    ._metadata.updated_at = (now | floor)' \
@@ -991,13 +980,15 @@ while true; do
                 jq --arg id "$TODO_ID" \
                    --arg text "$TODO_TEXT" \
                    --arg order "$NEW_ORDER" \
+                   --arg desc "$(stamp_description "")" \
                    '.todos += [{
                       id: $id,
                       text: $text,
                       done: false,
                       in_progress: false,
                       order_index: ($order | tonumber),
-                      created_at: (now | floor)
+                      created_at: (now | floor),
+                      description: $desc
                    }] |
                    ._metadata.updated_at = (now | floor)' \
                    "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
@@ -1041,6 +1032,7 @@ while true; do
                        --arg text "$TODO_TEXT" \
                        --arg order "$NEW_ORDER" \
                        --arg priority "$SELECTED_PRIORITY" \
+                       --arg desc "$(stamp_description "")" \
                        '.todos += [{
                           id: $id,
                           text: $text,
@@ -1048,6 +1040,7 @@ while true; do
                           in_progress: false,
                           order_index: ($order | tonumber),
                           created_at: (now | floor),
+                          description: $desc,
                           priorities: $priority
                        }] |
                        ._metadata.updated_at = (now | floor)' \
@@ -1056,13 +1049,15 @@ while true; do
                     jq --arg id "$TODO_ID" \
                        --arg text "$TODO_TEXT" \
                        --arg order "$NEW_ORDER" \
+                       --arg desc "$(stamp_description "")" \
                        '.todos += [{
                           id: $id,
                           text: $text,
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
-                          created_at: (now | floor)
+                          created_at: (now | floor),
+                          description: $desc
                        }] |
                        ._metadata.updated_at = (now | floor)' \
                        "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"

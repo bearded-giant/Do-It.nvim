@@ -12,8 +12,9 @@ function M.setup(state)
             done = false,
             timestamp = os.time(),
             order_index = #state.todos + 1,
+            description = require("doit.core.utils.footer").stamp(""),
         }
-        
+
         if priorities and #priorities > 0 then
             new_todo.priorities = priorities
         end
