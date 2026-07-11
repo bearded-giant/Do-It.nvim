@@ -60,6 +60,22 @@ function generateId() {
     return `${ts}_${rand}`;
 }
 
+// Drop the machine-managed "last updated" footer so re-saving refreshes the
+// stamp instead of stacking footers.
+function stripFooter(desc) {
+    return (desc || "").replace(/\n*----------\nlast updated:[\s\S]*$/, "");
+}
+
+// Re-append the footer with current local time. Empty body stays empty.
+function stampDescription(desc) {
+    const body = stripFooter(desc).replace(/\s+$/, "");
+    if (body === "") return "";
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}: ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return `${body}\n\n\n----------\nlast updated: ${stamp}`;
+}
+
 function getMaxOrder(todos) {
     if (!todos.length) return 0;
     return Math.max(...todos.map(t => t.order_index || 0));
@@ -315,7 +331,7 @@ server.tool(
             order_index: getMaxOrder(data.todos || []) + 1,
             created_at: Math.floor(Date.now() / 1000),
         };
-        if (description) newTodo.description = description;
+        if (description) newTodo.description = stampDescription(description);
         if (priority) newTodo.priorities = priority;
 
         data.todos = data.todos || [];
@@ -353,7 +369,7 @@ server.tool(
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
 
         if (text !== undefined) todo.text = text;
-        if (description !== undefined) todo.description = description;
+        if (description !== undefined) todo.description = stampDescription(description);
         if (priority !== undefined) {
             if (priority === "none") delete todo.priorities;
             else todo.priorities = priority;
@@ -513,9 +529,9 @@ server.tool(
 
         const todo = result.todo;
         if (mode === "replace" || !todo.description) {
-            todo.description = note;
+            todo.description = stampDescription(note);
         } else {
-            todo.description = todo.description.trimEnd() + "\n\n" + note;
+            todo.description = stampDescription(stripFooter(todo.description).trimEnd() + "\n\n" + note);
         }
         saveList(filepath, data);
 

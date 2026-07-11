@@ -288,6 +288,20 @@ input_text() {
     fi
 }
 
+# Drop the machine-managed "last updated" footer so editing shows body only
+# and re-saving refreshes the stamp instead of stacking footers.
+strip_footer() {
+    awk 'BEGIN{RS="\0"} {sub(/\n*----------\nlast updated:[^\n]*\n*$/,""); printf "%s",$0}' <<< "$1"
+}
+
+# Re-append the footer with current local time. Empty body stays empty (no stamp).
+stamp_description() {
+    local desc
+    desc=$(strip_footer "$1")
+    [[ -z "$desc" ]] && return
+    printf '%s\n\n\n----------\nlast updated: %s' "$desc" "$(date '+%Y-%m-%d: %H:%M')"
+}
+
 # Function to update todo status
 update_todo() {
     local todo_id="$1"
@@ -527,7 +541,7 @@ while true; do
                 VIEW_TMP=$(mktemp /tmp/todo_view.XXXXXX)
                 TODO_OBJ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id)' "$TODO_LIST_PATH")
                 VIEW_TEXT=$(echo "$TODO_OBJ" | jq -r '.text // ""')
-                VIEW_DESC=$(echo "$TODO_OBJ" | jq -r '.description // ""')
+                VIEW_DESC=$(strip_footer "$(echo "$TODO_OBJ" | jq -r '.description // ""')")
                 VIEW_PRIORITY=$(echo "$TODO_OBJ" | jq -r '.priorities // "default"')
                 VIEW_STATUS="pending"
                 echo "$TODO_OBJ" | jq -e '.in_progress == true' &>/dev/null && VIEW_STATUS="in-progress"
@@ -547,7 +561,7 @@ while true; do
                     -c "normal! ${HEADER_LINES}jG" \
                     -c 'nnoremap <buffer> q :wq<CR>'
 
-                NEW_DESC=$(tail -n +$((HEADER_LINES + 1)) "$VIEW_TMP")
+                NEW_DESC=$(stamp_description "$(tail -n +$((HEADER_LINES + 1)) "$VIEW_TMP")")
                 rm -f "$VIEW_TMP"
                 jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
                     .todos |= map(if .id == $id then .description = $desc else . end) |
@@ -582,7 +596,7 @@ while true; do
         "N")
             # add/edit description on a todo
             if [[ -n "$TODO_ID" ]]; then
-                CURRENT_DESC=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH")
+                CURRENT_DESC=$(strip_footer "$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH")")
                 if [[ "$LONG_DESC" == true ]]; then
                     DESC_TMP=$(mktemp /tmp/todo_desc.XXXXXX)
                     [[ -n "$CURRENT_DESC" ]] && printf '%s' "$CURRENT_DESC" > "$DESC_TMP"
@@ -593,6 +607,7 @@ while true; do
                     NEW_DESC=$(input_text "$CURRENT_DESC" "Description (enter to save, esc to cancel)")
                     [[ $? -eq 130 ]] && continue
                 fi
+                NEW_DESC=$(stamp_description "$NEW_DESC")
                 jq --arg id "$TODO_ID" --arg desc "$NEW_DESC" '
                     .todos |= map(if .id == $id then .description = $desc else . end) |
                     ._metadata.updated_at = (now | floor)
