@@ -5,8 +5,12 @@
 
 # Drop the footer so editing shows body only and re-saving refreshes rather
 # than stacks. Matches either verb so older "last updated" stamps are stripped.
+# Pure bash: macOS awk reads RS="\0" as paragraph mode and eats every blank line.
 strip_footer() {
-    awk 'BEGIN{RS="\0"} {sub(/\n*----------\nlast (updated|modified):[^\n]*\n*$/,""); printf "%s",$0}' <<< "$1"
+    local s="$1" nl=$'\n'
+    local re="${nl}*----------${nl}last (updated|modified):[^${nl}]*${nl}*\$"
+    [[ "$s" =~ $re ]] && s="${s%"${BASH_REMATCH[0]}"}"
+    printf '%s' "$s"
 }
 
 # Append a fresh footer. Body may be empty (footer-only) — every todo carries a stamp.

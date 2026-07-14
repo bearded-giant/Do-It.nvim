@@ -55,6 +55,15 @@ help_row() {
     printf "  %-42s%s\n" "$1" "$2"
 }
 
+# pipe stdin to the system clipboard; returns non-zero if no clipboard tool
+to_clip() {
+    if command -v pbcopy &>/dev/null; then pbcopy
+    elif command -v xclip &>/dev/null; then xclip -selection clipboard
+    elif command -v xsel &>/dev/null; then xsel --clipboard
+    else return 1
+    fi
+}
+
 UNDO_TYPE=""
 UNDO_ID=""
 UNDO_PREV_DONE=""
@@ -476,7 +485,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,Y,p,B,O,q,?,/,g \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -805,7 +814,7 @@ while true; do
             fi
             ;;
         "y")
-            # copy todo text (or note body) to system clipboard
+            # copy todo text (or note title/body) to system clipboard
             COPY_TEXT=""
             if [[ -n "$NOTE_ID" ]]; then
                 COPY_TEXT=$(jq -r --arg id "$NOTE_ID" '(.notes // [])[] | select(.id == $id) | if (.body // "") != "" then .body else (.title // "") end' "$TODO_LIST_PATH" 2>/dev/null)
@@ -813,35 +822,40 @@ while true; do
                 COPY_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH" 2>/dev/null)
             fi
             if [[ -n "$COPY_TEXT" ]]; then
-                if command -v pbcopy &>/dev/null; then
-                    printf '%s' "$COPY_TEXT" | pbcopy
-                elif command -v xclip &>/dev/null; then
-                    printf '%s' "$COPY_TEXT" | xclip -selection clipboard
-                elif command -v xsel &>/dev/null; then
-                    printf '%s' "$COPY_TEXT" | xsel --clipboard
+                if printf '%s' "$COPY_TEXT" | to_clip; then
+                    echo "Copied to clipboard"
                 else
                     echo "No clipboard tool found (pbcopy/xclip/xsel)"
-                    sleep 1
-                    continue
                 fi
-                echo "Copied to clipboard"
                 sleep 0.5
             fi
             ;;
+        "ctrl-y")
+            # copy the note text (item description / note body) shown in the preview pane
+            COPY_TEXT=""
+            if [[ -n "$NOTE_ID" ]]; then
+                COPY_TEXT=$(jq -r --arg id "$NOTE_ID" '(.notes // [])[] | select(.id == $id) | .body // ""' "$TODO_LIST_PATH" 2>/dev/null)
+            elif [[ -n "$TODO_ID" ]]; then
+                COPY_TEXT=$(strip_footer "$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .description // ""' "$TODO_LIST_PATH" 2>/dev/null)")
+            fi
+            if [[ -n "$COPY_TEXT" ]]; then
+                if printf '%s' "$COPY_TEXT" | to_clip; then
+                    echo "Copied note text to clipboard"
+                else
+                    echo "No clipboard tool found (pbcopy/xclip/xsel)"
+                fi
+            else
+                echo "No note text to copy"
+            fi
+            sleep 0.5
+            ;;
         "Y")
             # copy the active list name to system clipboard
-            if command -v pbcopy &>/dev/null; then
-                printf '%s' "$ACTIVE_LIST_NAME" | pbcopy
-            elif command -v xclip &>/dev/null; then
-                printf '%s' "$ACTIVE_LIST_NAME" | xclip -selection clipboard
-            elif command -v xsel &>/dev/null; then
-                printf '%s' "$ACTIVE_LIST_NAME" | xsel --clipboard
+            if printf '%s' "$ACTIVE_LIST_NAME" | to_clip; then
+                echo "Copied list name: $ACTIVE_LIST_NAME"
             else
                 echo "No clipboard tool found (pbcopy/xclip/xsel)"
-                sleep 1
-                continue
             fi
-            echo "Copied list name: $ACTIVE_LIST_NAME"
             sleep 0.5
             ;;
         "O")
@@ -1149,7 +1163,8 @@ while true; do
             help_row "VIEW / MISC"                       "  /      Search / filter"
             help_row "  Enter    Open item / note (nvim)" ""
             help_row "  y        Copy text"              "OBSIDIAN"
-            help_row "  Y        Copy list name"         "  O      Send to daily note"
+            help_row "  C-y      Copy note text"         "  O      Send to daily note"
+            help_row "  Y        Copy list name"         ""
             help_row "  q        Back (Lists)"           ""
             help_row "  Esc      Quit"                   ""
             help_row "  ?        This help"              ""
