@@ -12,6 +12,15 @@ const SESSION_FILE = path.join(DATA_DIR, "session.json");
 
 const PRIORITY_LABELS = { critical: "!!!", urgent: "!!", important: "!" };
 
+// nudge callers to write human-readable notes — these render in the tmux/nvim
+// right pane, so dense single-block walls are unreadable. claude:-prefixed
+// todos are LLM burn-down items (machine-read) and don't need this.
+const NOTE_FORMAT_HINT =
+    " Format for a human reader: each labeled section on its own line, a blank" +
+    " line between sections, commands/paths/code on their own lines (fence" +
+    " multi-line code with ```). Don't cram it into one dense paragraph." +
+    " (Exception: todos whose text starts 'claude:' are machine-read — plain is fine.)";
+
 function readJSON(filepath) {
     return JSON.parse(fs.readFileSync(filepath, "utf-8"));
 }
@@ -315,7 +324,7 @@ server.tool(
     {
         text: z.string().describe("Todo text"),
         list: z.string().optional().describe("List name (default: active list)"),
-        description: z.string().optional().describe("Multi-line notes/description"),
+        description: z.string().optional().describe("Multi-line notes/description." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Priority level"),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
     },
@@ -356,7 +365,7 @@ server.tool(
         id: z.string().describe("Todo ID"),
         list: z.string().optional().describe("List name (default: active list)"),
         text: z.string().optional().describe("New text"),
-        description: z.string().optional().describe("New description/notes"),
+        description: z.string().optional().describe("New description/notes." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important", "none"]).optional().describe("Set priority level. Use 'none' to remove priority."),
         done: z.boolean().optional().describe("Set done status"),
         in_progress: z.boolean().optional().describe("Set in_progress status"),
@@ -511,7 +520,7 @@ server.tool(
     {
         id: z.string().optional().describe("Todo ID."),
         query: z.string().optional().describe("Fuzzy text match (all words must appear)."),
-        note: z.string().describe("Note text to add to the todo item."),
+        note: z.string().describe("Note text to add to the todo item." + NOTE_FORMAT_HINT),
         list: z.string().optional().describe("List name (default: active list)"),
         mode: z.enum(["append", "replace"]).optional().describe("'append' (default) adds to existing notes, 'replace' overwrites them."),
     },
