@@ -29,8 +29,17 @@ COLOR_RESET=$'\e[0m'
 SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
 SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
+# item text is truncated to the preview pane, not a fixed column count, so wide
+# terminals show the whole line (fzf exports FZF_PREVIEW_COLUMNS to this command)
+preview_text_width() {
+    local w=$(( ${FZF_PREVIEW_COLUMNS:-0} - 2 ))
+    (( w < 20 )) && w=200
+    echo "$w"
+}
+
 preview_list() {
     local list_file="$LISTS_DIR/${1}.json"
+    local text_w=$(preview_text_width)
     if [[ -f "$list_file" ]]; then
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$list_file" 2>/dev/null || echo 0)
@@ -39,21 +48,21 @@ preview_list() {
         echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
         echo ""
         # show in-progress first, then pending
-        jq -r '
+        jq -r --argjson w "$text_w" '
             [.todos[] | select(.done == false)] |
             sort_by((if .in_progress then 0 else 1 end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
             .[0:5] | .[] |
-            (if .in_progress then "▶ " else "• " end) + (.text | split("\n")[0][0:50])
+            (if .in_progress then "▶ " else "• " end) + (.text | split("\n")[0][0:$w])
         ' "$list_file" 2>/dev/null | while read -r line; do
             echo "$line"
         done
         # show completed items if enabled
         if [[ "$SHOW_COMPLETED" == "true" && "$done_count" -gt 0 ]]; then
-            jq -r '
+            jq -r --argjson w "$text_w" '
                 [.todos[] | select(.done == true)] |
                 sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
                 .[0:3] | .[] |
-                "✓ " + (.text | split("\n")[0][0:50])
+                "✓ " + (.text | split("\n")[0][0:$w])
             ' "$list_file" 2>/dev/null | while read -r line; do
                 printf '%s%s%s\n' "$COLOR_DIM" "$line" "$COLOR_RESET"
             done

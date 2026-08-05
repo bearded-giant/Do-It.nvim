@@ -23,6 +23,9 @@ CURRENT_LIST=$(get_active_list_name)
 
 preview_list() {
     local list_file="$LISTS_DIR/${1}.json"
+    # truncate to the preview pane, not a fixed column count (fzf exports this)
+    local text_w=$(( ${FZF_PREVIEW_COLUMNS:-0} - 4 ))
+    (( text_w < 20 )) && text_w=200
     if [[ -f "$list_file" ]]; then
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false)] | length' "$list_file" 2>/dev/null || echo 0)
@@ -30,7 +33,7 @@ preview_list() {
         echo "Total: $total | Pending: $pending | In Progress: $in_progress"
         echo ""
         echo "Recent items:"
-        jq -r '.todos | sort_by(.order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:50])"' "$list_file" 2>/dev/null
+        jq -r --argjson w "$text_w" '.todos | sort_by(.order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:$w])"' "$list_file" 2>/dev/null
     fi
 }
 export -f preview_list
