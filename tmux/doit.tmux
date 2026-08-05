@@ -65,6 +65,9 @@ tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-lis
 # set -g @doit-interactive-popup-w "80%"
 # set -g @doit-interactive-popup-h "80%"
 
+# Markdown export directory for the E key (default: popup's working dir)
+# set -g @doit-export-dir "~/notes/exports"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")

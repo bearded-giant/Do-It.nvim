@@ -137,6 +137,15 @@ Lists~
     L                  List manager (create/rename/delete)
     m                  Move todo to another list
 
+Export~
+    E                  Export pending todos to markdown
+
+    Writes the current list's non-completed todos to a markdown file: one
+    `##` header per priority (Critical, Urgent, Important, Default), items
+    in list order, each item's note indented under it. The path prompt is
+    prefilled with `{@doit-export-dir}/{list}.md` (default dir: the popup's
+    working directory).
+
 Other~
     r                  Refresh list
     ?                  Show help
@@ -229,6 +238,13 @@ or Alt+Shift+I). Accepts tmux size syntax: absolute cells ("120") or
 terminal-relative percentages ("80%"). Percentages scale with the
 terminal, so they keep a consistent feel across laptop and ultrawide
 displays.
+
+Markdown export directory (default: the popup's working directory): >tmux
+    set -g @doit-export-dir "~/notes/exports"
+<
+Sets the directory prefilled in the `E` (export to markdown) prompt in the
+interactive manager. The nvim UI has the same key; its directory comes from
+the `export_markdown_path` module option.
 
 Environment Variables:~
 

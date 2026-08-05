@@ -485,7 +485,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -774,6 +774,25 @@ while true; do
             ;;
         "B")
             "$SCRIPT_DIR/todo-backup.sh"
+            sleep 1
+            ;;
+        "E")
+            # export pending todos to markdown
+            EXPORT_DIR=$(tmux show-option -gqv "@doit-export-dir")
+            EXPORT_DIR="${EXPORT_DIR:-$PWD}"
+            EXPORT_DIR="${EXPORT_DIR/#\~/$HOME}"
+            echo ""
+            EXPORT_PATH=$(input_text "$EXPORT_DIR/${ACTIVE_LIST_NAME}.md" "Export markdown to (enter=save, esc=cancel)")
+            if [[ $? -eq 130 || -z "$EXPORT_PATH" ]]; then
+                echo "Export cancelled"
+                sleep 0.3
+                continue
+            fi
+            if RESULT=$("$SCRIPT_DIR/todo-export.sh" "$EXPORT_PATH" "$TODO_LIST_PATH"); then
+                echo "Exported to $RESULT"
+            else
+                echo "Export failed"
+            fi
             sleep 1
             ;;
         "m")
@@ -1161,7 +1180,7 @@ while true; do
             help_row "  g        List notes (modal)"      "  l      Switch list"
             help_row "  on note: Enter/e open · d del · y copy" "  L    List manager"
             help_row "VIEW / MISC"                       "  /      Search / filter"
-            help_row "  Enter    Open item / note (nvim)" ""
+            help_row "  Enter    Open item / note (nvim)" "  E      Export pending to markdown"
             help_row "  y        Copy text"              "OBSIDIAN"
             help_row "  C-y      Copy note text"         "  O      Send to daily note"
             help_row "  Y        Copy list name"         ""

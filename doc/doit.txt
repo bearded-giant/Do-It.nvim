@@ -128,6 +128,7 @@ Configuration Structure Overview:
                     save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
                     import_export_path = vim.fn.expand("~/todos.json"),
                 },
+                export_markdown_path = nil,  -- markdown export dir (default: cwd)
                 keymaps = {
                     toggle_window = "<leader>td",
                     new_todo = "i",
@@ -285,8 +286,9 @@ Main Window~
     p           Edit priorities
     u           Undo deletion
     /           Search to-dos
-    I           Import to-dos
-    E           Export to-dos
+    I           Import to-dos (JSON)
+    E           Export pending to-dos to markdown
+    <leader>E   Export to-dos (JSON)
     <leader>D   Remove duplicates
     <Space>     Toggle priority
     <leader>p   Open scratchpad
@@ -464,6 +466,24 @@ Import and export todos using JSON format: >vim
     :Doit export ~/todos.json
     :Doit import ~/todos.json
 <
+Markdown export~
+`E` in the main window writes the current list's non-completed to-dos to a
+markdown file. Each priority becomes a `##` header (Critical, Urgent,
+Important, Default), items keep their in-list order, and each item's note
+(description) is included indented under it. Completed items are skipped.
+
+The prompt is prefilled with `{export_markdown_path}/{list}.md`, defaulting to
+the current working directory when `export_markdown_path` is unset: >lua
+    require("doit").setup({
+        modules = {
+            todos = {
+                export_markdown_path = "~/notes/exports",
+            }
+        }
+    })
+<
+The tmux UI has the same `E` key; its directory comes from the
+`@doit-export-dir` option (see |doit-tmux-configuration|).
 
 ==============================================================================
 3. Colors                                                      *doit-colors*

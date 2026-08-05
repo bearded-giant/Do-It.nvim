@@ -17,7 +17,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Due Dates** - Set deadlines with calendar integration
 - **Priorities** - Assign and sort by importance
 - **Time Estimation** - Track estimated completion time
-- **Import/Export** - Backup or share your tasks
+- **Import/Export** - Backup or share your tasks, or export pending items to markdown with `E`
 - **Lualine Integration** - Show active tasks in your statusline
 - **Tmux Add-on** - Optional tmux integration with shared data (see below)
 
@@ -346,6 +346,7 @@ Then install with `prefix + I`.
 | `e`     | Edit todo text        |
 | `d`     | Delete (can undo)     |
 | `u`     | Undo last delete      |
+| `E`     | Export to markdown    |
 | `?`     | Show help             |
 | `q`     | Quit                  |
 
@@ -367,6 +368,9 @@ set -g @doit-use-editor "true"
 # Accepts absolute cells ("120") or terminal-relative percentages ("80%")
 set -g @doit-interactive-popup-w "80%"
 set -g @doit-interactive-popup-h "80%"
+
+# Where `E` writes markdown exports (default: the popup's working directory)
+set -g @doit-export-dir "~/notes/exports"
 ```
 
 ### Status Bar Integration

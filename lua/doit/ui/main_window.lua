@@ -216,6 +216,39 @@ local function prompt_import(on_render)
 	prompt_io("import", on_render)
 end
 
+local function markdown_export_dir()
+	local dir
+	if config.options and config.options.modules and config.options.modules.todos then
+		dir = config.options.modules.todos.export_markdown_path
+	end
+	dir = dir or (config.options and config.options.export_markdown_path)
+	return vim.fn.expand(dir or vim.fn.getcwd())
+end
+
+local function prompt_export_markdown()
+	state = ensure_state_loaded()
+	local list_name = (state.todo_lists and state.todo_lists.active) or "todos"
+	local default_path = markdown_export_dir() .. "/" .. list_name .. ".md"
+
+	vim.ui.input({
+		prompt = "Export pending todos to markdown: ",
+		default = default_path,
+		completion = "file",
+	}, function(file_path)
+		if not file_path or file_path == "" then
+			vim.notify("Export cancelled", vim.log.levels.INFO)
+			return
+		end
+
+		file_path = vim.fn.expand(file_path)
+		vim.fn.mkdir(vim.fn.fnamemodify(file_path, ":h"), "p")
+
+		local export_markdown = require("doit.modules.todos.state.export_markdown")
+		local success, message = export_markdown.write(file_path, state.todos, list_name)
+		vim.notify(message, success and vim.log.levels.INFO or vim.log.levels.ERROR)
+	end)
+end
+
 -- normalize priority field (may be string or legacy table) to a string or nil
 local function todo_priority_name(todo)
 	local p = todo.priorities
@@ -1052,7 +1085,8 @@ local function create_window()
 			open_todo_scratchpad = "<leader>p",
 			toggle_list_manager = "L",
 			import_todos = "I",
-			export_todos = "E",
+			export_todos = "<leader>E",
+			export_markdown = "E",
 			backup_todos = "B",
 			search_todos = "/",
 			move_todo_up = "k",
@@ -1270,14 +1304,8 @@ local function create_window()
 		prompt_export()
 	end)
 
-	setup_keymap("import_todos", function()
-		prompt_io("import", function()
-			M.render_todos()
-		end)
-	end)
-
-	setup_keymap("export_todos", function()
-		prompt_io("export")
+	setup_keymap("export_markdown", function()
+		prompt_export_markdown()
 	end)
 
 	setup_keymap("backup_todos", function()
