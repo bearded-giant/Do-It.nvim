@@ -29,17 +29,13 @@ COLOR_RESET=$'\e[0m'
 SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
 SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
-# item text is truncated to the preview pane, not a fixed column count, so wide
-# terminals show the whole line (fzf exports FZF_PREVIEW_COLUMNS to this command)
-preview_text_width() {
-    local w=$(( ${FZF_PREVIEW_COLUMNS:-0} - 2 ))
-    (( w < 20 )) && w=200
-    echo "$w"
-}
-
 preview_list() {
     local list_file="$LISTS_DIR/${1}.json"
-    local text_w=$(preview_text_width)
+    # truncate to the preview pane, not a fixed column count, so wide terminals
+    # show the whole line. must stay inline: fzf runs this function in a fresh
+    # bash, where only exported functions exist (a helper here is not found).
+    local text_w=$(( ${FZF_PREVIEW_COLUMNS:-0} - 2 ))
+    (( text_w < 20 )) && text_w=200
     if [[ -f "$list_file" ]]; then
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$list_file" 2>/dev/null || echo 0)
