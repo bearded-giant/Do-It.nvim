@@ -481,6 +481,10 @@ while true; do
         [[ -n "$TARGET_LN" ]] && START_BIND=(--bind "start:pos($TARGET_LN)")
         CURSOR_TARGET=""
     fi
+    # drop anything left in the tty from a prior prompt so leftover bytes can't
+    # match --expect keys and fire an action the user never pressed
+    read -rsn 1000 -t 0.01 2>/dev/null
+
     SELECTION=$(printf '%s\n' "$LIST" | fzf --ansi --disabled \
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
@@ -1189,7 +1193,17 @@ while true; do
             help_row "  ?        This help"              ""
             printf "\n  %s\n" "$hr"
             printf "  Press any key to return...\n"
-            read -n 1 -s
+            # arrow/function keys arrive as ESC [ X: a bare 1-byte read leaves the
+            # tail bytes in the tty, and the next fzf reads them as real keypresses
+            # (a leaked "B" fired the backup action). Swallow the sequence instead.
+            while true; do
+                read -rsn1 HELP_KEY
+                if [[ "$HELP_KEY" == $'\e' ]]; then
+                    read -rsn2 -t 0.05 HELP_TAIL
+                    [[ -n "$HELP_TAIL" ]] && continue
+                fi
+                break
+            done
             ;;
     esac
 done
