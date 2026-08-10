@@ -497,7 +497,7 @@ while true; do
         --bind "[:transform:$SCRIPT_DIR/section-jump.sh down {n}" \
         --bind "]:transform:$SCRIPT_DIR/section-jump.sh up {n}" \
         --no-sort \
-        --height=97% \
+        --height=100% \
         --layout=reverse \
         --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
         --preview-window=right:50%)
@@ -807,7 +807,7 @@ while true; do
                     fzf --ansi \
                         --header="Move to list (from: $ACTIVE_LIST_NAME)" \
                         --prompt="Target > " \
-                        --height=40% \
+                        --height=100% \
                         --layout=reverse)
 
                 if [[ -n "$TARGET_LIST" ]]; then
@@ -1146,7 +1146,7 @@ while true; do
                 --header=" Type to filter, Enter to select, Esc to cancel" \
                 --prompt="/ " \
                 --no-sort \
-                --height=80% \
+                --height=100% \
                 --layout=reverse \
                 --preview='preview_todo {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
                 --preview-window=right:50%)

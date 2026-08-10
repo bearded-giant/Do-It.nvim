@@ -43,7 +43,7 @@ SELECTED=$(ls -1 "$LISTS_DIR"/*.json 2>/dev/null | xargs -n1 basename | sed 's/\
     fzf --ansi \
         --header="Switch Todo List (current: $CURRENT_LIST)" \
         --prompt="List > " \
-        --height=50% \
+        --height=100% \
         --layout=reverse \
         --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)

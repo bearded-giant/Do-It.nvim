@@ -36,7 +36,7 @@ M.defaults = {
     list_manager = {
         preview_enabled = true,
         width_ratio = 0.8,
-        height_ratio = 0.8,
+        height_ratio = 0.95,
         list_panel_ratio = 0.4,
     },
     quick_keys = true,

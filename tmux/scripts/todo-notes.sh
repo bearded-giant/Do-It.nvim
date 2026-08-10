@@ -103,7 +103,7 @@ while true; do
         --prompt="" \
         --expect=enter,n,e,d,y,q \
         --no-sort \
-        --height=97% \
+        --height=100% \
         --layout=reverse \
         --preview='preview_note {} | fold -s -w $FZF_PREVIEW_COLUMNS' \
         --preview-window=right:50%)

@@ -193,7 +193,7 @@ while true; do
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
-        --height=60% \
+        --height=100% \
         --layout=reverse \
         --expect=n,r,d,b,y,enter,q,/ \
         --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
@@ -227,7 +227,7 @@ while true; do
             SEARCH_RESULT=$(echo "$LIST_DISPLAY" | fzf --ansi \
                 --header=" Type to filter, Enter to switch, Esc to cancel" \
                 --prompt="/ " \
-                --height=60% \
+                --height=100% \
                 --layout=reverse \
                 --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
                 --preview-window=right:50%:wrap)

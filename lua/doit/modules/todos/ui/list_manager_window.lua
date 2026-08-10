@@ -42,7 +42,8 @@ function M.setup(parent_module)
         local list_panel_ratio = config.list_manager and config.list_manager.list_panel_ratio or 0.4
         
         local total_width = math.min(100, math.floor(ui.width * width_ratio))
-        local total_height = math.min(40, math.floor(ui.height * height_ratio))
+        -- cap by rows available, not a fixed 40, so tall terminals use the space
+        local total_height = math.max(10, math.min(ui.height - 4, math.floor(ui.height * height_ratio)))
         local list_width = preview_enabled and math.floor(total_width * list_panel_ratio) or total_width
         local preview_width = total_width - list_width - 3
         
