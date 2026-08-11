@@ -427,12 +427,22 @@ If you configured a custom storage path in your do-it.nvim setup (via `modules.t
 | Tool | Description |
 |------|-------------|
 | `list_todos` | List items from a list, filter by pending/done/in_progress |
-| `add_todo` | Create a new todo with optional notes |
-| `update_todo` | Edit text, description, or toggle status |
+| `add_todo` | Create a new todo with optional type, deps, and notes |
+| `update_todo` | Edit text, type, deps, description, or toggle status |
 | `delete_todo` | Remove an item (kept in deleted_todos for undo) |
 | `list_lists` | Show all lists with pending/total counts |
 | `switch_list` | Change the active list |
 | `search_todos` | Search across all lists by text |
+
+### Item Text Convention
+
+Items the MCP server creates get a scannable title instead of a bare sentence:
+
+```
+claude: [gate] 41. pre-store gate check (dep on #40)
+```
+
+You pass `type` (a short free-form tag like `gate`, `decision`, `comms`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list, so priority stays the bucket and the number tells you the order inside it. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. Composing is idempotent, so prefixes never stack.
 
 ### Environment Variables
 

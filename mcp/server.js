@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import { composeTodoText, nextRank } from "./todo-text.js";
 
 const DATA_DIR = process.env.DOIT_DATA_DIR || path.join(process.env.HOME, ".local/share/nvim/doit");
 const LISTS_DIR = path.join(DATA_DIR, "lists");
@@ -15,6 +16,15 @@ const PRIORITY_LABELS = { critical: "!!!", urgent: "!!", important: "!" };
 // nudge callers to write human-readable notes — these render in the tmux/nvim
 // right pane, so dense single-block walls are unreadable. claude:-prefixed
 // todos are LLM burn-down items (machine-read) and don't need this.
+const TYPE_HINT =
+    " Short lowercase tag for the kind of work, rendered as a scannable [tag]" +
+    " prefix — e.g. decision, gate, loader, comms, bug, spike, chore, research." +
+    " Free-form: coin a new one when none fit. Always set it on MCP-created items.";
+
+const DEPS_HINT =
+    " Rank numbers this item depends on, e.g. [12, 28] renders '(dep on #12, #28)'." +
+    " Reference the leading N. of the blocking item, not its id. Pass [] to clear.";
+
 const NOTE_FORMAT_HINT =
     " Format for a human reader: each labeled section on its own line, a blank" +
     " line between sections, commands/paths/code on their own lines (fence" +
@@ -194,6 +204,17 @@ There is always an active list (usually "daily"). When the user says "show my to
 
 Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
 
+Item text convention — MANDATORY for every item you create:
+
+    claude: [type] N. body (dep on #M, #K)
+
+- [type] — short lowercase work-type tag (decision, gate, loader, comms, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
+- N. — do-order rank across the whole list. Priority is the bucket (critical > urgent > important > default); N is the order INSIDE and ACROSS buckets, since a bucket with several items has no other visible ordering. add_todo assigns the next N automatically — do not write it into 'text'.
+- (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
+- claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag.
+
+Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its rank is preserved.
+
 Behavior:
 - "show todos" / "list todos" / "what's on my list" → list_todos (uses active list automatically)
 - "what's next" / "next todo" → list_todos with filter="pending" (first item is next)
@@ -320,20 +341,23 @@ server.tool(
 
 server.tool(
     "add_todo",
-    "Add a new todo item to a do-it list (writes to ~/.local/share/nvim/doit/lists/). Do not write JSON files directly.",
+    "Add a new todo item to a do-it list (writes to ~/.local/share/nvim/doit/lists/). Do not write JSON files directly. Stored text is composed as \"claude: [type] N. text (dep on #M)\" — pass type and deps as params, the rank N is assigned automatically.",
     {
-        text: z.string().describe("Todo text"),
+        text: z.string().describe("Todo text. Omit the [type] prefix and the leading rank number — those are composed from the params below. Keep a leading 'claude:' if the item is for the model to burn down."),
         list: z.string().optional().describe("List name (default: active list)"),
+        type: z.string().optional().describe("Work type." + TYPE_HINT),
+        deps: z.array(z.union([z.number(), z.string()])).optional().describe("Blocking rank numbers." + DEPS_HINT),
         description: z.string().optional().describe("Multi-line notes/description." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Priority level"),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
     },
-    async ({ text, list, description, priority, start }) => {
+    async ({ text, list, type, deps, description, priority, start }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
+        const composed = composeTodoText(text, { type, deps, rank: nextRank(data.todos || []) });
         const newTodo = {
             id,
-            text,
+            text: composed,
             done: false,
             in_progress: start || false,
             order_index: getMaxOrder(data.todos || []) + 1,
@@ -350,7 +374,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Added to "${name}": ${text}${status} [id:${id}]`,
+                text: `Added to "${name}": ${composed}${status} [id:${id}]`,
             }],
         };
     }
@@ -364,19 +388,27 @@ server.tool(
     {
         id: z.string().describe("Todo ID"),
         list: z.string().optional().describe("List name (default: active list)"),
-        text: z.string().optional().describe("New text"),
+        text: z.string().optional().describe("New text. The item's existing [type] prefix and rank number carry over — pass the body only."),
+        type: z.string().optional().describe("Change the work type." + TYPE_HINT),
+        deps: z.array(z.union([z.number(), z.string()])).optional().describe("Replace the blocking rank numbers." + DEPS_HINT),
         description: z.string().optional().describe("New description/notes." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important", "none"]).optional().describe("Set priority level. Use 'none' to remove priority."),
         done: z.boolean().optional().describe("Set done status"),
         in_progress: z.boolean().optional().describe("Set in_progress status"),
         order_index: z.number().optional().describe("Set order position"),
     },
-    async ({ id, list, text, description, priority, done, in_progress, order_index }) => {
+    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index }) => {
         const { name, filepath, data } = loadList(list);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
 
-        if (text !== undefined) todo.text = text;
+        if (text !== undefined || type !== undefined || deps !== undefined) {
+            todo.text = composeTodoText(text !== undefined ? text : todo.text, {
+                type,
+                deps,
+                inherit: todo.text,
+            });
+        }
         if (description !== undefined) todo.description = stampDescription(description);
         if (priority !== undefined) {
             if (priority === "none") delete todo.priorities;
