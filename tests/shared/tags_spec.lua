@@ -1,5 +1,4 @@
 local doit_state = require("doit.state")
-local tags = require("doit.state.tags")
 
 describe("tags", function()
 	before_each(function()

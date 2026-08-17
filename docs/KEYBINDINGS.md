@@ -27,13 +27,16 @@
 
 | Key | Description |
 |-----|-------------|
-| `i` | Add new todo |
-| `x` | Toggle todo status (pending/done) |
-| `d` | Delete current todo |
+| `<CR>` | Add new todo |
+| `c` | Toggle todo status (pending→in-progress→done) |
+| `X` | Revert todo to pending (not started) |
+| `p` | Set/change priority (critical/urgent/important) |
+| `d` | Delete current todo (or note, when on a note row) |
 | `D` | Delete all completed todos |
 | `u` | Undo last delete |
-| `e` | Edit current todo |
-| `q` | Close window |
+| `e` | Edit current todo (or note, when on a note row) |
+| `gn` | Add a list note (scratch note in the Notes section) |
+| `q/<Esc>` | Close window |
 | `?` | Show help (with ALL keybindings) |
 
 ### Organization
@@ -41,9 +44,9 @@
 | Key | Description |
 |-----|-------------|
 | `t` | Toggle tags window (filter by #tag) |
-| `C` | Toggle categories window |
-| `L` | Open list manager (switch/create lists) |
-| `c` | Clear active filter |
+| `L` | List manager - switch lists, create new lists |
+| `m` | Move current todo to another list |
+| `f` | Clear active filter |
 | `/` | Search todos |
 
 ### Advanced Features
@@ -52,9 +55,9 @@
 |-----|-------------|
 | `H` | Add/edit due date (calendar) |
 | `r` | Reorder current todo (use j/k to move) |
-| `p` | Edit priorities |
 | `T` | Add time estimation |
 | `R` | Remove time estimation |
+| `K` | View todo detail (full text + description) |
 | `o` | Open linked note |
 | `<leader>p` | Open scratchpad for todo |
 
@@ -63,7 +66,9 @@
 | Key | Description |
 |-----|-------------|
 | `I` | Import todos from file |
-| `E` | Export todos to file |
+| `E` | Export pending todos to markdown |
+| `<leader>E` | Export todos to JSON file |
+| `O` | Export todo to Obsidian daily note |
 
 ## List Manager Keymaps
 
@@ -89,7 +94,6 @@
 ## Features
 
 - Multiple named todo lists with persistence
-- Categories for organization
 - Tag-based filtering with #hashtags
 - Due dates with calendar integration
 - Priority system with weights
@@ -106,7 +110,7 @@ require("doit").setup({
   modules = {
     todos = {
       keymaps = {
-        new_todo = "a",  -- Change 'i' to 'a' for adding todos
+        new_todo = "n",  -- Change '<CR>' to 'n' for legacy style
         toggle_todo = "<Space>",  -- Use space to toggle
         -- etc...
       }

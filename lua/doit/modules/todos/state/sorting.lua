@@ -50,16 +50,13 @@ local function todo_less_than(a, b)
     elseif not a.due_date and b.due_date then
         return false
     end
-    return (a.timestamp or 0) < (b.timestamp or 0)
+    return (a.created_at or 0) < (b.created_at or 0)
 end
 
 -- Setup module
 function M.setup(state)
     -- Sort all todos
     function M.sort_todos()
-        for _, todo in ipairs(state.todos) do
-            todo._score = M.priority_rank(todo)
-        end
         table.sort(state.todos, todo_less_than)
     end
 

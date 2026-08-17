@@ -53,6 +53,21 @@ end
 
 local M = {}
 
+-- Same precedence as main_window's setup_keymap: user module config, user legacy
+-- top-level, then the single source of truth in modules/todos/config.lua.
+local function resolve_key(key_option)
+	local opts = config.options or {}
+	local mod = opts.modules and opts.modules.todos
+	local key = mod and mod.keymaps and mod.keymaps[key_option]
+	if not key and opts.keymaps then
+		key = opts.keymaps[key_option]
+	end
+	if not key then
+		key = require("doit.modules.todos.config").defaults.keymaps[key_option]
+	end
+	return key
+end
+
 local function get_todo_icon_pattern()
 	local done_icon = config.options.formatting.done.icon
 	local pending_icon = config.options.formatting.pending.icon
@@ -127,7 +142,6 @@ local function resolve_at_line(line_num)
 
 	local cur = 2  -- line 1 is the top blank; content starts at line 2
 	if state.active_filter then cur = cur + 2 end
-	if state.active_category then cur = cur + 2 end
 
 	local prev_group = nil
 	local done_started = false
@@ -157,22 +171,8 @@ local function resolve_at_line(line_num)
 		end
 
 		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-		local show_by_category = true
-		if state.active_category then
-			local module = get_todo_module()
-			if module and module.state and module.state.get_todo_category then
-				local todo_category_id = module.state.get_todo_category(todo.id)
-				show_by_category = (todo_category_id == state.active_category) or
-								  (state.active_category == "uncategorized" and
-								   (todo_category_id == "uncategorized" or not todo_category_id))
-			else
-				show_by_category = (todo.category == state.active_category) or
-								  (state.active_category == "Uncategorized" and
-								   (not todo.category or todo.category == ""))
-			end
-		end
 
-		if show_by_tag and show_by_category then
+		if show_by_tag then
 			if todo.done then
 				if not done_started then
 					done_started = true
@@ -280,7 +280,7 @@ end
 local function create_priority_selection_window(priorities, selected_priority, title)
 	local priority_options = {}
 	local keymaps = {
-		config.options.keymaps.toggle_priority,
+		resolve_key("toggle_priority"),
 		"q",
 		"<Esc>",
 	}
@@ -307,7 +307,7 @@ local function create_priority_selection_window(priorities, selected_priority, t
 		border = "rounded",
 		title = " " .. title .. " ",
 		title_pos = "center",
-		footer = string.format(" %s: select | <Enter>: confirm ", config.options.keymaps.toggle_priority),
+		footer = string.format(" %s: select | <Enter>: confirm ", resolve_key("toggle_priority")),
 		footer_pos = "center",
 	})
 
@@ -331,7 +331,7 @@ local function create_priority_selection_window(priorities, selected_priority, t
 end
 
 local function setup_priority_toggle(select_buf, select_win, selected_priority, priorities, priority_options)
-	vim.keymap.set("n", config.options.keymaps.toggle_priority, function()
+	vim.keymap.set("n", resolve_key("toggle_priority"), function()
 		if not (select_win and vim.api.nvim_win_is_valid(select_win)) then
 			return
 		end
@@ -551,9 +551,6 @@ function M.toggle_todo(win_id, on_render)
 				if state.active_filter then
 					line_offset = line_offset + 2
 				end
-				if state.active_category then
-					line_offset = line_offset + 2
-				end
 
 				local show_completed = true
 				local show_descriptions = true
@@ -573,23 +570,8 @@ function M.toggle_todo(win_id, on_render)
 					end
 
 					local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-					local show_by_category = true
 
-					if state.active_category then
-						local module = get_todo_module()
-						if module and module.state and module.state.get_todo_category then
-							local todo_category_id = module.state.get_todo_category(todo.id)
-							show_by_category = (todo_category_id == state.active_category) or
-											  (state.active_category == "uncategorized" and
-											   (todo_category_id == "uncategorized" or not todo_category_id))
-						else
-							show_by_category = (todo.category == state.active_category) or
-											  (state.active_category == "Uncategorized" and
-											   (not todo.category or todo.category == ""))
-						end
-					end
-
-					if show_by_tag and show_by_category then
+					if show_by_tag then
 						if i == new_position then
 							new_line_num = current_line
 							break
@@ -1125,7 +1107,7 @@ function M.add_due_date(win_id, on_render)
 
 	calendar.create(function(date_str)
 		if date_str and date_str ~= "" then
-			local success, err = state.add_due_date(todo_index, date_str)
+			local success, err = state.set_due_date(todo_index, date_str)
 			if success then
 				vim.notify("Due date added successfully", vim.log.levels.INFO)
 			else
@@ -1179,7 +1161,7 @@ function M.reorder_todo(win_id, on_render)
 	end
 
 	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
-	local reorder_key = (config.options.keymaps and config.options.keymaps.reorder_todo) or "r"
+	local reorder_key = resolve_key("reorder_todo")
 
 	-- group key mirrors the rendered grouping: in-progress flag + priority name.
 	-- reorder only swaps within a group so it matches "set rank within a grouping".
@@ -1187,22 +1169,9 @@ function M.reorder_todo(win_id, on_render)
 		return tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
 	end
 
-	-- passes the active tag/category filter (mirrors resolve_at_line)
+	-- passes the active tag filter (mirrors resolve_at_line)
 	local function is_visible(todo)
-		if state.active_filter and not todo.text:match("#" .. state.active_filter) then
-			return false
-		end
-		if not state.active_category then
-			return true
-		end
-		local module = get_todo_module()
-		if module and module.state and module.state.get_todo_category then
-			local cid = module.state.get_todo_category(todo.id)
-			return (cid == state.active_category)
-				or (state.active_category == "uncategorized" and (cid == "uncategorized" or not cid))
-		end
-		return (todo.category == state.active_category)
-			or (state.active_category == "Uncategorized" and (not todo.category or todo.category == ""))
+		return not state.active_filter or todo.text:match("#" .. state.active_filter) ~= nil
 	end
 
 	-- buffer line (1-based) of a todo's first row in the current render.

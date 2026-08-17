@@ -6,7 +6,6 @@ local highlights = require("doit.ui.highlights")
 local todo_actions = require("doit.ui.todo_actions")
 local help_window = require("doit.ui.help_window")
 local tag_window = require("doit.ui.tag_window")
-local category_window = require("doit.ui.category_window")
 local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
 local list_selector = require("doit.ui.list_selector")
@@ -56,7 +55,6 @@ local function ensure_state_loaded()
                 state = {
                     todos = {},
                     active_filter = nil,
-                    active_category = nil,
                     deleted_todos = {},
                     reordering_todo_index = nil,
                     todo_lists = { active = "daily" }
@@ -70,7 +68,6 @@ local function ensure_state_loaded()
                 end
                 state.sort_todos = state.sort_todos or function() end
                 state.set_filter = state.set_filter or function(f) state.active_filter = f end
-                state.clear_category_filter = state.clear_category_filter or function() state.active_category = nil end
                 state.undo_delete = state.undo_delete or function() return false end
                 state.get_priority_score = state.get_priority_score or function() return 0 end
             end
@@ -108,6 +105,9 @@ local function get_effective_key(key_option, default)
 	end
 	if not key and config.options and config.options.keymaps then
 		key = config.options.keymaps[key_option]
+	end
+	if not key then
+		key = require("doit.modules.todos.config").defaults.keymaps[key_option]
 	end
 	return key or default
 end
@@ -309,16 +309,6 @@ function M.build_render_rows()
 		push("")
 		push("  Filtered by tag: #" .. state.active_filter, { kind = "filter" })
 	end
-	if state.active_category then
-		push("")
-		local category_name = state.active_category
-		local module = get_todo_module()
-		if module and module.state and module.state.categories_by_id
-			and module.state.categories_by_id[state.active_category] then
-			category_name = module.state.categories_by_id[state.active_category].name
-		end
-		push("  Filtered by category: " .. category_name, { kind = "filter" })
-	end
 
 	local show_completed = true
 	local show_descriptions = false
@@ -371,22 +361,8 @@ function M.build_render_rows()
 		end
 
 		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
-		local show_by_category = true
-		if state.active_category then
-			local module = get_todo_module()
-			if module and module.state and module.state.get_todo_category then
-				local todo_category_id = module.state.get_todo_category(todo.id)
-				show_by_category = (todo_category_id == state.active_category) or
-								  (state.active_category == "uncategorized" and
-								   (todo_category_id == "uncategorized" or not todo_category_id))
-			else
-				show_by_category = (todo.category == state.active_category) or
-								  (state.active_category == "Uncategorized" and
-								   (not todo.category or todo.category == ""))
-			end
-		end
 
-		if show_by_tag and show_by_category then
+		if show_by_tag then
 			-- group separators (mirror tmux): blank line between priority groups,
 			-- blank + divider + blank before the completed block
 			if todo.done then
@@ -534,12 +510,6 @@ function M.render_todos()
 				end
 			end
 
-			-- Overdue highlight
-			if line:match("%[OVERDUE%]") then
-				local start_idx = line:find("%[OVERDUE%]")
-				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "ErrorMsg", line_nr, start_idx - 1, start_idx + 8)
-			end
-
 			-- Notes marker (dim so it doesn't break the title scan)
 			do
 				local s = line:find("%- %[NOTES%]")
@@ -563,7 +533,7 @@ function M.render_todos()
 					)
 				end
 			end
-		elseif line:match("Filtered by tag:") or line:match("Filtered by category:") then
+		elseif line:match("Filtered by tag:") then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "WarningMsg", line_nr, 0, -1)
 		end
 	end
@@ -681,32 +651,6 @@ function M.format_todo_line(todo)
 		end
 	end
 
-	local function format_due_date()
-		if todo.due_at then
-			local date = os.date("*t", todo.due_at)
-			local lang = calendar and calendar.get_language() or "en"
-			local month = calendar.MONTH_NAMES[lang][date.month]
-			local formatted
-			if lang == "pt" or lang == "es" then
-				formatted = string.format("%d de %s de %d", date.day, month, date.year)
-			elseif lang == "fr" or lang == "de" or lang == "it" then
-				formatted = string.format("%d %s %d", date.day, month, date.year)
-			elseif lang == "jp" then
-				formatted = string.format("%d年%s%d日", date.year, month, date.day)
-			else
-				formatted = string.format("%s %d, %d", month, date.day, date.year)
-			end
-
-			local icon = config.options.calendar and config.options.calendar.icon or ""
-			local due_date_str = (icon ~= "") and ("[" .. icon .. " " .. formatted .. "]") or ("[" .. formatted .. "]")
-			if (not todo.done) and (todo.due_at < os.time()) then
-				due_date_str = due_date_str .. " [OVERDUE]"
-			end
-			return due_date_str
-		end
-		return ""
-	end
-
 	for _, part in ipairs(format) do
 		if part == "icon" then
 			if is_reordering then
@@ -737,11 +681,6 @@ function M.format_todo_line(todo)
 			if todo.created_at and config.options.timestamp and config.options.timestamp.enabled then
 				table.insert(components, "- @" .. format_relative_time(todo.created_at))
 			end
-		elseif part == "due_date" then
-			local dd = format_due_date()
-			if dd ~= "" then
-				table.insert(components, dd)
-			end
 		elseif part == "priority" then
 			local score = state.get_priority_score(todo)
 			table.insert(components, string.format("Priority: %d", score))
@@ -771,9 +710,6 @@ function M.calculate_line_offset()
 	local offset = 1 -- Always have at least one blank line at the top
 	if state.active_filter then
 		offset = offset + 2 -- Add 2 more lines for tag filter header
-	end
-	if state.active_category then
-		offset = offset + 2 -- Add 2 more lines for category filter header
 	end
 	return offset
 end
@@ -1060,41 +996,8 @@ local function create_window()
 
 	local function setup_keymap(key_option, fn)
 		-- Default keymaps
-		local default_keymaps = {
-			new_todo = "n",
-			toggle_todo = "x",
-			revert_to_pending = "X",
-			delete_todo = "d",
-			delete_completed = "D",
-			close_window = "q",
-			undo_delete = "u",
-			toggle_help = "?",
-			toggle_tags = "t",
-			toggle_categories = "C",
-			clear_filter = "c",
-			edit_todo = "e",
-			edit_description = "A",
-			edit_priorities = "p",
-			add_due_date = "H",
-			remove_due_date = "r",
-			add_time_estimation = "T",
-			remove_time_estimation = "R",
-			reorder_todo = "r",
-			open_linked_note = "o",
-			view_detail = "K",
-			open_todo_scratchpad = "<leader>p",
-			toggle_list_manager = "L",
-			import_todos = "I",
-			export_todos = "<leader>E",
-			export_markdown = "E",
-			backup_todos = "B",
-			search_todos = "/",
-			move_todo_up = "k",
-			move_todo_down = "j",
-			move_todo_to_list = "m",
-			export_to_daily = "O",
-			new_note = "gn",
-		}
+		-- single source of truth: modules/todos/config.lua defaults
+		local default_keymaps = require("doit.modules.todos.config").defaults.keymaps
 
 		-- Try to get key from config, fall back to default
 		local key = nil
@@ -1191,21 +1094,10 @@ local function create_window()
 		M.render_todos()
 	end)
 	
-	setup_keymap("toggle_categories", function()
-		local module = get_todo_module()
-		if module and module.ui and module.ui.category_window then
-			module.ui.category_window.toggle_window()
-		else
-			category_window.create_category_window(win_id)
-		end
-		M.render_todos()
-	end)
-
 	setup_keymap("clear_filter", function()
 		state = ensure_state_loaded()
 		if state then
 			if state.set_filter then state.set_filter(nil) end
-			if state.clear_category_filter then state.clear_category_filter() end
 		end
 		M.render_todos()
 	end)
@@ -1236,12 +1128,6 @@ local function create_window()
 
 	setup_keymap("add_due_date", function()
 		todo_actions.add_due_date(win_id, function()
-			M.render_todos()
-		end)
-	end)
-
-	setup_keymap("remove_due_date", function()
-		todo_actions.remove_due_date(win_id, function()
 			M.render_todos()
 		end)
 	end)

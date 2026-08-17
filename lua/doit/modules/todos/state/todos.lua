@@ -10,7 +10,7 @@ function M.setup(state)
             id = generate_todo_id(),
             text = text,
             done = false,
-            timestamp = os.time(),
+            created_at = os.time(),
             order_index = #state.todos + 1,
             description = require("doit.core.utils.footer").stamp(""),
         }
@@ -129,16 +129,19 @@ function M.setup(state)
                 -- Pending -> In Progress
                 todo.in_progress = true
                 todo.done = false
+                todo.completed_at = nil
             elseif todo.in_progress and not todo.done then
                 -- In Progress -> Done
                 todo.in_progress = false
                 todo.done = true
+                todo.completed_at = os.time()
             else
                 -- Done -> Pending (reset both)
                 todo.in_progress = false
                 todo.done = false
+                todo.completed_at = nil
             end
-            
+
             state.save_todos()
         end
     end
@@ -154,6 +157,7 @@ function M.setup(state)
         if state.todos[index] then
             state.todos[index].in_progress = false
             state.todos[index].done = false
+            state.todos[index].completed_at = nil
             state.save_todos()
         end
     end
@@ -215,14 +219,6 @@ function M.setup(state)
         end
 
         return false
-    end
-    
-    function M.parse_categories(text)
-        local categories = {}
-        for tag in text:gmatch("#(%w+)") do
-            table.insert(categories, tag)
-        end
-        return categories
     end
     
     function M.edit_todo(index, new_text)

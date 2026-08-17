@@ -31,7 +31,6 @@ function M.setup(parent_module)
     local search_ops = require("doit.modules.todos.state.search")
     local sorting_ops = require("doit.modules.todos.state.sorting")
     local tags_ops = require("doit.modules.todos.state.tags")
-    local categories_ops = require("doit.modules.todos.state.categories")
     
     -- Initialize storage first to get the storage functions
     local storage = storage_module.setup(M)
@@ -49,10 +48,9 @@ function M.setup(parent_module)
     search_ops.setup(M)
     sorting_ops.setup(M)
     tags_ops.setup(M)
-    categories_ops.setup(M)
     
     -- Forward key functions directly to M
-    for _, module in ipairs({todos_ops, priorities, due_dates, search_ops, sorting_ops, tags_ops, categories_ops}) do
+    for _, module in ipairs({todos_ops, priorities, due_dates, search_ops, sorting_ops, tags_ops}) do
         for name, func in pairs(module) do
             if type(func) == "function" and not M[name] then
                 M[name] = func

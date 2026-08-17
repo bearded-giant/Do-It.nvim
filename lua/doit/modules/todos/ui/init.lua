@@ -15,8 +15,7 @@ function M.setup(module)
         "scratchpad", 
         "main_window", 
         "list_window",
-        "list_manager_window",
-        "category_window"
+        "list_manager_window"
     }
     
     for _, name in ipairs(components) do

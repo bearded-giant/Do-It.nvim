@@ -48,7 +48,6 @@ describe("todo_actions", function()
         mock_state = {
             todos = {},
             active_filter = nil,
-            active_category = nil,
             deleted_todos = {},
             MAX_UNDO_HISTORY = 50,
             delete_todo = function(index)

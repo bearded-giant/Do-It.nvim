@@ -1,5 +1,4 @@
 local doit_state = require("doit.state")
-local todos = require("doit.state.todos")
 local config = require("doit.config")
 
 describe("todos", function()
@@ -35,12 +34,6 @@ describe("todos", function()
 		assert.are.equal(false, doit_state.todos[1].done)
 	end)
 
-	pending("should parse categories from tags", function()
-		-- Feature not yet implemented: auto-parse category from tags
-		doit_state.add_todo("Test todo with #category tag", {})
-
-		assert.are.equal("category", doit_state.todos[1].category)
-	end)
 
 	it("should toggle todo status correctly", function()
 		doit_state.add_todo("Test todo", {})

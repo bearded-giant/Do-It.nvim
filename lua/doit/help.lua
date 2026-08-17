@@ -26,7 +26,6 @@ M.keymaps = {
 		},
 		organization = {
 			{ key = "t", desc = "Toggle tags window (filter by #tag)" },
-			{ key = "C", desc = "Toggle categories window" },
 			{ key = "L", desc = "List manager - switch lists, create new lists" },
 			{ key = "m", desc = "Move current todo to another list" },
 			{ key = "f", desc = "Clear active filter" },
@@ -74,7 +73,6 @@ M.commands = {
 
 M.features = {
 	"Multiple named todo lists with persistence",
-	"Categories for organization",
 	"Tag-based filtering with #hashtags",
 	"Due dates with calendar integration",
 	"Priority system with weights",

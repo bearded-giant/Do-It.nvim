@@ -15,6 +15,40 @@ local storage = {
     backup_all_lists = function() return true, "Not implemented" end
 }
 
+-- Transient keys (`_score`, `_priority_weight`) are computed per-render and must never
+-- reach disk; tmux and MCP round-trip unknown keys verbatim, so nvim owns the cleanup.
+local function strip_transient(todo)
+    local clean = {}
+    for k, v in pairs(todo) do
+        if type(k) ~= "string" or k:sub(1, 1) ~= "_" then
+            clean[k] = v
+        end
+    end
+    return clean
+end
+
+local function serializable_todos(todos)
+    local out = {}
+    for i, todo in ipairs(todos or {}) do
+        out[i] = strip_transient(todo)
+    end
+    return out
+end
+
+-- Mutates in place: used on load so pre-existing leaked keys are dropped from live state.
+local function scrub_transient(todos)
+    local scrubbed = false
+    for _, todo in ipairs(todos or {}) do
+        for k in pairs(todo) do
+            if type(k) == "string" and k:sub(1, 1) == "_" then
+                todo[k] = nil
+                scrubbed = true
+            end
+        end
+    end
+    return scrubbed
+end
+
 function storage.setup(M)
     -- Get module configuration
     local config
@@ -151,7 +185,7 @@ function storage.setup(M)
         end
         
         -- Create the list file
-        local todos = initial_todos or {}
+        local todos = serializable_todos(initial_todos)
         local data = {
             _metadata = metadata or {
                 created_at = os.time(),
@@ -213,18 +247,29 @@ function storage.setup(M)
                     }
                     M.todo_lists.notes = data.notes or {}
                     
-                    local needs_migration = false
-                    
+                    local needs_migration = scrub_transient(M.todos)
+
                     -- Migration: Add order_index if missing
                     for i, todo in ipairs(M.todos) do
                         if not todo.order_index then
                             todo.order_index = i
                             needs_migration = true
                         end
-                        
+
                         -- Add unique ID if missing
                         if not todo.id then
                             todo.id = os.time() .. "_" .. math.random(1000000, 9999999)
+                            needs_migration = true
+                        end
+
+                        -- Migration: `timestamp` was nvim-only; `created_at` is the
+                        -- cross-surface field tmux and MCP have always written.
+                        if todo.timestamp and not todo.created_at then
+                            todo.created_at = todo.timestamp
+                            needs_migration = true
+                        end
+                        if todo.timestamp then
+                            todo.timestamp = nil
                             needs_migration = true
                         end
                     end
@@ -249,14 +294,16 @@ function storage.setup(M)
                         end
                     end
                     
+                    -- Update active list BEFORE any migration save: save_to_disk resolves
+                    -- its path from M.todo_lists.active, so migrating during a list switch
+                    -- would write these todos into the previously-active list's file.
+                    M.todo_lists.active = list_name
+                    config.active_list = list_name
+
                     if needs_migration then
                         storage.save_to_disk()
                     end
-                    
-                    -- Update active list
-                    M.todo_lists.active = list_name
-                    config.active_list = list_name
-                    
+
                     -- Save session for persistence
                     local session = require("doit.modules.todos.state.session")
                     session.save_session(list_name)
@@ -411,7 +458,7 @@ function storage.setup(M)
         -- Prepare data structure
         local data = {
             _metadata = metadata,
-            todos = M.todos,
+            todos = serializable_todos(M.todos),
             notes = M.todo_lists.notes or {}
         }
         
@@ -525,6 +572,8 @@ function storage.setup(M)
         
         -- Otherwise, merge with current list
         for _, todo in ipairs(imported_todos) do
+            todo = strip_transient(todo)
+
             -- Ensure each todo has an ID
             if not todo.id then
                 todo.id = os.time() .. "_" .. math.random(1000000, 9999999)
@@ -556,7 +605,7 @@ function storage.setup(M)
         
         if export_format == "simple" then
             -- Simple format - just an array of todos
-            json_content = vim.fn.json_encode(M.todos)
+            json_content = vim.fn.json_encode(serializable_todos(M.todos))
         else
             -- Full format with metadata
             local data = {
@@ -564,7 +613,7 @@ function storage.setup(M)
                     name = M.todo_lists.active,
                     exported_at = os.time()
                 },
-                todos = M.todos
+                todos = serializable_todos(M.todos)
             }
             json_content = vim.fn.json_encode(data)
         end
@@ -695,7 +744,7 @@ function storage.setup(M)
         local dest_todos = dest_data.todos or {}
 
         -- Prepare destination data (without modifying M.todos yet)
-        local updated_todo = vim.deepcopy(todo_to_move)
+        local updated_todo = strip_transient(vim.deepcopy(todo_to_move))
         updated_todo.order_index = #dest_todos + 1
         table.insert(dest_todos, updated_todo)
 
@@ -714,7 +763,7 @@ function storage.setup(M)
 
         local source_data = {
             _metadata = vim.deepcopy(M.todo_lists.metadata) or {},
-            todos = source_todos
+            todos = serializable_todos(source_todos)
         }
         source_data._metadata.updated_at = os.time()
 

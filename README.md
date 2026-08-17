@@ -424,15 +424,41 @@ If you configured a custom storage path in your do-it.nvim setup (via `modules.t
 
 ### Available Tools
 
+Todo items:
+
 | Tool | Description |
 |------|-------------|
-| `list_todos` | List items from a list, filter by pending/done/in_progress |
-| `add_todo` | Create a new todo with optional type, deps, and notes |
-| `update_todo` | Edit text, type, deps, description, or toggle status |
-| `delete_todo` | Remove an item (kept in deleted_todos for undo) |
-| `list_lists` | Show all lists with pending/total counts |
+| `list_todos` | List items from a list, filtered by status and/or priority |
+| `search_todos` | Search every list for items matching a text pattern |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank |
+| `update_todo` | Edit text, description, status, priority, or order. Needs an id |
+| `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
+| `complete_todo` | Mark an item done. Fuzzy text query; with no args it looks at in-progress items |
+| `revert_todo` | Send an item back to pending |
+| `delete_todo` | Delete an item, keeping it in `_metadata.deleted_todos` for undo |
+| `clear_done` | Delete every completed item in a list, keeping the last 10 for undo |
+| `move_todo` | Move an item to another list |
+
+Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
+
+| Tool | Description |
+|------|-------------|
+| `add_note` | Write a note onto a todo item. Appends by default; `mode='replace'` overwrites |
+| `list_notes` | List the standalone notes on a list, returning titles and ids |
+| `get_note` | Read one list note in full |
+| `create_note` | Create a standalone list note, not attached to any todo |
+| `update_note` | Update a list note's title and/or body. Replaces by default; `mode='append'` adds |
+| `delete_note` | Delete a list note, keeping the last 10 for undo |
+
+Lists:
+
+| Tool | Description |
+|------|-------------|
+| `list_lists` | Show all lists and which one is active |
 | `switch_list` | Change the active list |
-| `search_todos` | Search across all lists by text |
+| `create_list` | Create a new empty list |
+| `rename_list` | Rename a list. Switch away from it first |
+| `delete_list` | Delete a list. Switch away from it first |
 
 ### Item Text Convention
 

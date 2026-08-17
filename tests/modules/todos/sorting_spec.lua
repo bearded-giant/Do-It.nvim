@@ -19,8 +19,8 @@ describe("todos sorting", function()
     describe("sort_todos", function()
         it("should sort incomplete before done", function()
             state.todos = {
-                { text = "Done", done = true, in_progress = false, timestamp = 1 },
-                { text = "Not done", done = false, in_progress = false, timestamp = 2 },
+                { text = "Done", done = true, in_progress = false, created_at = 1 },
+                { text = "Not done", done = false, in_progress = false, created_at = 2 },
             }
 
             sorting.sort_todos()
@@ -31,8 +31,8 @@ describe("todos sorting", function()
 
         it("should sort in_progress before pending", function()
             state.todos = {
-                { text = "Pending", done = false, in_progress = false, timestamp = 1 },
-                { text = "Active", done = false, in_progress = true, timestamp = 2 },
+                { text = "Pending", done = false, in_progress = false, created_at = 1 },
+                { text = "Active", done = false, in_progress = true, created_at = 2 },
             }
 
             sorting.sort_todos()
@@ -43,8 +43,8 @@ describe("todos sorting", function()
 
         it("should sort by priority rank within same status", function()
             state.todos = {
-                { text = "None", done = false, in_progress = false, timestamp = 1 },
-                { text = "Critical", done = false, in_progress = false, priorities = "critical", timestamp = 2 },
+                { text = "None", done = false, in_progress = false, created_at = 1 },
+                { text = "Critical", done = false, in_progress = false, priorities = "critical", created_at = 2 },
             }
 
             sorting.sort_todos()
@@ -57,10 +57,10 @@ describe("todos sorting", function()
             -- regression guard: nvim list order must match the tmux view.
             -- pending items ranked by priority string, independent of weighted config.
             state.todos = {
-                { text = "none", done = false, in_progress = false, timestamp = 1 },
-                { text = "important", done = false, in_progress = false, priorities = "important", timestamp = 2 },
-                { text = "critical", done = false, in_progress = false, priorities = "critical", timestamp = 3 },
-                { text = "urgent", done = false, in_progress = false, priorities = "urgent", timestamp = 4 },
+                { text = "none", done = false, in_progress = false, created_at = 1 },
+                { text = "important", done = false, in_progress = false, priorities = "important", created_at = 2 },
+                { text = "critical", done = false, in_progress = false, priorities = "critical", created_at = 3 },
+                { text = "urgent", done = false, in_progress = false, priorities = "urgent", created_at = 4 },
             }
 
             sorting.sort_todos()
@@ -74,8 +74,8 @@ describe("todos sorting", function()
         it("should keep in_progress ahead of higher-priority pending (tmux parity)", function()
             -- in_progress leads the list even when a pending item outranks it
             state.todos = {
-                { text = "pending critical", done = false, in_progress = false, priorities = "critical", timestamp = 1 },
-                { text = "active none", done = false, in_progress = true, timestamp = 2 },
+                { text = "pending critical", done = false, in_progress = false, priorities = "critical", created_at = 1 },
+                { text = "active none", done = false, in_progress = true, created_at = 2 },
             }
 
             sorting.sort_todos()
@@ -86,8 +86,8 @@ describe("todos sorting", function()
 
         it("should sort by order_index as tiebreaker", function()
             state.todos = {
-                { text = "Second", done = false, in_progress = false, order_index = 2, timestamp = 1 },
-                { text = "First", done = false, in_progress = false, order_index = 1, timestamp = 2 },
+                { text = "Second", done = false, in_progress = false, order_index = 2, created_at = 1 },
+                { text = "First", done = false, in_progress = false, order_index = 1, created_at = 2 },
             }
 
             sorting.sort_todos()
@@ -96,10 +96,10 @@ describe("todos sorting", function()
             assert.are.equal("Second", state.todos[2].text)
         end)
 
-        it("should sort by timestamp when all else is equal", function()
+        it("should sort by created_at when all else is equal", function()
             state.todos = {
-                { text = "Newer", done = false, in_progress = false, timestamp = 200 },
-                { text = "Older", done = false, in_progress = false, timestamp = 100 },
+                { text = "Newer", done = false, in_progress = false, created_at = 200 },
+                { text = "Older", done = false, in_progress = false, created_at = 100 },
             }
 
             sorting.sort_todos()
@@ -110,11 +110,11 @@ describe("todos sorting", function()
 
         it("should handle full sort with mixed statuses", function()
             state.todos = {
-                { text = "Done", done = true, in_progress = false, timestamp = 1 },
-                { text = "Active high", done = false, in_progress = true, _priority_weight = 10, timestamp = 2 },
-                { text = "Pending low", done = false, in_progress = false, _priority_weight = 1, timestamp = 3 },
-                { text = "Active low", done = false, in_progress = true, _priority_weight = 1, timestamp = 4 },
-                { text = "Pending high", done = false, in_progress = false, _priority_weight = 10, timestamp = 5 },
+                { text = "Done", done = true, in_progress = false, created_at = 1 },
+                { text = "Active high", done = false, in_progress = true, _priority_weight = 10, created_at = 2 },
+                { text = "Pending low", done = false, in_progress = false, _priority_weight = 1, created_at = 3 },
+                { text = "Active low", done = false, in_progress = true, _priority_weight = 1, created_at = 4 },
+                { text = "Pending high", done = false, in_progress = false, _priority_weight = 10, created_at = 5 },
             }
 
             sorting.sort_todos()
@@ -133,8 +133,8 @@ describe("todos sorting", function()
     describe("get_filtered_todos", function()
         it("should return all todos when no filter set", function()
             state.todos = {
-                { text = "Todo #work", done = false, in_progress = false, timestamp = 1 },
-                { text = "Todo #home", done = false, in_progress = false, timestamp = 2 },
+                { text = "Todo #work", done = false, in_progress = false, created_at = 1 },
+                { text = "Todo #home", done = false, in_progress = false, created_at = 2 },
             }
             state.active_filter = nil
 
@@ -144,9 +144,9 @@ describe("todos sorting", function()
 
         it("should filter by tag when filter is set", function()
             state.todos = {
-                { text = "Todo #work stuff", done = false, in_progress = false, timestamp = 1 },
-                { text = "Todo #home stuff", done = false, in_progress = false, timestamp = 2 },
-                { text = "Another #work item", done = false, in_progress = false, timestamp = 3 },
+                { text = "Todo #work stuff", done = false, in_progress = false, created_at = 1 },
+                { text = "Todo #home stuff", done = false, in_progress = false, created_at = 2 },
+                { text = "Another #work item", done = false, in_progress = false, created_at = 3 },
             }
             state.active_filter = "work"
 
@@ -159,8 +159,8 @@ describe("todos sorting", function()
 
         it("should return sorted results", function()
             state.todos = {
-                { text = "Done #tag", done = true, in_progress = false, timestamp = 1 },
-                { text = "Active #tag", done = false, in_progress = true, timestamp = 2 },
+                { text = "Done #tag", done = true, in_progress = false, created_at = 1 },
+                { text = "Active #tag", done = false, in_progress = true, created_at = 2 },
             }
             state.active_filter = "tag"
 

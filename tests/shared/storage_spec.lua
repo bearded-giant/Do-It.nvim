@@ -1,5 +1,4 @@
 local doit_state = require("doit.state")
-local storage = require("doit.state.storage")
 local config = require("doit.config")
 local mock_config = {
 	options = {

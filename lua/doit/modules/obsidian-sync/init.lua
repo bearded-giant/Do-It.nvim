@@ -728,9 +728,6 @@ function M.setup_functions()
 		if state.active_filter then
 			line_offset = line_offset + 2 -- blank line + filter text
 		end
-		if state.active_category then
-			line_offset = line_offset + 2 -- blank line + category text
-		end
 
 		-- Calculate which todo we're on
 		local todo_line = line_num - line_offset

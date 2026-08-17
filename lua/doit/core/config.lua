@@ -65,7 +65,6 @@ M.defaults = {
                 close_window = "q",
                 undo_delete = "u",
                 add_due_date = "H",
-                remove_due_date = "r",
                 toggle_help = "?",
                 toggle_tags = "t",
                 toggle_priority = "<Space>",

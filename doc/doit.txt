@@ -264,24 +264,24 @@ Examples: >vim
 KEYBINDINGS                                                *doit-keybindings*
 
 Main Window~
-    <leader>td   Toggle to-do window
+    <leader>do   Toggle to-do window
     <leader>dl   Toggle active to-dos list window
     <leader>dn   Toggle project notes window
-    n           Add new to-do
-    x           Toggle to-do status
+    <CR>        Add new to-do
+    c           Toggle to-do status
+    X           Revert to-do to pending
     d           Delete current to-do (or list note, on a note row)
     D           Delete all completed
     gn          Add a list note (scratch note in the Notes section)
     q           Close window
     H           Add due date
-    r           Remove due date
     T           Add time estimation
     R           Remove time estimation
     ?           Toggle help window
     L           Open list manager (switch lists)
     m           Move to-do to another list
     t           Toggle tags window
-    c           Clear active tag filter
+    f           Clear active tag filter
     e           Edit to-do (or list note, on a note row)
     p           Edit priorities
     u           Undo deletion
@@ -554,7 +554,6 @@ For complete tmux documentation, see |doit_tmux.txt| (|doit-tmux-contents|)
 - ✓ Active To-do to Top
 - ✓ Project Notes
 - Named (and Multiple) To-do Lists
-- To-do Categories View
 
 ==============================================================================
 
