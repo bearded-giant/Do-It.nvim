@@ -29,7 +29,7 @@ function M.setup(parent_module)
     }
 
     function M.generate_note_id()
-        return os.time() .. "_" .. math.random(1000000, 9999999)
+        return require("doit.core.utils.id").generate()
     end
 
     function M.create_note(title)

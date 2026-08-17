@@ -2,7 +2,7 @@ local M = {}
 
 function M.setup(state)
     local function generate_todo_id()
-        return os.time() .. "_" .. math.random(1000000, 9999999)
+        return require("doit.core.utils.id").generate(state.todos)
     end
     
     function M.add_todo(text, priorities)

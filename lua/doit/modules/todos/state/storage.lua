@@ -264,7 +264,7 @@ function storage.setup(M)
 
                         -- Add unique ID if missing
                         if not todo.id then
-                            todo.id = os.time() .. "_" .. math.random(1000000, 9999999)
+                            todo.id = require("doit.core.utils.id").generate(M.todos)
                             needs_migration = true
                         end
 
@@ -500,7 +500,7 @@ function storage.setup(M)
         local notes = storage.get_notes()
         local now = os.time()
         local note = {
-            id = tostring(now) .. "_" .. math.random(1000000, 9999999),
+            id = require("doit.core.utils.id").generate(notes),
             title = title or "",
             body = body or "",
             created_at = now,
@@ -593,7 +593,7 @@ function storage.setup(M)
 
             -- Ensure each todo has an ID
             if not todo.id then
-                todo.id = os.time() .. "_" .. math.random(1000000, 9999999)
+                todo.id = require("doit.core.utils.id").generate(M.todos)
             end
             
             -- Add order_index if missing
