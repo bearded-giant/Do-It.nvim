@@ -380,9 +380,31 @@ List notes: each list also has standalone scratch notes (title + body), parallel
 - "rewrite the X note" / "rename the note" → update_note (mode="replace" default)
 - "delete the X note" → delete_note with query
 
-The list parameter is optional on all tools — omit it to use the active list. Only pass list when the user names a specific list.
+Tags: written inline in the todo text as #tag — there is no tag field. Matching is exact, so #labels never matches #labels-web, and a tag may contain letters, digits, _, - and /.
+- "what tags are on this list" → list_tags (name + how many items carry it)
+- "show the #api todos" → list_todos with tag="api" (omit the '#')
 
-All tools that act on a single todo support fuzzy text matching via the 'query' parameter — the user does not need to know the exact todo text or ID.`,
+Due dates: the 'due_date' field, "YYYY-MM-DD", shared with the nvim and tmux views.
+- "due X by friday" → add_todo (or update_todo) with due="2026-08-21"
+- "what's overdue" → list_todos with due="overdue"; also "today" and "week" (week spans overdue through the next 7 days)
+- clear a due date with update_todo due=""
+
+Nesting: a todo may hang off another via 'parent'. Ranks stay FLAT — N is still unique across the whole list, and a child gets its own N.
+- "add X as a subtask of 3" → add_todo with parent=3 (a rank number or an id)
+- "move X under Y" → update_todo with parent=<rank or id>; parent="" moves it back to the top level
+- Deleting a parent does NOT delete its children: they are promoted to the top level. Completing a parent does not complete them either.
+
+Duplicates: dedupe_todos removes items whose text matches after normalization (the claude: marker, [type] tag, rank prefix, (dep on #N) suffix, case and whitespace are all ignored, so an item typed in Neovim matches the same item created here). It is a DRY RUN by default — pass dry_run:false to actually delete.
+
+The 'list' parameter is optional on MOST tools — omit it to use the active list, and only pass it when the user names a specific list. The exceptions:
+- search_todos: no list param at all — it always searches every list.
+- move_todo: uses 'from_list' (optional, defaults to active) and 'to_list' (required).
+- switch_list: 'list' is required — it names the list to switch TO, not the one to act in.
+- create_list and delete_list take 'name'; rename_list takes 'old_name' and 'new_name'.
+
+Most tools that act on a single todo accept fuzzy text matching via 'query', so the user does not need the exact text or ID: start_todo, complete_todo, revert_todo, add_note, delete_todo, move_todo, and the note tools get_note / update_note / delete_note.
+
+update_todo is the exception — it REQUIRES an id and has no 'query'. To act on an item the user described rather than identified, either use one of the fuzzy tools above, or call list_todos / search_todos first to get the id.`,
     }
 );
 
