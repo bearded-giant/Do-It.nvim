@@ -279,6 +279,28 @@ function storage.setup(M)
                             needs_migration = true
                         end
                     end
+
+                    -- Nesting: a todo with no parent_id is top level. A parent_id
+                    -- pointing at an id that is not in this list (parent deleted,
+                    -- or the child was moved here alone) promotes the child rather
+                    -- than leaving it unreachable.
+                    local ids = {}
+                    for _, todo in ipairs(M.todos) do
+                        if todo.id then
+                            ids[todo.id] = true
+                        end
+                    end
+                    for _, todo in ipairs(M.todos) do
+                        if todo.parent_id and not ids[todo.parent_id] then
+                            todo.parent_id = nil
+                            todo.depth = 0
+                            needs_migration = true
+                        end
+                        if todo.parent_id == nil and (todo.depth or 0) ~= 0 then
+                            todo.depth = 0
+                            needs_migration = true
+                        end
+                    end
                     
                     -- Migration: Convert priorities from array to string
                     for _, todo in ipairs(M.todos) do

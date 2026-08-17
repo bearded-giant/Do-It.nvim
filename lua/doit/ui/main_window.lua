@@ -396,18 +396,21 @@ function M.build_render_rows()
 
 			local marker = priority_marker(todo)
 			local formatted = M.format_todo_line(todo)
+			-- nested todos are indented under their parent; depth is maintained by
+			-- the structure-aware sort, so the render just consumes it
+			local indent = string.rep("  ", todo.depth or 0)
 			local text_lines = vim.split(formatted, "\n", { plain = true })
 			for j, text_line in ipairs(text_lines) do
 				if j == 1 then
-					push(marker .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = true })
+					push(indent .. marker .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = true })
 				else
-					push("    " .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = false })
+					push(indent .. "    " .. text_line, { kind = "todo", todo = todo, todo_index = i, is_first = false })
 				end
 			end
 			if show_descriptions and todo.description and todo.description ~= "" then
 				local desc_lines = vim.split(todo.description, "\n", { plain = true })
 				for _, desc_line in ipairs(desc_lines) do
-					push("      " .. desc_line, { kind = "todo", todo = todo, todo_index = i, is_description = true })
+					push(indent .. "      " .. desc_line, { kind = "todo", todo = todo, todo_index = i, is_description = true })
 				end
 			end
 		end

@@ -55,11 +55,77 @@ local function todo_less_than(a, b)
     return (a.created_at or 0) < (b.created_at or 0)
 end
 
+-- Order a flat list so every child follows its parent and a subtree stays
+-- contiguous. Roots are sorted by the normal comparator; a child rides with its
+-- parent regardless of its own priority, so a subtree never splits across a
+-- priority or status section.
+--
+-- A todo whose parent_id points at something not in `todos` (a different list,
+-- or a parent deleted out from under it) is treated as a root, so nothing can
+-- disappear from the render.
+function M.structure_aware(todos)
+    local by_id, children, roots = {}, {}, {}
+
+    for _, todo in ipairs(todos) do
+        if todo.id then
+            by_id[todo.id] = todo
+        end
+    end
+
+    for _, todo in ipairs(todos) do
+        local parent = todo.parent_id and by_id[todo.parent_id]
+        -- a cycle would otherwise strand the whole ring out of the output
+        if parent and parent ~= todo then
+            children[todo.parent_id] = children[todo.parent_id] or {}
+            table.insert(children[todo.parent_id], todo)
+        else
+            table.insert(roots, todo)
+        end
+    end
+
+    table.sort(roots, todo_less_than)
+    for _, group in pairs(children) do
+        table.sort(group, todo_less_than)
+    end
+
+    local ordered = {}
+    local emitted = {}
+
+    local function emit(todo, depth)
+        if emitted[todo] then
+            return
+        end
+        emitted[todo] = true
+        todo.depth = depth
+        table.insert(ordered, todo)
+        for _, child in ipairs(children[todo.id] or {}) do
+            emit(child, depth + 1)
+        end
+    end
+
+    for _, root in ipairs(roots) do
+        emit(root, 0)
+    end
+
+    -- any todo left over sat in a parent cycle; append so it stays reachable
+    for _, todo in ipairs(todos) do
+        if not emitted[todo] then
+            todo.depth = 0
+            table.insert(ordered, todo)
+        end
+    end
+
+    return ordered
+end
+
 -- Setup module
 function M.setup(state)
     -- Sort all todos
     function M.sort_todos()
-        table.sort(state.todos, todo_less_than)
+        local ordered = M.structure_aware(state.todos)
+        for i, todo in ipairs(ordered) do
+            state.todos[i] = todo
+        end
     end
 
     -- Get filtered and sorted list of todos
@@ -77,10 +143,7 @@ function M.setup(state)
             todos = vim.deepcopy(state.todos)
         end
 
-        -- Sort the filtered todos with the same comparator as sort_todos
-        table.sort(todos, todo_less_than)
-
-        return todos
+        return M.structure_aware(todos)
     end
 
     return M

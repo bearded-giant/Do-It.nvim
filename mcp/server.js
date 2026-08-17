@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { composeTodoText, nextRank, normalizeTodoText } from "./todo-text.js";
+import { composeTodoText, nextRank, normalizeTodoText, parseTodoText } from "./todo-text.js";
 
 const DATA_DIR = process.env.DOIT_DATA_DIR || path.join(process.env.HOME, ".local/share/nvim/doit");
 const LISTS_DIR = path.join(DATA_DIR, "lists");
@@ -122,6 +122,95 @@ function renderDue(due, now) {
     if (days === 0) return "due today";
     if (days === 1) return "due tomorrow";
     return `in ${days}d`;
+}
+
+// Nesting: parent_id + depth, mirroring state/sorting.lua's structure_aware().
+// A child rides with its parent so a subtree is contiguous and never splits
+// across a section, and a child whose parent is missing is treated as a root so
+// nothing disappears from the listing.
+function structureAware(todos) {
+    const byId = new Map(todos.map(t => [t.id, t]));
+    const children = new Map();
+    const roots = [];
+
+    for (const todo of todos) {
+        const parent = todo.parent_id ? byId.get(todo.parent_id) : null;
+        if (parent && parent !== todo) {
+            if (!children.has(todo.parent_id)) children.set(todo.parent_id, []);
+            children.get(todo.parent_id).push(todo);
+        } else {
+            roots.push(todo);
+        }
+    }
+
+    const byOrder = (a, b) => (a.order_index || 0) - (b.order_index || 0);
+    roots.sort(byOrder);
+    for (const group of children.values()) group.sort(byOrder);
+
+    const ordered = [];
+    const seen = new Set();
+    const emit = (todo, depth) => {
+        if (seen.has(todo.id)) return;
+        seen.add(todo.id);
+        ordered.push({ todo, depth });
+        for (const child of children.get(todo.id) || []) emit(child, depth + 1);
+    };
+    for (const root of roots) emit(root, 0);
+    // anything left sat in a parent cycle; keep it reachable
+    for (const todo of todos) if (!seen.has(todo.id)) ordered.push({ todo, depth: 0 });
+
+    return ordered;
+}
+
+// Accepts an id or a rank number (the leading "N." the user scans), matching how
+// deps are referenced.
+function resolveTodoRef(todos, ref) {
+    if (ref === undefined || ref === null || ref === "") return null;
+    const asId = todos.find(t => t.id === String(ref));
+    if (asId) return asId;
+    const rank = Number(String(ref).replace(/^#/, ""));
+    if (!Number.isNaN(rank)) {
+        const byRank = todos.find(t => parseTodoText(t.text).rank === rank);
+        if (byRank) return byRank;
+    }
+    return undefined; // explicitly "asked for one, found none"
+}
+
+function descendantIds(todos, rootId) {
+    const out = new Set();
+    const walk = id => {
+        for (const t of todos) {
+            if (t.parent_id === id && !out.has(t.id)) {
+                out.add(t.id);
+                walk(t.id);
+            }
+        }
+    };
+    walk(rootId);
+    return out;
+}
+
+function redepth(todos, parentId, depth) {
+    for (const t of todos) {
+        if (t.parent_id === parentId) {
+            t.depth = depth;
+            redepth(todos, t.id, depth + 1);
+        }
+    }
+}
+
+// Promote a deleted todo's DIRECT children to top level. Their own descendants
+// stay attached and are only re-depthed — a grandchild must not be orphaned
+// because its grandparent went away. Completion is per-item with no cascade, so
+// a child never vanishes because its parent was deleted.
+function promoteChildren(todos, parentId) {
+    for (const t of todos) {
+        if (t.parent_id === parentId) {
+            delete t.parent_id;
+            t.depth = 0;
+            redepth(todos, t.id, 1);
+        }
+    }
 }
 
 // Drop the machine-managed footer so re-saving refreshes the stamp instead of
@@ -336,13 +425,12 @@ server.tool(
             });
         }
 
-        todos.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-
-        const lines = todos.map(t => {
+        const lines = structureAware(todos).map(({ todo: t, depth }) => {
             const status = t.done ? "[x]" : t.in_progress ? "[~]" : "[ ]";
             const prio = t.priorities ? ` ${PRIORITY_LABELS[t.priorities] || t.priorities}` : "";
             const dueLabel = t.due_date ? ` [${renderDue(t.due_date)}]` : "";
-            let line = `${status}${prio} ${t.text}${dueLabel}  [id:${t.id}]`;
+            const indent = "  ".repeat(depth);
+            let line = `${indent}${status}${prio} ${t.text}${dueLabel}  [id:${t.id}]`;
             if (t.description) {
                 const notePreview = t.description.split("\n").map(l => `    ${l}`).join("\n");
                 line += `\n    notes:\n${notePreview}`;
@@ -448,9 +536,10 @@ server.tool(
         description: z.string().optional().describe("Multi-line notes/description." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Priority level"),
         due: z.string().optional().describe("Due date as YYYY-MM-DD. Shared with the nvim and tmux views."),
+        parent: z.union([z.number(), z.string()]).optional().describe("Nest under this item: its rank number (the leading N.) or its id. Ranks stay flat and unique across the whole list."),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
     },
-    async ({ text, list, type, deps, description, priority, due, start }) => {
+    async ({ text, list, type, deps, description, priority, due, parent, start }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
         const composed = composeTodoText(text, { type, deps, rank: nextRank(data.todos || []) });
@@ -467,6 +556,12 @@ server.tool(
         if (due) {
             if (!parseDue(due)) throw new Error(`Invalid due date "${due}". Use YYYY-MM-DD.`);
             newTodo.due_date = due;
+        }
+        if (parent !== undefined) {
+            const parentTodo = resolveTodoRef(data.todos || [], parent);
+            if (!parentTodo) throw new Error(`Parent "${parent}" not found in list "${name}".`);
+            newTodo.parent_id = parentTodo.id;
+            newTodo.depth = (parentTodo.depth || 0) + 1;
         }
 
         data.todos = data.todos || [];
@@ -500,8 +595,9 @@ server.tool(
         in_progress: z.boolean().optional().describe("Set in_progress status"),
         order_index: z.number().optional().describe("Set order position"),
         due: z.string().optional().describe("Set due date as YYYY-MM-DD. Use an empty string to clear it."),
+        parent: z.union([z.number(), z.string()]).optional().describe("Re-nest under this item (rank number or id). Use an empty string to move it back to the top level."),
     },
-    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index, due }) => {
+    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index, due, parent }) => {
         const { name, filepath, data } = loadList(list);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
@@ -527,6 +623,21 @@ server.tool(
             if (in_progress) todo.done = false;
         }
         if (order_index !== undefined) todo.order_index = order_index;
+        if (parent !== undefined) {
+            if (parent === "") {
+                delete todo.parent_id;
+                todo.depth = 0;
+            } else {
+                const parentTodo = resolveTodoRef(data.todos || [], parent);
+                if (!parentTodo) throw new Error(`Parent "${parent}" not found in list "${name}".`);
+                if (parentTodo.id === todo.id) throw new Error("A todo cannot be its own parent.");
+                if (descendantIds(data.todos || [], todo.id).has(parentTodo.id)) {
+                    throw new Error("That parent is inside this todo's own subtree, which would make a cycle.");
+                }
+                todo.parent_id = parentTodo.id;
+                todo.depth = (parentTodo.depth || 0) + 1;
+            }
+        }
         if (due !== undefined) {
             if (due === "") {
                 delete todo.due_date;
@@ -719,6 +830,8 @@ server.tool(
         }
 
         const idx = data.todos.findIndex(t => t.id === result.todo.id);
+        // incomplete children outlive their parent (no completion cascade)
+        promoteChildren(data.todos, data.todos[idx].id);
         const [removed] = data.todos.splice(idx, 1);
         data._metadata = data._metadata || {};
         data._metadata.deleted_todos = data._metadata.deleted_todos || [];
@@ -750,6 +863,7 @@ server.tool(
             return { content: [{ type: "text", text: `No completed items on "${name}".` }] };
         }
 
+        for (const t of done) promoteChildren(data.todos, t.id);
         data.todos = data.todos.filter(t => !t.done);
         data._metadata = data._metadata || {};
         data._metadata.deleted_todos = [...done, ...(data._metadata.deleted_todos || [])].slice(0, 10);
@@ -1029,7 +1143,11 @@ server.tool(
 
         // remove from source
         const idx = source.data.todos.findIndex(t => t.id === result.todo.id);
+        // the subtree stays behind, promoted, rather than following across lists
+        promoteChildren(source.data.todos, source.data.todos[idx].id);
         const [moved] = source.data.todos.splice(idx, 1);
+        delete moved.parent_id;
+        moved.depth = 0;
 
         // add to target
         moved.order_index = getMaxOrder(targetData.todos || []) + 1;

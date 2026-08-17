@@ -5,7 +5,37 @@ function M.setup(state)
         return require("doit.core.utils.id").generate(state.todos)
     end
     
-    function M.add_todo(text, priorities)
+    -- Re-depth a subtree in place, keeping its parent links intact.
+    local function redepth(parent_id, depth)
+        for _, todo in ipairs(state.todos) do
+            if todo.parent_id == parent_id then
+                todo.depth = depth
+                redepth(todo.id, depth + 1)
+            end
+        end
+    end
+
+    -- Promote a deleted todo's DIRECT children to top level. Their own
+    -- descendants stay attached to them and are only re-depthed — a grandchild
+    -- must not be orphaned just because its grandparent went away. Completion is
+    -- per-item (no cascade), so a child never vanishes because its parent did.
+    local function promote_children(parent_id)
+        if not parent_id then
+            return
+        end
+        for _, todo in ipairs(state.todos) do
+            if todo.parent_id == parent_id then
+                todo.parent_id = nil
+                todo.depth = 0
+                redepth(todo.id, 1)
+            end
+        end
+    end
+    M.promote_children = promote_children
+
+    function M.add_todo(text, priorities, parent_id)
+        local parent = parent_id and M.get_todo_by_id(parent_id) or nil
+
         local new_todo = {
             id = generate_todo_id(),
             text = text,
@@ -14,6 +44,11 @@ function M.setup(state)
             order_index = #state.todos + 1,
             description = require("doit.core.utils.footer").stamp(""),
         }
+
+        if parent then
+            new_todo.parent_id = parent.id
+            new_todo.depth = (parent.depth or 0) + 1
+        end
 
         if priorities and #priorities > 0 then
             new_todo.priorities = priorities
@@ -171,7 +206,9 @@ function M.setup(state)
         if state.todos[index] then
             local todo = state.todos[index]
             todo.delete_time = os.time()
-            
+
+            promote_children(todo.id)
+
             table.insert(state.deleted_todos, 1, todo)
             table.remove(state.todos, index)
             
@@ -190,10 +227,13 @@ function M.setup(state)
             if state.todos[i].done then
                 local todo = state.todos[i]
                 todo.delete_time = os.time()
-                
+
+                -- incomplete children outlive a completed parent
+                promote_children(todo.id)
+
                 table.insert(state.deleted_todos, 1, todo)
                 table.remove(state.todos, i)
-                
+
                 deleted_count = deleted_count + 1
             end
         end
@@ -214,6 +254,12 @@ function M.setup(state)
             local todo = table.remove(state.deleted_todos, 1)
 
             todo.delete_time = nil
+
+            -- the parent may be gone since the delete; never restore a dangling link
+            if todo.parent_id and not M.get_todo_by_id(todo.parent_id) then
+                todo.parent_id = nil
+                todo.depth = 0
+            end
 
             todo.order_index = #state.todos + 1
 
