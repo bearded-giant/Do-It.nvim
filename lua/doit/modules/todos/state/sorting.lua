@@ -1,4 +1,6 @@
 -- Sorting functionality for todos module
+local tags_util = require("doit.modules.todos.state.tags")
+
 local M = {}
 
 -- Rank by the priority string directly (critical > urgent > important > none).
@@ -67,7 +69,7 @@ function M.setup(state)
         -- Apply tag filter if set
         if state.active_filter then
             for _, todo in ipairs(state.todos) do
-                if todo.text:find("#" .. state.active_filter) then
+                if tags_util.has_tag(todo.text, state.active_filter) then
                     table.insert(todos, todo)
                 end
             end

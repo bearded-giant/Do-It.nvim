@@ -428,8 +428,9 @@ Todo items:
 
 | Tool | Description |
 |------|-------------|
-| `list_todos` | List items from a list, filtered by status and/or priority |
+| `list_todos` | List items from a list, filtered by status, priority and/or #tag |
 | `search_todos` | Search every list for items matching a text pattern |
+| `list_tags` | List the inline #tags on a list, with usage counts |
 | `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank |
 | `update_todo` | Edit text, description, status, priority, or order. Needs an id |
 | `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |

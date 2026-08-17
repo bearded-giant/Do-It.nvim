@@ -55,8 +55,9 @@ describe("tags", function()
 	it("should delete tags from all todos", function()
 		doit_state.delete_tag("tag1")
 
-		assert.are.equal("Todo with ", doit_state.todos[1].text)
-		assert.are.equal("Another  todo", doit_state.todos[3].text)
+		-- the gap the tag leaves behind is closed, so no trailing/doubled spaces
+		assert.are.equal("Todo with", doit_state.todos[1].text)
+		assert.are.equal("Another todo", doit_state.todos[3].text)
 
 		assert.are.equal("Todo with #tag2 and #tag3", doit_state.todos[2].text)
 	end)
@@ -66,6 +67,43 @@ describe("tags", function()
 
 		doit_state.delete_tag("tagend")
 
-		assert.are.equal("Todo with tag at end ", doit_state.todos[5].text)
+		assert.are.equal("Todo with tag at end", doit_state.todos[5].text)
+	end)
+
+	it("should not collapse a multi-line todo when deleting a tag", function()
+		table.insert(doit_state.todos, { text = "line one #drop\nline two", done = false })
+
+		doit_state.delete_tag("drop")
+
+		assert.are.equal("line one\nline two", doit_state.todos[5].text)
+	end)
+
+	it("should match tags exactly, not as a prefix", function()
+		doit_state.todos = {
+			{ text = "fix #labels bug", done = false },
+			{ text = "ship #labels-web page", done = false },
+		}
+
+		doit_state.rename_tag("labels", "tickets")
+
+		assert.are.equal("fix #tickets bug", doit_state.todos[1].text)
+		assert.are.equal("ship #labels-web page", doit_state.todos[2].text)
+	end)
+
+	it("should support dashes, underscores and slashes in tags", function()
+		doit_state.todos = {
+			{ text = "audit #api/v2 route", done = false },
+			{ text = "chore #back_end task", done = false },
+			{ text = "spike #labels-web idea", done = false },
+		}
+
+		local names = {}
+		for _, tag in ipairs(doit_state.get_all_tags()) do
+			names[tag.name] = true
+		end
+
+		assert.is_true(names["api/v2"])
+		assert.is_true(names["back_end"])
+		assert.is_true(names["labels-web"])
 	end)
 end)

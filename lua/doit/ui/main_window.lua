@@ -9,6 +9,7 @@ local tag_window = require("doit.ui.tag_window")
 local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
 local list_selector = require("doit.ui.list_selector")
+local tags_util = require("doit.modules.todos.state.tags")
 
 local core = require("doit.core")
 
@@ -360,7 +361,7 @@ function M.build_render_rows()
 			goto continue
 		end
 
-		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+		local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
 
 		if show_by_tag then
 			-- group separators (mirror tmux): blank line between priority groups,

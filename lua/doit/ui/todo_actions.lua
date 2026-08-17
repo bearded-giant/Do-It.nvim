@@ -5,6 +5,7 @@ local calendar = require("doit.calendar")
 local multiline_input = require("doit.core.ui.multiline_input")
 
 local footer = require("doit.core.utils.footer")
+local tags_util = require("doit.modules.todos.state.tags")
 
 -- Lazy loading of todo module and state
 local todo_module = nil
@@ -170,7 +171,7 @@ local function resolve_at_line(line_num)
 			goto continue
 		end
 
-		local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+		local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
 
 		if show_by_tag then
 			if todo.done then
@@ -569,7 +570,7 @@ function M.toggle_todo(win_id, on_render)
 						goto continue_cursor
 					end
 
-					local show_by_tag = not state.active_filter or todo.text:match("#" .. state.active_filter)
+					local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
 
 					if show_by_tag then
 						if i == new_position then
@@ -1021,7 +1022,7 @@ function M.edit_priorities(win_id, on_render)
 							if state.active_filter then
 								local visible_count = 0
 								for i, todo in ipairs(state.todos) do
-									if todo.text:match("#" .. state.active_filter) then
+									if tags_util.has_tag(todo.text, state.active_filter) then
 										visible_count = visible_count + 1
 										if i == new_position then
 											new_line_num = visible_count + 2 -- 2 extra lines for filter header
@@ -1200,7 +1201,7 @@ function M.reorder_todo(win_id, on_render)
 
 	-- passes the active tag filter (mirrors resolve_at_line)
 	local function is_visible(todo)
-		return not state.active_filter or todo.text:match("#" .. state.active_filter) ~= nil
+		return tags_util.has_tag(todo.text, state.active_filter)
 	end
 
 	-- buffer line (1-based) of a todo's first row in the current render.

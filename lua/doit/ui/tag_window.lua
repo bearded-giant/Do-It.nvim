@@ -1,14 +1,22 @@
 local vim = vim
 
--- Get the todo module and use its state
 local core = require("doit.core")
-local todo_module = core.get_module("todos")
-local state = todo_module and todo_module.state or {}
-if state.load_todos then
-    state.load_todos()
+
+-- Resolved lazily: this module is required while the todos module is still
+-- registering, so capturing state at require time yields an empty table.
+local function get_state()
+    local todo_module = core.get_module("todos")
+    if not todo_module then
+        local ok, doit = pcall(require, "doit")
+        if ok and doit.load_module then
+            todo_module = doit.load_module("todos", {})
+        end
+    end
+    return (todo_module and todo_module.state) or {}
 end
 
 local config = require("doit.config")
+local todos_config = require("doit.modules.todos.config")
 
 local M = {}
 
@@ -41,7 +49,8 @@ function M.create_tag_window(main_win_id)
 
 	local width = 30
 	local height = 10
-	local ui = vim.api.nvim_list_uis()[1]
+	-- headless has no attached UI, so fall back to the editor grid
+	local ui = vim.api.nvim_list_uis()[1] or { width = vim.o.columns, height = vim.o.lines }
 	local main_width = 40
 	local main_col = math.floor((ui.width - main_width) / 2)
 	local col = main_col - width - 2
@@ -59,18 +68,41 @@ function M.create_tag_window(main_win_id)
 		title_pos = "center",
 	})
 
-	local tags = state.get_all_tags()
-	if #tags == 0 then
-		tags = { "No tags found" }
+	local state = get_state()
+
+	-- get_all_tags returns { name = , count = } records, so the display string and
+	-- the tag itself are kept apart: rows render with counts, actions look the tag
+	-- up by line number instead of re-parsing what is on screen.
+	local tag_names = {}
+
+	local function render_tags()
+		local tags = state.get_all_tags()
+		local lines = {}
+		tag_names = {}
+
+		for _, tag in ipairs(tags) do
+			table.insert(lines, string.format("#%s  (%d)", tag.name, tag.count))
+			table.insert(tag_names, tag.name)
+		end
+
+		if #lines == 0 then
+			lines = { "No tags found" }
+		end
+
+		vim.api.nvim_buf_set_option(tag_buf_id, "modifiable", true)
+		vim.api.nvim_buf_set_lines(tag_buf_id, 0, -1, false, lines)
 	end
 
-	vim.api.nvim_buf_set_lines(tag_buf_id, 0, -1, false, tags)
-	vim.api.nvim_buf_set_option(tag_buf_id, "modifiable", true)
+	local function tag_at_cursor()
+		local cursor = vim.api.nvim_win_get_cursor(tag_win_id)
+		return tag_names[cursor[1]]
+	end
+
+	render_tags()
 
 	vim.keymap.set("n", "<CR>", function()
-		local cursor = vim.api.nvim_win_get_cursor(tag_win_id)
-		local tag = vim.api.nvim_buf_get_lines(tag_buf_id, cursor[1] - 1, cursor[1], false)[1]
-		if tag ~= "No tags found" then
+		local tag = tag_at_cursor()
+		if tag then
 			state.set_tag_filter(tag)
 			M.close_tag_window()
 			if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
@@ -79,37 +111,27 @@ function M.create_tag_window(main_win_id)
 		end
 	end, { buffer = tag_buf_id })
 
-	vim.keymap.set("n", config.options.keymaps.edit_tag, function()
-		local cursor = vim.api.nvim_win_get_cursor(tag_win_id)
-		local old_tag = vim.api.nvim_buf_get_lines(tag_buf_id, cursor[1] - 1, cursor[1], false)[1]
-		if old_tag ~= "No tags found" then
+	vim.keymap.set("n", todos_config.resolve_key("edit_tag"), function()
+		local old_tag = tag_at_cursor()
+		if old_tag then
 			vim.ui.input({ prompt = "Edit tag: ", default = old_tag }, function(new_tag)
 				if new_tag and new_tag ~= "" and new_tag ~= old_tag then
 					state.rename_tag(old_tag, new_tag)
-					local updated_tags = state.get_all_tags()
-					if #updated_tags == 0 then
-						updated_tags = { "No tags found" }
-					end
-					vim.api.nvim_buf_set_lines(tag_buf_id, 0, -1, false, updated_tags)
+					render_tags()
 				end
 			end)
 		end
 	end, { buffer = tag_buf_id })
 
-	vim.keymap.set("n", config.options.keymaps.delete_tag, function()
-		local cursor = vim.api.nvim_win_get_cursor(tag_win_id)
-		local tag = vim.api.nvim_buf_get_lines(tag_buf_id, cursor[1] - 1, cursor[1], false)[1]
-		if tag ~= "No tags found" then
+	vim.keymap.set("n", todos_config.resolve_key("delete_tag"), function()
+		local tag = tag_at_cursor()
+		if tag then
 			state.delete_tag(tag)
-			local updated_tags = state.get_all_tags()
-			if #updated_tags == 0 then
-				updated_tags = { "No tags found" }
-			end
-			vim.api.nvim_buf_set_lines(tag_buf_id, 0, -1, false, updated_tags)
+			render_tags()
 		end
 	end, { buffer = tag_buf_id })
 
-	vim.keymap.set("n", config.options.keymaps.close_window, function()
+	vim.keymap.set("n", todos_config.resolve_key("close_window"), function()
 		M.close_tag_window()
 		if main_win_id and vim.api.nvim_win_is_valid(main_win_id) then
 			vim.api.nvim_set_current_win(main_win_id)

@@ -79,6 +79,20 @@ function generateId() {
     return `${ts}_${rand}`;
 }
 
+// Tags live inline in the todo text, not in a schema field — same contract as
+// the nvim and tmux surfaces. Matching is exact-token, so #labels never matches
+// #labels-web. Charset mirrors state/tags.lua's [%w_%-/]+.
+const TAG_PATTERN = /#([\w\-/]+)/g;
+
+function parseTags(text) {
+    return [...String(text || "").matchAll(TAG_PATTERN)].map(m => m[1]);
+}
+
+function hasTag(text, tag) {
+    if (!tag) return true;
+    return parseTags(text).includes(tag);
+}
+
 // Drop the machine-managed footer so re-saving refreshes the stamp instead of
 // stacking. Matches either verb so older "last updated" stamps are stripped too.
 function stripFooter(desc) {
@@ -261,8 +275,9 @@ server.tool(
         list: z.string().optional().describe("List name (default: active list)"),
         filter: z.enum(["all", "pending", "done", "in_progress"]).optional().describe("Filter by status (default: all)"),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Filter by priority level. Items without a priority are 'default'."),
+        tag: z.string().optional().describe("Filter by inline #tag, without the '#'. Exact match: 'labels' does not match 'labels-web'."),
     },
-    async ({ list, filter = "all", priority }) => {
+    async ({ list, filter = "all", priority, tag }) => {
         const { name, data } = loadList(list);
         let todos = data.todos || [];
 
@@ -272,6 +287,11 @@ server.tool(
 
         if (priority) {
             todos = todos.filter(t => t.priorities === priority);
+        }
+
+        if (tag) {
+            const wanted = tag.replace(/^#/, "");
+            todos = todos.filter(t => hasTag(t.text, wanted));
         }
 
         todos.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
@@ -297,6 +317,41 @@ server.tool(
             content: [{
                 type: "text",
                 text,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "list_tags",
+    "List the inline #tags used on a do-it list, with how many items carry each. Tags are parsed from todo text — there is no tag field. Counts cover active (not done) items by default, matching what the nvim and tmux tag pickers show.",
+    {
+        list: z.string().optional().describe("List name (default: active list)"),
+        include_done: z.boolean().optional().describe("Also count tags on completed items (default: false)"),
+    },
+    async ({ list, include_done }) => {
+        const { name, data } = loadList(list);
+        const todos = (data.todos || []).filter(t => include_done || !t.done);
+
+        const counts = new Map();
+        for (const todo of todos) {
+            for (const tag of parseTags(todo.text)) {
+                counts.set(tag, (counts.get(tag) || 0) + 1);
+            }
+        }
+
+        if (counts.size === 0) {
+            return { content: [{ type: "text", text: `No tags on "${name}".` }] };
+        }
+
+        const rows = [...counts.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([tag, n]) => `#${tag}  (${n})`);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Tags on "${name}":\n\n${rows.join("\n")}`,
             }],
         };
     }

@@ -132,6 +132,15 @@ Delete/Undo~
     D                  Delete all completed
     u                  Undo last delete
 
+Tags~
+    t                  Filter by inline #tag (picker shows usage counts)
+    c                  Clear the active tag filter
+
+    Tags are written inline in the todo text, so they are shared with the
+    nvim UI and the MCP server. Matching is exact: filtering on `labels`
+    shows `#labels` items and not `#labels-web`. Tag names may contain
+    letters, digits, `_`, `-` and `/`.
+
 Lists~
     l                  Switch lists
     L                  List manager (create/rename/delete)

@@ -5,6 +5,7 @@ local core = require("doit.core")
 local todo_module = core.get_module("todos")
 local state = todo_module and todo_module.state or {}
 local config = require("doit.config")
+local todos_config = require("doit.modules.todos.config")
 
 local M = {}
 
@@ -88,11 +89,7 @@ local function handle_search_query(query, main_win_id)
 
 	vim.api.nvim_buf_set_option(search_buf_id, "modifiable", false)
 
-	-- confirm config and keymaps exist
-	local close_key = "q"
-	if config and config.options and config.options.keymaps and config.options.keymaps.close_window then
-		close_key = config.options.keymaps.close_window
-	end
+	local close_key = todos_config.resolve_key("close_window") or "q"
 
 	vim.keymap.set("n", close_key, function()
 		M.close_search_window()

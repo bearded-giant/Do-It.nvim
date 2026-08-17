@@ -140,6 +140,22 @@ M.defaults = {
     hour_score_value = 1 / 8,
 }
 
+-- Resolve a keymap by option name. Precedence matches main_window's setup_keymap:
+-- user module config, user legacy top-level, then M.defaults here. Callers MUST
+-- use this rather than indexing config.options.keymaps, which only exists when
+-- the user supplied one.
+function M.resolve_key(key_option)
+    local ok, root = pcall(require, "doit.config")
+    local opts = (ok and root.options) or {}
+
+    local mod = opts.modules and opts.modules.todos
+    local key = mod and mod.keymaps and mod.keymaps[key_option]
+    if not key and opts.keymaps then
+        key = opts.keymaps[key_option]
+    end
+    return key or M.defaults.keymaps[key_option]
+end
+
 -- Module configuration
 M.options = {}
 

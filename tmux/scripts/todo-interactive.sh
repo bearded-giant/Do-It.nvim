@@ -113,6 +113,31 @@ export TODO_LIST_PATH
 # Function to display todos in a formatted way (excludes done todos)
 # Format: hidden ID at end for extraction, visible: status + priority indicator + first line of text
 # Shows ... indicator for multi-line items
+# Tags live inline in the todo text (no schema field), same contract as nvim and
+# MCP. Matching is exact-token so #labels never matches #labels-web; the charset
+# mirrors state/tags.lua's [%w_%-/]+.
+# Active inline-tag filter (empty = show everything). Set by the [t] picker.
+TAG_FILTER=""
+
+# fzf tag picker with usage counts. Returns the chosen tag on stdout, empty on
+# cancel. Counts cover active items only, matching the nvim tag window.
+pick_tag() {
+    local rows
+    rows=$(jq -r '
+        [.todos[] | select(.done != true) | .text | scan("#([\\w/-]+)")] | flatten |
+        group_by(.) | map({name: .[0], count: length}) |
+        sort_by(-.count, .name) | .[] | "\(.name)\t\(.count)"
+    ' "$TODO_LIST_PATH" 2>/dev/null)
+
+    [[ -z "$rows" ]] && return 1
+
+    printf '%s\n' "$rows" \
+        | awk -F'\t' '{printf "#%s  (%s)\n", $1, $2}' \
+        | fzf --ansi --header=" Filter by tag   ·   [esc] cancel" --prompt="tag> " \
+              --height=100% --layout=reverse --no-sort \
+        | sed 's/^#//; s/  ([0-9]*)$//'
+}
+
 format_todos() {
     # tracks the previous priority group so we can emit a blank line on change
     local prev_group=""
@@ -153,8 +178,8 @@ format_todos() {
             "important") printf "%s%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r --argjson tw "$text_w" '.todos |
-        map(select(.in_progress == true)) |
+    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+        map(select(.in_progress == true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:$tw]) as $first_line |
@@ -183,8 +208,8 @@ format_todos() {
             "important") printf "%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s  %-${text_w}s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r --argjson tw "$text_w" '.todos |
-        map(select(.done == false and .in_progress != true)) |
+    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+        map(select(.done == false and .in_progress != true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:$tw]) as $first_line |
@@ -219,8 +244,8 @@ format_todos() {
             obs_icon=""
             [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
             printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        done < <(jq -r --argjson tw "$text_w" '.todos |
-            map(select(.done == true)) |
+        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+            map(select(.done == true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
             sort_by(-(.completed_at // 0)) |
             .[] |
             (.text | split("\n")[0][0:$tw]) as $first_line |
@@ -487,9 +512,9 @@ while true; do
 
     SELECTION=$(printf '%s\n' "$LIST" | fzf --ansi --disabled \
         "${START_BIND[@]}" \
-        --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)   ·   [?] help" \
+        --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)${TAG_FILTER:+   ·   filter: #$TAG_FILTER [c] clear}   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g,t,c \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -522,6 +547,17 @@ while true; do
         NOTE_ID="${TODO_ID#note_}"
         TODO_ID=""
     fi
+    # t filters the list by an inline #tag, c clears that filter
+    if [[ "$KEY" == "t" ]]; then
+        PICKED=$(pick_tag) || { TAG_FILTER=""; continue; }
+        [[ -n "$PICKED" ]] && TAG_FILTER="$PICKED"
+        continue
+    fi
+    if [[ "$KEY" == "c" ]]; then
+        TAG_FILTER=""
+        continue
+    fi
+
     # g browses the full notes list (CRUD modal); selecting a note row opens it
     if [[ "$KEY" == "g" ]]; then
         "$SCRIPT_DIR/todo-notes.sh"
@@ -1184,6 +1220,8 @@ while true; do
             help_row "  g        List notes (modal)"      "  l      Switch list"
             help_row "  on note: Enter/e open · d del · y copy" "  L    List manager"
             help_row "VIEW / MISC"                       "  /      Search / filter"
+            help_row ""                                  "  t      Filter by #tag"
+            help_row ""                                  "  c      Clear tag filter"
             help_row "  Enter    Open item / note (nvim)" "  E      Export pending to markdown"
             help_row "  y        Copy text"              "OBSIDIAN"
             help_row "  C-y      Copy note text"         "  O      Send to daily note"
