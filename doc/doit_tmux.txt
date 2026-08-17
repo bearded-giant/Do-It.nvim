@@ -250,6 +250,15 @@ displays.
 
 Markdown export directory (default: the popup's working directory): >tmux
     set -g @doit-export-dir "~/notes/exports"
+
+Per-project lists (default: off): >tmux
+    set -g @doit-project-lists "on"
+<
+    A pane inside a git repository resolves to a list named after the
+    repository directory, created the first time it is used. Panes outside a
+    repository fall back to the session's active list, and DOIT_ACTIVE_LIST
+    still wins over both. The nvim side is `modules.todos.project_lists`, and
+    both derive the same name for a given repository.
 <
 Sets the directory prefilled in the `E` (export to markdown) prompt in the
 interactive manager. The nvim UI has the same key; its directory comes from
@@ -260,7 +269,7 @@ Environment Variables:~
 The plugin sets these environment variables automatically:
 - DOIT_TMUX_DIR: Path to tmux plugin directory
 - DOIT_SCRIPTS_DIR: Path to scripts directory
-- DOIT_ACTIVE_LIST: Currently active list name
+- DOIT_ACTIVE_LIST: Currently active list name (overrides per-project lists)
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

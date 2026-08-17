@@ -459,6 +459,26 @@ Set a default list to load on startup: >lua
         }
     })
 <
+Per-project lists:~
+Give each git repository its own list, named after the repository directory
+and created the first time you open it: >lua
+    require("doit").setup({
+        modules = {
+            todos = {
+                project_lists = true,  -- default: false
+            }
+        }
+    })
+<
+Outside a git repository the default list is used. The tmux add-on has the
+matching `@doit-project-lists` option, and both derive the same name from a
+given repository, so the two surfaces always resolve to the same list.
+
+A list name becomes a filename, so characters outside letters, digits, `.`,
+`_` and `-` are dropped and whitespace becomes `_`. Dots are kept, meaning a
+repository called `do-it.nvim` uses a list of the same name. Two repositories
+with the same directory name share a list.
+
 
 IMPORT/EXPORT                                                 *doit-import*
 

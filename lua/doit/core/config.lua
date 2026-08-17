@@ -19,6 +19,8 @@ M.defaults = {
     modules = {
         todos = {
             enabled = true,
+            -- opt-in: inside a git repo, use a list named after the repo dir
+            project_lists = false,
             save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
             timestamp = {
                 enabled = true,

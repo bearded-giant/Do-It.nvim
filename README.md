@@ -371,6 +371,10 @@ set -g @doit-interactive-popup-h "80%"
 
 # Where `E` writes markdown exports (default: the popup's working directory)
 set -g @doit-export-dir "~/notes/exports"
+
+# Per-project lists: a pane inside a git repo uses a list named after the
+# repo directory, created on first use (default: off)
+set -g @doit-project-lists "on"
 ```
 
 ### Status Bar Integration
@@ -479,7 +483,7 @@ Duplicate detection strips that whole wrapper before comparing, so an item you t
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOIT_DATA_DIR` | `~/.local/share/nvim/doit` | Data directory path |
-| `DOIT_ACTIVE_LIST` | (from session.json) | Override active list name |
+| `DOIT_ACTIVE_LIST` | (from session.json) | Override active list name. Wins over per-project derivation |
 
 The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
 

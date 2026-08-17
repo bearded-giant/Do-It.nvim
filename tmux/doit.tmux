@@ -68,6 +68,12 @@ tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-lis
 # Markdown export directory for the E key (default: popup's working dir)
 # set -g @doit-export-dir "~/notes/exports"
 
+# Per-project lists (default: off). When on, a pane inside a git repo resolves
+# to a list named after the repo directory, created on first use. Panes outside
+# a repo fall back to the session's active list. DOIT_ACTIVE_LIST still wins.
+# The nvim side is modules.todos.project_lists.
+# set -g @doit-project-lists "on"
+
 # Alt+Shift shortcuts (no prefix needed)
 # Check if alt bindings are enabled (default: yes)
 alt_bindings=$(tmux show-option -gqv "@doit-alt-bindings")

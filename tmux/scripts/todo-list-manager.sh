@@ -82,7 +82,7 @@ create_list() {
     fi
 
     # sanitize name (alphanumeric, dash, underscore only)
-    SAFE_NAME=$(echo "$NEW_NAME" | tr ' ' '_' | tr -cd '[:alnum:]_-')
+    SAFE_NAME=$(sanitize_list_name "$NEW_NAME")
 
     if [[ -f "$LISTS_DIR/${SAFE_NAME}.json" ]]; then
         echo "${COLOR_RED}Error: List '$SAFE_NAME' already exists${COLOR_RESET}"
@@ -128,7 +128,7 @@ rename_list() {
         return
     fi
 
-    SAFE_NAME=$(echo "$NEW_NAME" | tr ' ' '_' | tr -cd '[:alnum:]_-')
+    SAFE_NAME=$(sanitize_list_name "$NEW_NAME")
 
     if [[ -f "$LISTS_DIR/${SAFE_NAME}.json" ]]; then
         echo "${COLOR_RED}Error: List '$SAFE_NAME' already exists${COLOR_RESET}"

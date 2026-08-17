@@ -1,11 +1,14 @@
 -- Core utilities for doit.nvim
 local M = {}
 
--- Initialize all utility modules
+-- Bound at module scope: core/init.lua requires this module but never called
+-- setup(), so these stayed nil at runtime and every core.utils.project caller
+-- (including core/api.lua's M.projects) was dead.
+M.path = require("doit.core.utils.path")
+M.fs = require("doit.core.utils.fs")
+M.project = require("doit.core.utils.project")
+
 function M.setup()
-    M.path = require("doit.core.utils.path")
-    M.fs = require("doit.core.utils.fs")
-    M.project = require("doit.core.utils.project")
     return M
 end
 

@@ -66,6 +66,19 @@ function M.get_identifier()
     return M.hash_path(root)
 end
 
+-- Git root only, with no cwd fallback. get_root() falls back to cwd when
+-- config.project.detection.fallback_to_cwd is on, which would make every
+-- directory look like a project — list derivation needs the stricter answer.
+function M.get_git_root(cwd)
+    cwd = cwd or vim.fn.getcwd()
+    local cmd = "git -C " .. vim.fn.shellescape(cwd) .. " rev-parse --show-toplevel 2>/dev/null"
+    local git_root = vim.fn.system(cmd):gsub("\n", "")
+    if git_root == "" then
+        return nil
+    end
+    return git_root
+end
+
 -- Get project name (last directory name)
 function M.get_name()
     local root = M.get_root()

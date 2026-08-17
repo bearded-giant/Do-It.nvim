@@ -169,6 +169,12 @@ function storage.setup(M)
             list_name = default_list_name
         end
 
+        -- A list name is a filename. Without this a name carrying a slash or
+        -- ".." would resolve outside lists_dir; the same rule runs in bash on
+        -- the tmux side so both surfaces agree on where a list lives.
+        local project_list = require("doit.modules.todos.state.project_list")
+        list_name = project_list.sanitize(list_name) or default_list_name
+
         return config.lists_dir .. "/" .. list_name .. ".json"
     end
     
@@ -439,9 +445,20 @@ function storage.setup(M)
             end
         end
         
+        -- Opt-in: a git repo gets its own list. Runs after the session restore so
+        -- it wins for this session, but the session file still remembers whatever
+        -- list was last active globally. load_list creates the file when missing.
+        if config.project_lists then
+            local project_list = require("doit.modules.todos.state.project_list")
+            local derived = project_list.derive()
+            if derived then
+                config.active_list = derived
+            end
+        end
+
         -- Load the configured active list
         storage.load_list(config.active_list)
-        
+
         -- Get available lists
         storage.get_available_lists()
     end

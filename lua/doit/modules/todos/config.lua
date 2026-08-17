@@ -5,6 +5,10 @@ local M = {}
 M.defaults = {
     enabled = true,
     show_completed = true,
+    -- opt-in: inside a git repo, use a list named after the repo dir.
+    -- Must stay in sync with core/config.lua's modules.todos default and the
+    -- tmux @doit-project-lists option.
+    project_lists = false,
     save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
     import_export_path = vim.fn.expand("~/todos.json"),
     backup_dir = vim.fn.stdpath("data") .. "/doit/backups",
