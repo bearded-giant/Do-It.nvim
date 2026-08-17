@@ -93,6 +93,37 @@ function hasTag(text, tag) {
     return parseTags(text).includes(tag);
 }
 
+// Due dates are "YYYY-MM-DD" strings in the shared `due_date` field, matching
+// state/due_dates.lua. Both ends of the comparison are taken at noon so a DST
+// shift cannot round the difference to the wrong day.
+const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDue(due) {
+    if (typeof due !== "string" || !DUE_DATE_RE.test(due)) return null;
+    const [y, m, d] = due.split("-").map(Number);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, m - 1, d, 12);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+    return dt;
+}
+
+function daysUntilDue(due, now) {
+    const dt = parseDue(due);
+    if (!dt) return null;
+    const ref = now || new Date();
+    const todayNoon = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 12);
+    return Math.round((dt - todayNoon) / 86400000);
+}
+
+function renderDue(due, now) {
+    const days = daysUntilDue(due, now);
+    if (days === null) return "";
+    if (days < 0) return `overdue ${-days}d`;
+    if (days === 0) return "due today";
+    if (days === 1) return "due tomorrow";
+    return `in ${days}d`;
+}
+
 // Drop the machine-managed footer so re-saving refreshes the stamp instead of
 // stacking. Matches either verb so older "last updated" stamps are stripped too.
 function stripFooter(desc) {
@@ -276,8 +307,9 @@ server.tool(
         filter: z.enum(["all", "pending", "done", "in_progress"]).optional().describe("Filter by status (default: all)"),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Filter by priority level. Items without a priority are 'default'."),
         tag: z.string().optional().describe("Filter by inline #tag, without the '#'. Exact match: 'labels' does not match 'labels-web'."),
+        due: z.enum(["overdue", "today", "week"]).optional().describe("Filter by due date: overdue, due today, or due within 7 days (which includes overdue and today)."),
     },
-    async ({ list, filter = "all", priority, tag }) => {
+    async ({ list, filter = "all", priority, tag, due }) => {
         const { name, data } = loadList(list);
         let todos = data.todos || [];
 
@@ -294,12 +326,23 @@ server.tool(
             todos = todos.filter(t => hasTag(t.text, wanted));
         }
 
+        if (due) {
+            todos = todos.filter(t => {
+                const days = daysUntilDue(t.due_date);
+                if (days === null) return false;
+                if (due === "overdue") return days < 0;
+                if (due === "today") return days === 0;
+                return days <= 7; // "week" spans overdue through the next 7 days
+            });
+        }
+
         todos.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
         const lines = todos.map(t => {
             const status = t.done ? "[x]" : t.in_progress ? "[~]" : "[ ]";
             const prio = t.priorities ? ` ${PRIORITY_LABELS[t.priorities] || t.priorities}` : "";
-            let line = `${status}${prio} ${t.text}  [id:${t.id}]`;
+            const dueLabel = t.due_date ? ` [${renderDue(t.due_date)}]` : "";
+            let line = `${status}${prio} ${t.text}${dueLabel}  [id:${t.id}]`;
             if (t.description) {
                 const notePreview = t.description.split("\n").map(l => `    ${l}`).join("\n");
                 line += `\n    notes:\n${notePreview}`;
@@ -404,9 +447,10 @@ server.tool(
         deps: z.array(z.union([z.number(), z.string()])).optional().describe("Blocking rank numbers." + DEPS_HINT),
         description: z.string().optional().describe("Multi-line notes/description." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Priority level"),
+        due: z.string().optional().describe("Due date as YYYY-MM-DD. Shared with the nvim and tmux views."),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
     },
-    async ({ text, list, type, deps, description, priority, start }) => {
+    async ({ text, list, type, deps, description, priority, due, start }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
         const composed = composeTodoText(text, { type, deps, rank: nextRank(data.todos || []) });
@@ -420,6 +464,10 @@ server.tool(
         };
         newTodo.description = stampDescription(description || "");
         if (priority) newTodo.priorities = priority;
+        if (due) {
+            if (!parseDue(due)) throw new Error(`Invalid due date "${due}". Use YYYY-MM-DD.`);
+            newTodo.due_date = due;
+        }
 
         data.todos = data.todos || [];
         data.todos.push(newTodo);
@@ -451,8 +499,9 @@ server.tool(
         done: z.boolean().optional().describe("Set done status"),
         in_progress: z.boolean().optional().describe("Set in_progress status"),
         order_index: z.number().optional().describe("Set order position"),
+        due: z.string().optional().describe("Set due date as YYYY-MM-DD. Use an empty string to clear it."),
     },
-    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index }) => {
+    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index, due }) => {
         const { name, filepath, data } = loadList(list);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
@@ -478,6 +527,15 @@ server.tool(
             if (in_progress) todo.done = false;
         }
         if (order_index !== undefined) todo.order_index = order_index;
+        if (due !== undefined) {
+            if (due === "") {
+                delete todo.due_date;
+            } else if (!parseDue(due)) {
+                throw new Error(`Invalid due date "${due}". Use YYYY-MM-DD.`);
+            } else {
+                todo.due_date = due;
+            }
+        }
 
         saveList(filepath, data);
 

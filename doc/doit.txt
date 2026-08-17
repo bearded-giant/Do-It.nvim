@@ -274,7 +274,8 @@ Main Window~
     D           Delete all completed
     gn          Add a list note (scratch note in the Notes section)
     q           Close window
-    H           Add due date
+    H           Add due date (calendar picker)
+    h           Remove due date
     T           Add time estimation
     R           Remove time estimation
     ?           Toggle help window

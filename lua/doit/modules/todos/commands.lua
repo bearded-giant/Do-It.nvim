@@ -424,6 +424,64 @@ Commands:
         }
     }
     
+    commands.DoItDue = {
+        callback = function()
+            local due_dates = require("doit.modules.todos.state.due_dates")
+            local state = module.state
+
+            local rows = {}
+            for _, todo in ipairs(state.todos or {}) do
+                if not todo.done and todo.due_date then
+                    local days = due_dates.days_until(todo.due_date)
+                    if days then
+                        table.insert(rows, { todo = todo, days = days })
+                    end
+                end
+            end
+
+            if #rows == 0 then
+                vim.notify("No open to-dos with a due date.", vim.log.levels.INFO)
+                return
+            end
+
+            -- soonest (most overdue) first
+            table.sort(rows, function(a, b) return a.days < b.days end)
+
+            local items = {}
+            for _, row in ipairs(rows) do
+                local first_line = vim.split(row.todo.text, "\n", { plain = true })[1]
+                table.insert(items, string.format("%-14s %s", due_dates.render(row.todo.due_date), first_line))
+            end
+
+            vim.ui.select(items, { prompt = "Due to-dos" }, function(_, idx)
+                if not idx then
+                    return
+                end
+                -- jump to the picked todo in the main window
+                local main_window = require("doit.ui.main_window")
+                main_window.toggle_todo_window()
+                main_window.render_todos()
+                local target = rows[idx].todo
+                local win = main_window.get_window_id()
+                if not win or not vim.api.nvim_win_is_valid(win) then
+                    return
+                end
+                local buf = vim.api.nvim_win_get_buf(win)
+                local needle = vim.split(target.text, "\n", { plain = true })[1]
+                for i, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+                    if line:find(needle, 1, true) then
+                        pcall(vim.api.nvim_win_set_cursor, win, { i, 0 })
+                        break
+                    end
+                end
+            end)
+        end,
+        opts = {
+            desc = "List open to-dos with a due date, soonest first",
+            nargs = 0,
+        }
+    }
+
     commands.DoItBackup = {
         callback = function()
             local success, msg = module.state.backup_all_lists()

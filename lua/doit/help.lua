@@ -33,6 +33,7 @@ M.keymaps = {
 			{ key = "/", desc = "Search todos" },
 		},
 		advanced = {
+			{ key = "h", desc = "Remove due date" },
 			{ key = "H", desc = "Add/edit due date (calendar)" },
 			{ key = "r", desc = "Reorder current todo (use j/k to move)" },
 			{ key = "T", desc = "Add time estimation" },

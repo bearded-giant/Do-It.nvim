@@ -10,6 +10,7 @@ local search_window = require("doit.ui.search_window")
 local scratchpad = require("doit.ui.scratchpad")
 local list_selector = require("doit.ui.list_selector")
 local tags_util = require("doit.modules.todos.state.tags")
+local due_dates = require("doit.modules.todos.state.due_dates")
 
 local core = require("doit.core")
 
@@ -682,6 +683,11 @@ function M.format_todo_line(todo)
 			if todo.created_at and config.options.timestamp and config.options.timestamp.enabled then
 				table.insert(components, "- @" .. format_relative_time(todo.created_at))
 			end
+		elseif part == "due_date" then
+			local due = due_dates.render(todo.due_date)
+			if due ~= "" then
+				table.insert(components, "[" .. due .. "]")
+			end
 		elseif part == "priority" then
 			local score = state.get_priority_score(todo)
 			table.insert(components, string.format("Priority: %d", score))
@@ -1135,6 +1141,12 @@ local function create_window()
 
 	setup_keymap("add_due_date", function()
 		todo_actions.add_due_date(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("remove_due_date", function()
+		todo_actions.remove_due_date(win_id, function()
 			M.render_todos()
 		end)
 	end)

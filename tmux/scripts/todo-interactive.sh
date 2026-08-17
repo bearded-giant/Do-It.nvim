@@ -84,6 +84,15 @@ SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
 SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
 # preview command for fzf - shows full todo content with line wrapping
+# Relative due label, matching state/due_dates.lua's render() and the MCP
+# server's renderDue(): "overdue 3d" / "due today" / "due tomorrow" / "in 5d".
+# jq's own date builtins are used so there is no BSD-vs-GNU `date` split.
+DUE_JQ='
+def due_days: ((. | strptime("%Y-%m-%d") | mktime) - ($today | strptime("%Y-%m-%d") | mktime)) / 86400 | round;
+def due_label: due_days as $n | if $n < 0 then "overdue \($n * -1)d" elif $n == 0 then "due today" elif $n == 1 then "due tomorrow" else "in \($n)d" end;
+'
+export DUE_JQ
+
 preview_todo() {
     local line="$1"
     local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
@@ -96,10 +105,11 @@ preview_todo() {
             (.body // "")
         ' "$TODO_LIST_PATH" 2>/dev/null
     elif [[ -n "$todo_id" ]]; then
-        jq -r --arg id "$todo_id" '
+        jq -r --arg id "$todo_id" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ"'
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
             "\nPriority: " + (.priorities // "none") +
+            (if .due_date then "\nDue: " + .due_date + " (" + (.due_date | due_label) + ")" else "" end) +
             (if .obsidian_ref then "\nObsidian:  " + (.obsidian_ref.date // "linked") else "" end) +
             "\n────────────────────────────────" +
             "\n" + .text +
@@ -160,7 +170,7 @@ format_todos() {
     echo ""
 
     # First print in-progress todos
-    while IFS='|' read -r id status priority text multiline obs; do
+    while IFS='|' read -r id status priority text multiline obs due; do
         # blank line between distinct priority groups
         local group="${priority:-default}"
         [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
@@ -169,6 +179,14 @@ format_todos() {
         # Add ... for multi-line items
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
+        if [[ -n "$due" ]]; then
+            # overdue shouts, everything else stays quiet
+            if [[ "$due" == overdue* ]]; then
+                suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
+            else
+                suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
+            fi
+        fi
         obs_icon=""
         [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         # Append ID at end (dimmed) for reliable extraction
@@ -178,18 +196,19 @@ format_todos() {
             "important") printf "%s%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ"'.todos |
         map(select(.in_progress == true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:$tw]) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
+        (if .due_date then (.due_date | due_label) else "" end) as $due |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)|\($due)"
     ' "$TODO_LIST_PATH")
 
     # Then print not started todos, grouped under named priority headers
-    while IFS='|' read -r id status priority text multiline obs; do
+    while IFS='|' read -r id status priority text multiline obs due; do
         local group="${priority:-default}"
         if [[ "$group" != "$prev_pd_group" ]]; then
             [[ -n "$any_rows" ]] && echo ""
@@ -200,6 +219,14 @@ format_todos() {
         any_rows=1
         suffix=""
         [[ "$multiline" == "true" ]] && suffix=" ..."
+        if [[ -n "$due" ]]; then
+            # overdue shouts, everything else stays quiet
+            if [[ "$due" == overdue* ]]; then
+                suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
+            else
+                suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
+            fi
+        fi
         obs_icon=""
         [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
         case "$priority" in
@@ -208,14 +235,15 @@ format_todos() {
             "important") printf "%s%s* %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
             *)           printf "%s  %-${text_w}s%s%s %s[%s]%s\n" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac
-    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ"'.todos |
         map(select(.done == false and .in_progress != true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
         sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
         .[] |
         (.text | split("\n")[0][0:$tw]) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
-        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)"
+        (if .due_date then (.due_date | due_label) else "" end) as $due |
+        "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)|\($due)"
     ' "$TODO_LIST_PATH")
 
     # Notes section (always shown) between pending and completed
@@ -233,7 +261,7 @@ format_todos() {
     # Finally print completed todos (if show_completed is enabled)
     if [[ "$SHOW_COMPLETED" == "true" ]]; then
         local first_done="true"
-        while IFS='|' read -r id status priority text multiline obs; do
+        while IFS='|' read -r id status priority text multiline obs due; do
             # blank / horizontal rule / blank between notes and completed
             if [[ "$first_done" == "true" ]]; then
                 first_done="false"
@@ -244,7 +272,7 @@ format_todos() {
             obs_icon=""
             [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
             printf "%s%s  %-${text_w}s%s%s %s[%s]%s\n" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" '.todos |
+        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ"'.todos |
             map(select(.done == true)) | map(select($tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null))) |
             sort_by(-(.completed_at // 0)) |
             .[] |
@@ -514,7 +542,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)${TAG_FILTER:+   ·   filter: #$TAG_FILTER [c] clear}   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g,t,c \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g,t,c,h \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -547,6 +575,26 @@ while true; do
         NOTE_ID="${TODO_ID#note_}"
         TODO_ID=""
     fi
+    # h sets or clears the due date on the highlighted todo
+    if [[ "$KEY" == "h" && -n "$TODO_ID" ]]; then
+        CURRENT_DUE=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .due_date // ""' "$TODO_LIST_PATH")
+        NEW_DUE=$(input_text "$CURRENT_DUE" " Due date YYYY-MM-DD  ·  empty clears  ·  [esc] cancel ")
+        if [[ $? -ne 130 ]]; then
+            if [[ -z "$NEW_DUE" ]]; then
+                jq --arg id "$TODO_ID" '(.todos[] | select(.id == $id)) |= del(.due_date)' \
+                    "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
+            elif [[ "$NEW_DUE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                jq --arg id "$TODO_ID" --arg due "$NEW_DUE" '(.todos[] | select(.id == $id)).due_date = $due' \
+                    "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
+            else
+                echo "Invalid date '$NEW_DUE' - use YYYY-MM-DD" >&2
+                sleep 1
+            fi
+            CURSOR_TARGET="$TODO_ID"
+        fi
+        continue
+    fi
+
     # t filters the list by an inline #tag, c clears that filter
     if [[ "$KEY" == "t" ]]; then
         PICKED=$(pick_tag) || { TAG_FILTER=""; continue; }
@@ -1222,6 +1270,7 @@ while true; do
             help_row "VIEW / MISC"                       "  /      Search / filter"
             help_row ""                                  "  t      Filter by #tag"
             help_row ""                                  "  c      Clear tag filter"
+            help_row ""                                  "  h      Set / clear due date"
             help_row "  Enter    Open item / note (nvim)" "  E      Export pending to markdown"
             help_row "  y        Copy text"              "OBSIDIAN"
             help_row "  C-y      Copy note text"         "  O      Send to daily note"

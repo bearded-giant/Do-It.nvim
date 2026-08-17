@@ -54,6 +54,7 @@
 
 | Key | Description |
 |-----|-------------|
+| `h` | Remove due date |
 | `H` | Add/edit due date (calendar) |
 | `r` | Reorder current todo (use j/k to move) |
 | `T` | Add time estimation |

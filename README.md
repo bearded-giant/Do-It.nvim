@@ -432,11 +432,11 @@ Todo items:
 
 | Tool | Description |
 |------|-------------|
-| `list_todos` | List items from a list, filtered by status, priority and/or #tag |
+| `list_todos` | List items from a list, filtered by status, priority, #tag and/or due date |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
-| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank |
-| `update_todo` | Edit text, description, status, priority, or order. Needs an id |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due` |
+| `update_todo` | Edit text, description, status, priority, due date, or order. Needs an id |
 | `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
 | `complete_todo` | Mark an item done. Fuzzy text query; with no args it looks at in-progress items |
 | `revert_todo` | Send an item back to pending |

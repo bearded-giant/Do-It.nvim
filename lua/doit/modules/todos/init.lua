@@ -34,7 +34,36 @@ function M.setup(opts)
     local state_module = require("doit.modules.todos.state")
     M.state = state_module.setup(M)
     M.state.load_todos()
-    
+
+    -- One-line nudge at startup; :DoItDue lists them. Deferred so it lands after
+    -- the intro screen instead of being cleared by it.
+    if M.config.due_notify ~= false then
+        vim.schedule(function()
+            local due_dates = require("doit.modules.todos.state.due_dates")
+            local overdue, today = 0, 0
+            for _, todo in ipairs(M.state.todos or {}) do
+                if not todo.done and todo.due_date then
+                    local status = due_dates.status(todo.due_date)
+                    if status == "overdue" then
+                        overdue = overdue + 1
+                    elseif status == "today" then
+                        today = today + 1
+                    end
+                end
+            end
+            if overdue > 0 or today > 0 then
+                local parts = {}
+                if overdue > 0 then table.insert(parts, overdue .. " overdue") end
+                if today > 0 then table.insert(parts, today .. " due today") end
+                vim.notify(
+                    "doit: " .. table.concat(parts, ", ") .. " (:DoItDue)",
+                    overdue > 0 and vim.log.levels.WARN or vim.log.levels.INFO
+                )
+            end
+        end)
+    end
+
+
     -- Initialize UI with module reference
     local ui_module = require("doit.modules.todos.ui")
     M.ui = ui_module.setup(M)

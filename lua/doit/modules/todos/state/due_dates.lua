@@ -1,5 +1,65 @@
--- Due date management for todos module
+-- Due date management for todos module.
+-- Canonical field: `due_date`, a "YYYY-MM-DD" string shared with tmux and MCP.
 local M = {}
+
+function M.parse(due_date)
+    if type(due_date) ~= "string" then
+        return nil
+    end
+    local year, month, day = due_date:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+    if not year then
+        return nil
+    end
+    return { year = tonumber(year), month = tonumber(month), day = tonumber(day) }
+end
+
+-- Whole days from today to due_date: negative is overdue, 0 is today.
+-- Both ends are taken at noon so a DST shift cannot round the difference to the
+-- wrong day.
+function M.days_until(due_date, now)
+    local parts = M.parse(due_date)
+    if not parts then
+        return nil
+    end
+
+    local due_noon = os.time({ year = parts.year, month = parts.month, day = parts.day, hour = 12 })
+    local today = os.date("*t", now or os.time())
+    local today_noon = os.time({ year = today.year, month = today.month, day = today.day, hour = 12 })
+
+    return math.floor((due_noon - today_noon) / 86400 + 0.5)
+end
+
+-- "overdue", "today", "soon" (within a week) or "later"; nil when unparseable.
+function M.status(due_date, now)
+    local days = M.days_until(due_date, now)
+    if not days then
+        return nil
+    end
+    if days < 0 then
+        return "overdue"
+    elseif days == 0 then
+        return "today"
+    elseif days <= 7 then
+        return "soon"
+    end
+    return "later"
+end
+
+-- Short render for a todo row: "overdue 3d" / "due today" / "in 5d".
+function M.render(due_date, now)
+    local days = M.days_until(due_date, now)
+    if not days then
+        return ""
+    end
+    if days < 0 then
+        return string.format("overdue %dd", -days)
+    elseif days == 0 then
+        return "due today"
+    elseif days == 1 then
+        return "due tomorrow"
+    end
+    return string.format("in %dd", days)
+end
 
 -- Setup module
 function M.setup(state)

@@ -19,6 +19,49 @@ ACTIVE_LIST_NAME="$(get_active_list_name)"
 CHAR_LIMIT="${DOIT_CHAR_LIMIT:-20}"
 ICON_TASK=$'\xef\x82\xae'
 
+# Ids of open, overdue todos. due_date is "YYYY-MM-DD", which sorts correctly as
+# a string, so "before today" needs no date arithmetic (and no BSD/GNU date split).
+get_overdue_ids() {
+    if ! command -v jq &> /dev/null || [[ ! -f "$TODO_LIST_PATH" ]]; then
+        return
+    fi
+    jq -r --arg today "$(date +%Y-%m-%d)" '
+        .todos[]
+        | select(.done != true)
+        | select(.due_date != null and .due_date < $today)
+        | .id
+    ' "$TODO_LIST_PATH" 2>/dev/null | sort
+}
+
+get_overdue_count() {
+    get_overdue_ids | grep -c . || true
+}
+
+# Fire a tmux message only when an item CROSSES into overdue, not on every
+# status refresh (this runs on status-interval). The seen-set is per list.
+notify_new_overdue() {
+    [[ -n "$TMUX" ]] || return 0
+    command -v tmux &>/dev/null || return 0
+
+    local state_dir="$DOIT_DATA_DIR/.overdue"
+    local state_file="$state_dir/${ACTIVE_LIST_NAME}"
+    mkdir -p "$state_dir" 2>/dev/null || return 0
+
+    local current fresh
+    current=$(get_overdue_ids)
+    if [[ -f "$state_file" ]]; then
+        fresh=$(comm -23 <(printf '%s\n' "$current") "$state_file" | grep -c . || true)
+    else
+        # first run for this list: record without shouting about pre-existing items
+        fresh=0
+    fi
+    printf '%s\n' "$current" > "$state_file"
+
+    if [[ "${fresh:-0}" -gt 0 ]]; then
+        tmux display-message "doit: $fresh todo(s) just went overdue on ${ACTIVE_LIST_NAME}"
+    fi
+}
+
 get_active_todo() {
     if ! command -v jq &> /dev/null; then
         echo ""
@@ -30,12 +73,17 @@ get_active_todo() {
         return
     fi
 
+    local overdue_suffix="" overdue
+    overdue=$(get_overdue_count)
+    [[ "${overdue:-0}" -gt 0 ]] && overdue_suffix=" !${overdue}"
+
     local todo_text
     todo_text=$(jq -r '.todos[] | select(.in_progress == true) | .text' "$TODO_LIST_PATH" 2>/dev/null | head -1)
     todo_text=$(echo "$todo_text" | xargs)
 
     if [[ -z "$todo_text" ]]; then
-        echo ""
+        # no active item, but overdue work still deserves the slot
+        [[ -n "$overdue_suffix" ]] && echo "${overdue_suffix# }"
         return
     fi
 
@@ -43,7 +91,7 @@ get_active_todo() {
         todo_text="${todo_text:0:$CHAR_LIMIT}..."
     fi
 
-    echo "$todo_text"
+    echo "${todo_text}${overdue_suffix}"
 }
 
 show_todo() {
@@ -56,9 +104,13 @@ show_todo() {
     tmux set -gq @doit-color-urgent "$thm_yellow"
     tmux set -gq @doit-color-important "$thm_blue"
 
-    local initial_text
+    local initial_text overdue
     initial_text=$(get_active_todo)
-    if [[ -n "$initial_text" ]]; then
+    overdue=$(get_overdue_count)
+    if [[ "${overdue:-0}" -gt 0 ]]; then
+        # overdue work outranks "something is in progress" for the chip colour
+        tmux set -gq @doit-todo-fg "$thm_red"
+    elif [[ -n "$initial_text" ]]; then
         tmux set -gq @doit-todo-fg "$thm_green"
     else
         tmux set -gq @doit-todo-fg "$thm_blue"
@@ -84,5 +136,6 @@ show_todo() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    notify_new_overdue
     get_active_todo
 fi
