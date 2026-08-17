@@ -5,7 +5,20 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { composeTodoText, nextRank, normalizeTodoText, parseTodoText } from "./todo-text.js";
+
+// Root VERSION is the single source of truth, read at runtime exactly as the
+// nvim (init.lua read_version) and tmux (DOIT_VERSION) surfaces do, so a release
+// bump does not have to be repeated here.
+function readVersion() {
+    try {
+        const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+        return fs.readFileSync(path.join(root, "VERSION"), "utf-8").trim() || "0.0.0";
+    } catch {
+        return "0.0.0";
+    }
+}
 
 const DATA_DIR = process.env.DOIT_DATA_DIR || path.join(process.env.HOME, ".local/share/nvim/doit");
 const LISTS_DIR = path.join(DATA_DIR, "lists");
@@ -327,7 +340,7 @@ function resolveTodo(data, listName, { id, query, fallbackFilter }) {
 const server = new McpServer(
     {
         name: "doit",
-        version: "1.0.0",
+        version: readVersion(),
     },
     {
         instructions: `Do-it.nvim todo list manager. Data lives at ~/.local/share/nvim/doit/lists/*.json — NOT in any project directory.

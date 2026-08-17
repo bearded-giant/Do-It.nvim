@@ -1,6 +1,6 @@
 {
   "name": "doit-mcp",
-  "version": "1.0.0",
+  "version": "2.0.7",
   "description": "MCP server for do-it.nvim todo management",
   "type": "module",
   "main": "server.js",
