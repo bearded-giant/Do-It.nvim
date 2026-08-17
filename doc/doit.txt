@@ -289,7 +289,7 @@ Main Window~
     I           Import to-dos (JSON)
     E           Export pending to-dos to markdown
     <leader>E   Export to-dos (JSON)
-    <leader>D   Remove duplicates
+    <leader>D   Remove duplicates (confirms first; undo with u)
     <Space>     Toggle priority
     <leader>p   Open scratchpad
     r           Enter reordering mode

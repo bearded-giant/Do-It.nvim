@@ -34,6 +34,7 @@
 | `d` | Delete current todo (or note, when on a note row) |
 | `D` | Delete all completed todos |
 | `u` | Undo last delete |
+| `<leader>D` | Remove duplicate todos (confirms first, undoable with u) |
 | `e` | Edit current todo (or note, when on a note row) |
 | `gn` | Add a list note (scratch note in the Notes section) |
 | `q/<Esc>` | Close window |

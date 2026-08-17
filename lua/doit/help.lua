@@ -19,6 +19,7 @@ M.keymaps = {
 			{ key = "d", desc = "Delete current todo (or note, when on a note row)" },
 			{ key = "D", desc = "Delete all completed todos" },
 			{ key = "u", desc = "Undo last delete" },
+			{ key = "<leader>D", desc = "Remove duplicate todos (confirms first, undoable with u)" },
 			{ key = "e", desc = "Edit current todo (or note, when on a note row)" },
 			{ key = "gn", desc = "Add a list note (scratch note in the Notes section)" },
 			{ key = "q/<Esc>", desc = "Close window" },

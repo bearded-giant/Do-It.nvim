@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { composeTodoText, nextRank } from "./todo-text.js";
+import { composeTodoText, nextRank, normalizeTodoText } from "./todo-text.js";
 
 const DATA_DIR = process.env.DOIT_DATA_DIR || path.join(process.env.HOME, ".local/share/nvim/doit");
 const LISTS_DIR = path.join(DATA_DIR, "lists");
@@ -646,6 +646,80 @@ server.tool(
             content: [{
                 type: "text",
                 text: `Cleared ${done.length} completed items from "${name}".`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "dedupe_todos",
+    "Remove duplicate todos from a list. Duplicates are items whose text matches after normalization — the claude: marker, [type] tag, rank prefix and (dep on #N) suffix are ignored, so an item typed in nvim matches the same item created here. Defaults to a DRY RUN that only reports what it would remove; pass dry_run:false to actually delete. Ranks are not renumbered.",
+    {
+        list: z.string().optional().describe("List name (default: active list)"),
+        dry_run: z
+            .boolean()
+            .optional()
+            .describe("Report without deleting (default: true). Pass false to delete."),
+    },
+    async ({ list, dry_run }) => {
+        const dryRun = dry_run !== false;
+        const { name, filepath, data } = loadList(list);
+        const todos = data.todos || [];
+
+        // first occurrence in order_index order is the keeper, so repeated runs
+        // are stable; a copy carrying notes wins over a bare one
+        const ordered = [...todos].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const groups = new Map();
+        for (const todo of ordered) {
+            const key = normalizeTodoText(todo.text);
+            if (!key) continue; // an empty body carries no identity
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(todo);
+        }
+
+        const removed = [];
+        const report = [];
+        for (const [, items] of groups) {
+            if (items.length < 2) continue;
+            // every todo carries a footer stamp, so "has a description" is always
+            // true — the tie-break has to look past the footer at real notes
+            const hasNotes = t => Boolean(stripFooter(t.description).trim());
+            const keepIdx = items.findIndex(hasNotes);
+            const keeper = items[keepIdx === -1 ? 0 : keepIdx];
+            const drops = items.filter(t => t !== keeper);
+            removed.push(...drops);
+            report.push(
+                `keep: ${keeper.text}` +
+                    drops.map(d => `\n  drop: ${d.text}${hasNotes(d) ? " (HAS NOTES)" : ""}`).join("")
+            );
+        }
+
+        if (removed.length === 0) {
+            return { content: [{ type: "text", text: `No duplicates on "${name}".` }] };
+        }
+
+        if (dryRun) {
+            return {
+                content: [{
+                    type: "text",
+                    text:
+                        `DRY RUN — would remove ${removed.length} duplicate(s) from "${name}":\n\n` +
+                        report.join("\n\n") +
+                        `\n\nRe-run with dry_run:false to apply.`,
+                }],
+            };
+        }
+
+        const dropIds = new Set(removed.map(t => t.id));
+        data.todos = todos.filter(t => !dropIds.has(t.id));
+        data._metadata = data._metadata || {};
+        data._metadata.deleted_todos = [...removed, ...(data._metadata.deleted_todos || [])].slice(0, 10);
+        saveList(filepath, data);
+
+        return {
+            content: [{
+                type: "text",
+                text: `Removed ${removed.length} duplicate(s) from "${name}":\n\n${report.join("\n\n")}`,
             }],
         };
     }

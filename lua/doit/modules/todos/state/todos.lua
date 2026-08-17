@@ -34,17 +34,22 @@ function M.setup(state)
         local core = package.loaded["doit.core"]
         local notes_module = core and core.get_module and core.get_module("notes")
         
-        if not notes_module or not notes_module.state then
+        local notes_state = notes_module and notes_module.state
+        -- the notes module can be present but only partly wired (disabled, or a
+        -- todos-only setup), so every entry point is checked before it is called
+        if not notes_state or not notes_state.parse_note_links or not notes_state.find_note_by_title then
             return
         end
-        
-        local links = notes_module.state.parse_note_links(todo.text)
-        
+
+        local links = notes_state.parse_note_links(todo.text)
+
         if #links > 0 then
-            local note = notes_module.state.find_note_by_title(links[1])
+            local note = notes_state.find_note_by_title(links[1])
             if note and note.id then
                 todo.note_id = note.id
-                todo.note_summary = notes_module.state.generate_summary(note.content)
+                if notes_state.generate_summary then
+                    todo.note_summary = notes_state.generate_summary(note.content)
+                end
                 todo.note_updated_at = os.time()
             end
         end
@@ -258,29 +263,89 @@ function M.setup(state)
         return true
     end
     
-    function M.remove_duplicates()
-        local text_map = {}
-        local duplicates = {}
-        
+    -- Indices of todos that repeat an earlier todo's normalized text. The first
+    -- occurrence is always the keeper, so this is stable under re-runs.
+    local function duplicate_indices()
+        local normalize = require("doit.modules.todos.state.normalize")
+        local footer = require("doit.core.utils.footer")
+        -- every todo carries a footer stamp, so "has a description" is always
+        -- true — the keeper test has to look past the footer at real notes
+        local function has_notes(todo)
+            return footer.strip(todo.description or ""):gsub("%s", "") ~= ""
+        end
+
+        local groups = {}
+        local order = {}
         for i, todo in ipairs(state.todos) do
-            if text_map[todo.text] then
-                table.insert(duplicates, i)
-            else
-                text_map[todo.text] = true
+            local key = normalize.normalize(todo.text)
+            -- an empty body carries no identity; never collapse those together
+            if key ~= "" then
+                if not groups[key] then
+                    groups[key] = {}
+                    table.insert(order, key)
+                end
+                table.insert(groups[key], i)
             end
         end
-        
-        table.sort(duplicates, function(a, b) return a > b end)
-        
-        for _, idx in ipairs(duplicates) do
+
+        local dupes = {}
+        for _, key in ipairs(order) do
+            local idxs = groups[key]
+            if #idxs > 1 then
+                -- keep the copy carrying real notes, else the first occurrence,
+                -- so nvim and MCP agree on which one survives
+                local keep = idxs[1]
+                for _, i in ipairs(idxs) do
+                    if has_notes(state.todos[i]) then
+                        keep = i
+                        break
+                    end
+                end
+                for _, i in ipairs(idxs) do
+                    if i ~= keep then
+                        table.insert(dupes, i)
+                    end
+                end
+            end
+        end
+
+        table.sort(dupes)
+        return dupes
+    end
+
+    -- Non-destructive: lets the UI show a count and preview before confirming.
+    function M.find_duplicates()
+        local dupes = duplicate_indices()
+        local previews = {}
+        for _, idx in ipairs(dupes) do
+            table.insert(previews, state.todos[idx].text)
+        end
+        return #dupes, previews
+    end
+
+    function M.remove_duplicates()
+        local dupes = duplicate_indices()
+
+        -- descending so earlier indices stay valid, and routed through the same
+        -- bookkeeping as delete_todo so `u` can restore a mistaken dedupe
+        table.sort(dupes, function(a, b) return a > b end)
+
+        for _, idx in ipairs(dupes) do
+            local todo = state.todos[idx]
+            todo.delete_time = os.time()
+            table.insert(state.deleted_todos, 1, todo)
             table.remove(state.todos, idx)
         end
-        
-        if #duplicates > 0 then
+
+        while #state.deleted_todos > state.MAX_UNDO_HISTORY do
+            table.remove(state.deleted_todos)
+        end
+
+        if #dupes > 0 then
             state.save_todos()
         end
-        
-        return #duplicates
+
+        return #dupes
     end
     
     return M

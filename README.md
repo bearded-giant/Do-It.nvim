@@ -437,6 +437,7 @@ Todo items:
 | `revert_todo` | Send an item back to pending |
 | `delete_todo` | Delete an item, keeping it in `_metadata.deleted_todos` for undo |
 | `clear_done` | Delete every completed item in a list, keeping the last 10 for undo |
+| `dedupe_todos` | Remove items whose text matches after normalization. Dry run by default |
 | `move_todo` | Move an item to another list |
 
 Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
@@ -469,6 +470,8 @@ claude: [gate] 41. pre-store gate check (dep on #40)
 ```
 
 You pass `type` (a short free-form tag like `gate`, `decision`, `comms`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list, so priority stays the bucket and the number tells you the order inside it. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. Composing is idempotent, so prefixes never stack.
+
+Duplicate detection strips that whole wrapper before comparing, so an item you typed in Neovim as `buy milk` matches the one MCP stored as `claude: [chore] 3. buy milk (dep on #1)`. Comparison ignores the `claude:` marker, the `[type]` tag, the rank prefix, the `(dep on #N)` suffix, case, and whitespace. A `[[note link]]` prefix is not a type tag and survives, and a number without a following space (`3.buy milk`, `1.5x throughput`) is not a rank. When duplicates are collapsed the copy carrying real notes wins, and the rest go to the undo stack — `<leader>D` in Neovim confirms first, and `dedupe_todos` is a dry run unless you pass `dry_run:false`.
 
 ### Environment Variables
 

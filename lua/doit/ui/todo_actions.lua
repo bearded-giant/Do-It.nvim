@@ -860,13 +860,42 @@ function M.link_to_note(win_id, on_render)
 end
 
 function M.remove_duplicates(on_render)
-	ensure_state_loaded()  -- Ensure state is loaded
-	local dups = 0
-	if state.remove_duplicates then
-		dups = state.remove_duplicates()
+	ensure_state_loaded()
+	if not state.remove_duplicates then
+		return
 	end
-	vim.notify("Removed " .. dups .. " duplicates.", vim.log.levels.INFO)
-	maybe_render(on_render)
+
+	local count, previews = 0, {}
+	if state.find_duplicates then
+		count, previews = state.find_duplicates()
+	end
+
+	if count == 0 then
+		vim.notify("No duplicate to-dos found.", vim.log.levels.INFO)
+		return
+	end
+
+	local preview = table.concat(vim.list_slice(previews, 1, math.min(3, #previews)), ", ")
+	if #previews > 3 then
+		preview = preview .. ", ..."
+	end
+
+	local prompt = string.format("Remove %d duplicate to-do%s (%s)? (y/N): ",
+		count, count == 1 and "" or "s", preview)
+
+	vim.ui.input({ prompt = prompt }, function(answer)
+		if not answer or not answer:lower():match("^y") then
+			vim.notify("Dedupe cancelled.", vim.log.levels.INFO)
+			return
+		end
+		local removed = state.remove_duplicates()
+		vim.notify(
+			string.format("Removed %d duplicate%s. Press u to restore one at a time.",
+				removed, removed == 1 and "" or "s"),
+			vim.log.levels.INFO
+		)
+		maybe_render(on_render)
+	end)
 end
 
 function M.edit_todo(win_id, on_render)

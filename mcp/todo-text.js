@@ -7,6 +7,25 @@ const TEXT_SHAPE =
 
 const DEP_SUFFIX = /\s*\(dep on [^)]*\)\s*$/i;
 
+// Duplicate detection compares normalized text, so an item typed in nvim matches
+// the same item created through MCP with a rank/type/deps wrapper around it.
+// Lowercasing first is what lets the lua port (state/normalize.lua) use plain
+// patterns and still agree byte-for-byte — lua has no case-insensitive matching.
+const CLAUDE_PREFIX = /^claude:\s*/;
+// [^\][]+ rejects both brackets, so a "[[note link]]" prefix is not eaten as a type tag.
+const TYPE_TAG = /^\[[^\][]+\]\s*/;
+// The trailing space is required: it keeps "1.5x throughput" and "3.buy milk" intact.
+const RANK_PREFIX = /^\d+[a-z]*\.\s+/;
+
+export function normalizeTodoText(text) {
+    let s = (text || "").toLowerCase().trim();
+    s = s.replace(CLAUDE_PREFIX, "");
+    s = s.replace(TYPE_TAG, "");
+    s = s.replace(RANK_PREFIX, "");
+    s = s.replace(DEP_SUFFIX, "");
+    return s.replace(/\s+/g, " ").trim();
+}
+
 export function parseTodoText(text) {
     const { groups } = TEXT_SHAPE.exec(text || "");
     return {

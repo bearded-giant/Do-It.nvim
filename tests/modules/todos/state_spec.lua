@@ -110,16 +110,6 @@ describe("todos", function()
 	end)
 
 	it("should remove duplicates", function()
-		local original_vim_inspect = vim.inspect
-		vim.inspect = function(obj)
-			return obj.text
-		end
-
-		local original_vim_fn_sha256 = vim.fn.sha256
-		vim.fn.sha256 = function(str)
-			return str
-		end
-
 		doit_state.add_todo("Duplicate todo", {})
 		doit_state.add_todo("Unique todo", {})
 		doit_state.add_todo("Duplicate todo", {})
@@ -128,8 +118,44 @@ describe("todos", function()
 
 		assert.are.equal(1, removed) -- returns number
 		assert.are.equal(2, #doit_state.todos)
+	end)
 
-		vim.inspect = original_vim_inspect
-		vim.fn.sha256 = original_vim_fn_sha256
+	it("should match duplicates on normalized text across surfaces", function()
+		-- an item typed in nvim and the same item created through MCP
+		doit_state.add_todo("buy milk", {})
+		doit_state.add_todo("claude: [chore] 3. buy milk (dep on #1)", {})
+		doit_state.add_todo("buy bread", {})
+
+		assert.are.equal(1, doit_state.remove_duplicates())
+		assert.are.equal(2, #doit_state.todos)
+	end)
+
+	it("should not treat a note-link prefix as a type tag", function()
+		doit_state.add_todo("buy milk", {})
+		doit_state.add_todo("[[my note]] buy milk", {})
+
+		assert.are.equal(0, doit_state.remove_duplicates())
+		assert.are.equal(2, #doit_state.todos)
+	end)
+
+	it("should push removed duplicates onto the undo stack", function()
+		doit_state.add_todo("same thing", {})
+		doit_state.add_todo("same thing", {})
+
+		doit_state.remove_duplicates()
+
+		assert.are.equal(1, #doit_state.deleted_todos)
+		assert.is_true(doit_state.undo_delete())
+		assert.are.equal(2, #doit_state.todos)
+	end)
+
+	it("should report duplicates without deleting them", function()
+		doit_state.add_todo("count me", {})
+		doit_state.add_todo("count me", {})
+
+		local count = doit_state.find_duplicates()
+
+		assert.are.equal(1, count)
+		assert.are.equal(2, #doit_state.todos) -- nothing removed
 	end)
 end)

@@ -1081,6 +1081,12 @@ local function create_window()
 		end
 	end)
 
+	setup_keymap("remove_duplicates", function()
+		todo_actions.remove_duplicates(function()
+			M.render_todos()
+		end)
+	end)
+
 	setup_keymap("close_window", function()
 		M.close_window()
 	end)
