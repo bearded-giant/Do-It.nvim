@@ -257,9 +257,12 @@ In the list switcher (prefix + d + l) and list manager (prefix + d + L):
 
     ENTER              Link the selected list to the current session (also
                        refreshes the global pointer)
-    g                  Set the global pointer only, touch no link
-    u                  Unlink the current session (falls back to the global
+    g / ctrl-g         Set the global pointer only, touch no link
+    u / ctrl-u         Unlink the current session (falls back to the global
                        chain)
+
+The manager uses the bare keys (g, u); the switcher uses ctrl-g and ctrl-u so
+plain letters keep filtering the list as you type.
 
 Rows show which sessions link each list, e.g. `work  [api infra]`. Sessions
 that no longer exist in `tmux list-sessions` render dimmed. The daily list is

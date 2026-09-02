@@ -78,10 +78,10 @@ build_rows() {
 
 if [[ -n "$SESS" ]]; then
     HEADER="Lists — session: $SESS → $CURRENT_LIST
-ENTER: link to session   g: set global only   u: unlink session"
+ENTER: link to session   ctrl-g: set global only   ctrl-u: unlink session"
 else
     HEADER="Switch Todo List (current: $CURRENT_LIST)
-ENTER: switch   g: set global"
+ENTER: switch   ctrl-g: set global"
 fi
 
 RESULT=$(build_rows | \
@@ -90,7 +90,7 @@ RESULT=$(build_rows | \
         --prompt="List > " \
         --height=100% \
         --layout=reverse \
-        --expect=g,u \
+        --expect=ctrl-g,ctrl-u \
         --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)
 
@@ -98,13 +98,13 @@ KEY=$(echo "$RESULT" | head -1)
 SELECTED=$(echo "$RESULT" | tail -1 | awk '{print $1}')
 
 case "$KEY" in
-    "u")
+    "ctrl-u")
         if [[ -n "$SESS" ]]; then
             unlink_session "$SESS"
             echo "Unlinked session '$SESS' (falls back to global list)"
         fi
         ;;
-    "g")
+    "ctrl-g")
         [[ -n "$SELECTED" ]] && set_global_list "$SELECTED"
         ;;
     *)
