@@ -135,9 +135,9 @@ _Calendar (macOS only):_
 
 **Basic Keys (in todo window):**
 
-- `n` - Add new todo
+- `<CR>` - Add new todo
 - `a` - Add a child todo under the current one
-- `x` - Toggle status
+- `c` - Toggle status (pending → in-progress → done)
 - `d` - Delete todo
 - `?` - Show full help
 - `L` - List manager
@@ -345,20 +345,31 @@ Then install with `prefix + I`.
 
 **In interactive manager:**
 
-| Key     | Action                |
-|---------|-----------------------|
-| `Enter` | Toggle done           |
-| `K`/`J` | Reorder (a parent moves with its subtree) |
-| `s`     | Start/In-progress     |
-| `x`     | Stop in-progress      |
-| `X`     | Revert to pending     |
-| `n`     | New todo              |
-| `e`     | Edit todo text        |
-| `d`     | Delete (can undo)     |
-| `u`     | Undo last delete      |
-| `E`     | Export to markdown    |
-| `?`     | Show help             |
-| `q`     | Quit                  |
+| Key       | Action                |
+|-----------|-----------------------|
+| `Enter`   | Open item/note in nvim (view, edit its note) |
+| `s`       | Start (in-progress)   |
+| `x`       | Complete (done)       |
+| `X`       | Revert to pending     |
+| `n` / `p` | New todo / paste new from clipboard |
+| `e`       | Edit todo text        |
+| `P`       | Set priority          |
+| `N`       | Edit note (description) |
+| `g`       | List notes modal      |
+| `K`/`J`   | Reorder (a parent moves with its subtree) |
+| `[`/`]`   | Jump section down/up  |
+| `m`       | Move todo to another list |
+| `l` / `L` | Switch list / list manager |
+| `t` / `c` | Filter by #tag / clear filter |
+| `h`       | Set or clear due date |
+| `/`       | Search                |
+| `d` / `D` | Delete todo / clear all completed |
+| `u`       | Undo last delete      |
+| `E`       | Export pending to markdown |
+| `O`       | Send to Obsidian daily note |
+| `y` / `Y` | Copy todo text / list name |
+| `?`       | Show help             |
+| `q` / `Esc` | Back to lists / quit |
 
 In create/edit mode: type text, Enter twice to save, Esc to cancel.
 
