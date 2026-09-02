@@ -116,15 +116,17 @@ Nested Todos~
     parent.
 
 Status Changes~
-    Enter              Toggle done/pending
     s                  Start (mark in-progress)
-    x                  Stop in-progress
+    x                  Complete (mark done)
     X                  Revert to pending
 
 Editing~
     n                  New todo
+    p                  Paste clipboard as new todo
     e                  Edit todo text
     P                  Set priority
+    N                  Edit the todo's note (description)
+    h                  Set or clear due date
     g                  Open list notes modal (create/edit/delete notes)
 
     In new/edit mode: Enter to save, Esc to cancel
@@ -139,15 +141,19 @@ List Notes~
         q                  Back to the todo list
 
 View/Copy~
-    p                  View full note (scrollable popup, q to exit)
-    y                  Copy text to clipboard
+    Enter              Open the item (or note row) in nvim: view status,
+                       priority and text, edit its note in place
+    y                  Copy todo text to clipboard
+    Ctrl-y             Copy the todo's note text
+    Y                  Copy the list name
 
 Delete/Undo~
     d                  Delete todo (can undo)
     D                  Delete all completed
     u                  Undo last delete
 
-Tags~
+Search/Tags~
+    /                  Search todos (typeahead filter)
     t                  Filter by inline #tag (picker shows usage counts)
     c                  Clear the active tag filter
 
@@ -163,6 +169,7 @@ Lists~
 
 Export~
     E                  Export pending todos to markdown
+    O                  Send the todo to the Obsidian daily note
 
     Writes the current list's non-completed todos to a markdown file: one
     `##` header per priority (Critical, Urgent, Important, Default), items
@@ -174,7 +181,8 @@ Export~
 Other~
     r                  Refresh list
     ?                  Show help
-    q                  Quit
+    q                  Back to Lists (list manager)
+    Esc                Quit
 
 ==============================================================================
 STATUS BAR                                              *doit-tmux-status*
