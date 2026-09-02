@@ -11,48 +11,90 @@ local function get_session_file()
     return session_dir .. "/session.json"
 end
 
--- Save current list selection globally
+-- Current tmux session name, or nil outside tmux
+local function tmux_session_name()
+    if not vim.env.TMUX or vim.fn.executable("tmux") == 0 then
+        return nil
+    end
+    local cmd = "tmux display-message -p '#S'"
+    if vim.env.TMUX_PANE then
+        -- pane-targeted: correct even after the window moved between sessions
+        cmd = "tmux display-message -p -t " .. vim.fn.shellescape(vim.env.TMUX_PANE) .. " '#S'"
+    end
+    local out = vim.fn.system(cmd)
+    if vim.v.shell_error ~= 0 or not out then
+        return nil
+    end
+    out = out:gsub("%s+$", "")
+    if out == "" then
+        return nil
+    end
+    return out
+end
+
+local function read_session()
+    local file = io.open(get_session_file(), "r")
+    if not file then
+        return {}
+    end
+    local content = file:read("*all")
+    file:close()
+
+    if content and content ~= "" then
+        local success, data = pcall(vim.fn.json_decode, content)
+        if success and type(data) == "table" then
+            return data
+        end
+    end
+    return {}
+end
+
+-- Save current list selection. The file is shared with the tmux and MCP
+-- surfaces and carries a per-tmux-session 'sessions' link map, so this must
+-- read-merge-write — a wholesale rewrite would clobber the other sessions'
+-- links. Inside tmux the switch writes BOTH the session link and the global
+-- pointer; outside tmux the global pointer only.
 function M.save_session(list_name)
     if not list_name then
         return
     end
 
-    local session_file = get_session_file()
-    local session_data = {
-        active_list = list_name,
-        timestamp = os.time()
-    }
+    local data = read_session()
+    data.active_list = list_name
+    data.timestamp = os.time()
 
-    local file = io.open(session_file, "w")
+    local sess = tmux_session_name()
+    if sess then
+        if type(data.sessions) ~= "table" then
+            data.sessions = {}
+        end
+        data.sessions[sess] = list_name
+    end
+    -- an empty lua table json_encodes as [] which breaks the jq readers
+    if type(data.sessions) == "table" and next(data.sessions) == nil then
+        data.sessions = nil
+    end
+
+    local file = io.open(get_session_file(), "w")
     if file then
-        local json = vim.fn.json_encode(session_data)
+        local json = vim.fn.json_encode(data)
         file:write(json)
         file:close()
     end
 end
 
--- Load last selected list globally
+-- Load last selected list. Returns (list_name, from_link): inside tmux the
+-- session's linked list wins over the global pointer, and from_link tells the
+-- caller the choice was an explicit link (which outranks project derivation).
 function M.load_session()
-    local session_file = get_session_file()
-    
-    if vim.fn.filereadable(session_file) == 0 then
-        return nil
+    local data = read_session()
+
+    local sess = tmux_session_name()
+    if sess and type(data.sessions) == "table" and data.sessions[sess] then
+        return data.sessions[sess], true
     end
-    
-    local file = io.open(session_file, "r")
-    if file then
-        local content = file:read("*all")
-        file:close()
-        
-        if content and content ~= "" then
-            local success, data = pcall(vim.fn.json_decode, content)
-            if success and data then
-                return data.active_list
-            end
-        end
-    end
-    
-    return nil
+
+    return data.active_list, false
 end
 
 -- Clean old sessions (optional)

@@ -17,6 +17,8 @@ if ! command -v fzf &> /dev/null; then
 fi
 
 CURRENT_LIST=$(get_active_list_name)
+SESS=$(get_tmux_session_name 2>/dev/null) || SESS=""
+LIVE_SESSIONS=$(tmux list-sessions -F '#S' 2>/dev/null)
 
 # colors
 COLOR_GREEN=$'\e[1;32m'
@@ -30,7 +32,10 @@ SHOW_COMPLETED=$(tmux show-option -gqv @doit-show-completed)
 SHOW_COMPLETED="${SHOW_COMPLETED:-true}"
 
 preview_list() {
-    local list_file="$LISTS_DIR/${1}.json"
+    # rows carry markers/badges — first word after any "* " marker is the name
+    local name
+    name=$(printf '%s' "$1" | sed 's/^[* ]*//' | awk '{print $1}')
+    local list_file="$LISTS_DIR/${name}.json"
     # truncate to the preview pane, not a fixed column count, so wide terminals
     # show the whole line. must stay inline: fzf runs this function in a fresh
     # bash, where only exported functions exist (a helper here is not found).
@@ -70,6 +75,35 @@ export LISTS_DIR
 export SHOW_COMPLETED
 export COLOR_DIM
 export COLOR_RESET
+
+# " [sess1 sess2]" for lists some session links; dead sessions render dim
+badge_for_list() {
+    local badge="" s
+    while IFS= read -r s; do
+        [[ -z "$s" ]] && continue
+        if grep -qxF -- "$s" <<< "$LIVE_SESSIONS"; then
+            badge+=" $s"
+        else
+            badge+=" ${COLOR_DIM}${s}${COLOR_RESET}"
+        fi
+    done < <(sessions_for_list "$1")
+    [[ -n "$badge" ]] && printf ' [%s]' "${badge# }"
+}
+
+# daily pinned to the top with its pending count; active list marked with *
+build_rows() {
+    local name pending marker
+    if [[ -f "$LISTS_DIR/daily.json" ]]; then
+        pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
+        marker="  "; [[ "daily" == "$CURRENT_LIST" ]] && marker="* "
+        printf '%sdaily (%s pending)%s\n' "$marker" "$pending" "$(badge_for_list daily)"
+    fi
+    while IFS= read -r name; do
+        [[ -z "$name" || "$name" == "daily" ]] && continue
+        marker="  "; [[ "$name" == "$CURRENT_LIST" ]] && marker="* "
+        printf '%s%s%s\n' "$marker" "$name" "$(badge_for_list "$name")"
+    done < <(get_available_lists)
+}
 
 create_list() {
     echo ""
@@ -137,6 +171,7 @@ rename_list() {
     fi
 
     mv "$LISTS_DIR/${old_name}.json" "$LISTS_DIR/${SAFE_NAME}.json"
+    relink_sessions_for_list "$old_name" "$SAFE_NAME"
 
     # update session if this was active list
     if [[ "$old_name" == "$CURRENT_LIST" ]]; then
@@ -163,6 +198,7 @@ delete_list() {
 
     if [[ "$CONFIRM" == "yes" ]]; then
         rm -f "$LISTS_DIR/${list_name}.json"
+        prune_links_for_list "$list_name"
         echo "${COLOR_GREEN}Deleted: $list_name${COLOR_RESET}"
     else
         echo "Cancelled"
@@ -175,35 +211,31 @@ while true; do
     clear
     CURRENT_LIST=$(get_active_list_name)
 
-    # format list with active indicator
-    LIST_DISPLAY=$(get_available_lists | while read -r name; do
-        if [[ "$name" == "$CURRENT_LIST" ]]; then
-            echo "* $name (active)"
-        else
-            echo "  $name"
-        fi
-    done)
+    # format list with active indicator + session-link badges
+    LIST_DISPLAY=$(build_rows)
 
+    SESSION_HINT=""
+    [[ -n "$SESS" ]] && SESSION_HINT=" - Session: $SESS"
     SELECTION=$(echo "$LIST_DISPLAY" | fzf --ansi \
         --header="
- List Manager - Active: $CURRENT_LIST
+ List Manager - Active: $CURRENT_LIST$SESSION_HINT
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup    y: Copy name
- ENTER: Switch to list    /: Search
+ ENTER: Link to session    g: Set global    u: Unlink session    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=100% \
         --layout=reverse \
-        --expect=n,r,d,b,y,enter,q,/ \
-        --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
+        --expect=n,r,d,b,y,g,u,enter,q,/ \
+        --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)
 
     KEY=$(echo "$SELECTION" | head -1)
     LIST_LINE=$(echo "$SELECTION" | tail -1)
 
-    # extract list name from line
-    SELECTED_LIST=$(echo "$LIST_LINE" | sed 's/^[* ]*//' | sed 's/ (active)$//')
+    # extract list name from line (strip marker, count, badges)
+    SELECTED_LIST=$(echo "$LIST_LINE" | sed 's/^[* ]*//' | awk '{print $1}')
 
     case "$KEY" in
         "q"|"")
@@ -229,12 +261,12 @@ while true; do
                 --prompt="/ " \
                 --height=100% \
                 --layout=reverse \
-                --preview='bash -c "preview_list \$(echo {} | sed \"s/^[* ]*//\" | sed \"s/ (active)\$//\")"' \
+                --preview='bash -c "preview_list {}"' \
                 --preview-window=right:50%:wrap)
 
             if [[ -n "$SEARCH_RESULT" ]]; then
-                SEARCH_LIST=$(echo "$SEARCH_RESULT" | sed 's/^[* ]*//' | sed 's/ (active)$//')
-                if [[ -n "$SEARCH_LIST" && "$SEARCH_LIST" != "$CURRENT_LIST" ]]; then
+                SEARCH_LIST=$(echo "$SEARCH_RESULT" | sed 's/^[* ]*//' | awk '{print $1}')
+                if [[ -n "$SEARCH_LIST" ]]; then
                     set_active_list "$SEARCH_LIST"
                     break
                 fi
@@ -261,8 +293,22 @@ while true; do
             "$SCRIPT_DIR/todo-backup.sh"
             sleep 1
             ;;
+        "g")
+            if [[ -n "$SELECTED_LIST" ]]; then
+                set_global_list "$SELECTED_LIST"
+                echo "${COLOR_GREEN}Global list set: $SELECTED_LIST${COLOR_RESET}"
+                sleep 0.5
+            fi
+            ;;
+        "u")
+            if [[ -n "$SESS" ]]; then
+                unlink_session "$SESS"
+                echo "${COLOR_GREEN}Unlinked session '$SESS' (falls back to global list)${COLOR_RESET}"
+                sleep 0.5
+            fi
+            ;;
         "enter")
-            if [[ -n "$SELECTED_LIST" && "$SELECTED_LIST" != "$CURRENT_LIST" ]]; then
+            if [[ -n "$SELECTED_LIST" ]]; then
                 set_active_list "$SELECTED_LIST"
                 break
             fi

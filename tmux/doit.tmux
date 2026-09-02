@@ -10,11 +10,10 @@ SCRIPTS_DIR="$CURRENT_DIR/scripts"
 tmux set-environment -g DOIT_TMUX_DIR "$CURRENT_DIR"
 tmux set-environment -g DOIT_SCRIPTS_DIR "$SCRIPTS_DIR"
 
-# Set active list from session.json
-if command -v jq &> /dev/null && [[ -f "$HOME/.local/share/nvim/doit/session.json" ]]; then
-    ACTIVE_LIST=$(jq -r '.active_list // "daily"' "$HOME/.local/share/nvim/doit/session.json")
-    tmux set-environment -g DOIT_ACTIVE_LIST "$ACTIVE_LIST"
-fi
+# Older versions seeded a global DOIT_ACTIVE_LIST env var here and on every
+# list switch. That global pins EVERY session to one list, which defeats
+# per-session links — unset any residue left in a long-running server.
+tmux set-environment -gu DOIT_ACTIVE_LIST 2>/dev/null
 
 # Default keybinding prefix (can be overridden with @doit-key)
 default_key="d"
@@ -52,6 +51,10 @@ tmux bind-key -T doit-menu l display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-lis
 # List manager - create/rename/delete (prefix + d + L)
 tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-list-manager.sh"
 
+# Daily list popup: interactive manager pinned to the daily list, without
+# touching this session's link (prefix + d + d)
+tmux bind-key -T doit-menu d display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh --list daily"
+
 # Editor mode for create/edit (default: off, uses inline input)
 # Set to "true" to use $EDITOR (nvim, vim, etc) instead
 # set -g @doit-use-editor "true"
@@ -83,4 +86,5 @@ if [[ "$alt_bindings" != "off" ]]; then
     tmux bind-key -n M-X run-shell "$SCRIPTS_DIR/todo-toggle.sh"
     tmux bind-key -n M-N display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
     tmux bind-key -n M-L display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
+    tmux bind-key -n M-D display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh --list daily"
 fi

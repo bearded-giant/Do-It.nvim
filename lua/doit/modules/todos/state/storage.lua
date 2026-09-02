@@ -455,22 +455,27 @@ function storage.setup(M)
             end
         end
         
-        -- Try to restore last session's list
+        -- Try to restore last session's list. Inside tmux the session's linked
+        -- list wins (from_link), and an explicit link also outranks project
+        -- derivation below.
         local session = require("doit.modules.todos.state.session")
-        local last_list = session.load_session()
-        
+        local last_list, from_link = session.load_session()
+
         if last_list then
             -- Verify the list still exists
             local list_path = get_list_path(last_list)
             if vim.fn.filereadable(list_path) == 1 then
                 config.active_list = last_list
+            else
+                -- dead link: fall back through the rest of the chain
+                from_link = false
             end
         end
-        
+
         -- Opt-in: a git repo gets its own list. Runs after the session restore so
         -- it wins for this session, but the session file still remembers whatever
         -- list was last active globally. load_list creates the file when missing.
-        if config.project_lists then
+        if not from_link and config.project_lists then
             local project_list = require("doit.modules.todos.state.project_list")
             local derived = project_list.derive()
             if derived then

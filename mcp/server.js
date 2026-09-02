@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { composeTodoText, nextRank, normalizeTodoText, parseTodoText } from "./todo-text.js";
 
@@ -53,14 +54,45 @@ function writeJSON(filepath, data) {
     fs.renameSync(filepath + ".tmp", filepath);
 }
 
+// Current tmux session name, or null outside tmux. Resolved per call, not per
+// process — the user moves panes between sessions and the server lives long.
+function getTmuxSessionName() {
+    if (!process.env.TMUX) return null;
+    try {
+        const target = process.env.TMUX_PANE ? ["-t", process.env.TMUX_PANE] : [];
+        const out = execFileSync("tmux", ["display-message", "-p", ...target, "#S"], {
+            encoding: "utf-8",
+            stdio: ["ignore", "pipe", "ignore"],
+        });
+        return out.trim() || null;
+    } catch {
+        return null;
+    }
+}
+
+function readSession() {
+    try {
+        return readJSON(SESSION_FILE);
+    } catch {
+        return {};
+    }
+}
+
+function updateSession(mutate) {
+    const session = readSession();
+    mutate(session);
+    session.timestamp = Math.floor(Date.now() / 1000);
+    writeJSON(SESSION_FILE, session);
+}
+
+// env override > per-tmux-session link > global .active_list > daily
 function getActiveListName() {
     if (process.env.DOIT_ACTIVE_LIST) return process.env.DOIT_ACTIVE_LIST;
-    try {
-        const session = readJSON(SESSION_FILE);
-        return session.active_list || "daily";
-    } catch {
-        return "daily";
-    }
+    const session = readSession();
+    const sess = getTmuxSessionName();
+    const link = sess && session.sessions ? session.sessions[sess] : null;
+    if (link && fs.existsSync(getListPath(link))) return link;
+    return session.active_list || "daily";
 }
 
 function getListPath(listName) {
@@ -349,6 +381,11 @@ IMPORTANT: Always use these MCP tools for todo operations. NEVER use bash, grep,
 
 There is always an active list (usually "daily"). When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
 
+Session-linked lists: when this server runs inside tmux, the active list is PER TMUX SESSION. Resolution: DOIT_ACTIVE_LIST env > the current tmux session's link (the 'sessions' map in session.json) > the global pointer > "daily". Outside tmux only the global pointer applies.
+- switch_list inside tmux links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link.
+- create_list: the result text reports link state — if it auto-linked the new list to the current session, tell the user; if the session is already linked to another list, ASK the user before calling switch_list to relink. Never relink silently.
+- list_lists shows which tmux sessions link each list — use it to answer "which session works on what".
+
 Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
 
 Item text convention — MANDATORY for every item you create:
@@ -377,7 +414,8 @@ Behavior:
 - "move X to work list" → move_todo with query + target list
 - "search for X" → search_todos
 - "show my lists" / "which lists" → list_lists
-- "switch to X list" → switch_list
+- "switch to X list" → switch_list (in tmux: links this session + sets global; pass scope to narrow)
+- "set the global list without touching this session" → switch_list with scope="global" (unlinking a session is done in the tmux UI with the u key)
 - "todos for <project>" → list_todos with list=<project-name> (list names often match project names)
 - "create list X" → create_list
 - "rename list X to Y" → rename_list
@@ -1211,13 +1249,19 @@ server.tool(
         const files = fs.readdirSync(LISTS_DIR).filter(f => f.endsWith(".json"));
         const active = getActiveListName();
 
+        const linksByList = {};
+        for (const [sess, list] of Object.entries(readSession().sessions || {})) {
+            (linksByList[list] = linksByList[list] || []).push(sess);
+        }
+
         const lines = files.map(f => {
             const name = f.replace(/\.json$/, "");
             const data = readJSON(path.join(LISTS_DIR, f));
             const total = (data.todos || []).length;
             const pending = (data.todos || []).filter(t => !t.done).length;
+            const linked = linksByList[name] ? ` (linked: ${linksByList[name].join(", ")})` : "";
             const marker = name === active ? " <-- active" : "";
-            return `${name}: ${pending} pending / ${total} total${marker}`;
+            return `${name}: ${pending} pending / ${total} total${linked}${marker}`;
         });
 
         return {
@@ -1231,25 +1275,39 @@ server.tool(
 
 server.tool(
     "switch_list",
-    "Switch the active do-it list.",
+    "Switch the active do-it list. Inside tmux the default links the current tmux session to the list AND updates the global pointer; scope narrows the write.",
     {
         list: z.string().describe("List name to switch to"),
+        scope: z.enum(["session", "global"]).optional().describe("'session': only link the current tmux session (needs tmux). 'global': only set the global pointer, touch no session link. Omit for the default (both inside tmux, global outside)."),
     },
-    async ({ list }) => {
+    async ({ list, scope }) => {
         const filepath = getListPath(list);
         if (!fs.existsSync(filepath)) {
             throw new Error(`List "${list}" not found. Use list_lists to see available lists.`);
         }
 
-        const session = fs.existsSync(SESSION_FILE) ? readJSON(SESSION_FILE) : {};
-        session.active_list = list;
-        session.timestamp = Math.floor(Date.now() / 1000);
-        writeJSON(SESSION_FILE, session);
+        const sess = getTmuxSessionName();
+        if (scope === "session" && !sess) {
+            throw new Error("Not inside tmux — there is no session to link. Use scope 'global' or omit scope.");
+        }
 
+        const linkIt = scope !== "global" && sess;
+        const setGlobal = scope !== "session";
+        updateSession(session => {
+            if (linkIt) {
+                session.sessions = session.sessions || {};
+                session.sessions[sess] = list;
+            }
+            if (setGlobal) session.active_list = list;
+        });
+
+        const effects = [];
+        if (linkIt) effects.push(`linked tmux session "${sess}"`);
+        if (setGlobal) effects.push("set the global pointer");
         return {
             content: [{
                 type: "text",
-                text: `Switched active list to "${list}"`,
+                text: `Switched active list to "${list}" (${effects.join(" and ")})`,
             }],
         };
     }
@@ -1276,10 +1334,25 @@ server.tool(
         };
         writeJSON(filepath, data);
 
+        let sessionNote = "";
+        const sess = getTmuxSessionName();
+        if (sess) {
+            const existing = (readSession().sessions || {})[sess];
+            if (!existing) {
+                updateSession(session => {
+                    session.sessions = session.sessions || {};
+                    session.sessions[sess] = name;
+                });
+                sessionNote = `\ntmux session "${sess}" had no linked list, so "${name}" is now linked to it (it is this session's active list). Tell the user.`;
+            } else if (existing !== name) {
+                sessionNote = `\ntmux session "${sess}" is currently linked to "${existing}". Do NOT relink it yourself — ask the user whether this session should switch to "${name}" (then call switch_list).`;
+            }
+        }
+
         return {
             content: [{
                 type: "text",
-                text: `Created list "${name}" at ${filepath}`,
+                text: `Created list "${name}" at ${filepath}${sessionNote}`,
             }],
         };
     }
@@ -1308,6 +1381,12 @@ server.tool(
 
         fs.renameSync(oldPath, newPath);
 
+        updateSession(session => {
+            for (const [sess, list] of Object.entries(session.sessions || {})) {
+                if (list === old_name) session.sessions[sess] = new_name;
+            }
+        });
+
         return {
             content: [{
                 type: "text",
@@ -1335,6 +1414,12 @@ server.tool(
         const data = readJSON(filepath);
         const count = (data.todos || []).length;
         fs.unlinkSync(filepath);
+
+        updateSession(session => {
+            for (const [sess, list] of Object.entries(session.sessions || {})) {
+                if (list === name) delete session.sessions[sess];
+            }
+        });
 
         return {
             content: [{

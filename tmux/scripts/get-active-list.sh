@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # get the active todo list path from session.json or environment
-# priority: DOIT_ACTIVE_LIST env var > session.json > default (daily)
+# priority: DOIT_PINNED_LIST > DOIT_ACTIVE_LIST env var > per-tmux-session link
+#           (sessions map in session.json) > derived project list > global
+#           .active_list > default (daily)
 
 DOIT_DATA_DIR="${DOIT_DATA_DIR:-$HOME/.local/share/nvim/doit}"
 SESSION_FILE="$DOIT_DATA_DIR/session.json"
@@ -37,18 +39,97 @@ project_lists_enabled() {
     [[ "$opt" == "on" || "$opt" == "1" || "$opt" == "true" ]]
 }
 
-get_active_list_name() {
-    local list_name="" derived=""
+# Current tmux session name, empty outside tmux. DOIT_SESSION_NAME overrides:
+# the status bar passes #{session_name} through it because #() commands run
+# without a client context, and tests use it to fake a session.
+get_tmux_session_name() {
+    if [[ -n "$DOIT_SESSION_NAME" ]]; then
+        printf '%s' "$DOIT_SESSION_NAME"
+        return 0
+    fi
+    [[ -n "$TMUX" ]] || return 1
+    command -v tmux &>/dev/null || return 1
+    if [[ -n "$TMUX_PANE" ]]; then
+        tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null
+    else
+        tmux display-message -p '#S' 2>/dev/null
+    fi
+}
 
-    # check env var first, then the derived project list, then session.json
-    if [[ -n "$DOIT_ACTIVE_LIST" ]]; then
+# read-modify-write session.json with a jq filter; preserves unrelated keys
+_update_session_file() {
+    command -v jq &>/dev/null || return 1
+    mkdir -p "$(dirname "$SESSION_FILE")"
+    [[ -f "$SESSION_FILE" ]] || echo '{}' > "$SESSION_FILE"
+    jq "$@" "$SESSION_FILE" > "${SESSION_FILE}.tmp" && mv "${SESSION_FILE}.tmp" "$SESSION_FILE"
+}
+
+# List linked to session $1, empty when unlinked.
+get_session_link() {
+    [[ -f "$SESSION_FILE" ]] || return 1
+    command -v jq &>/dev/null || return 1
+    jq -r --arg s "$1" '(.sessions? // {})[$s] // empty' "$SESSION_FILE" 2>/dev/null
+}
+
+# Link session $1 to list $2.
+link_session() {
+    [[ -n "$1" && -n "$2" ]] || return 1
+    _update_session_file --arg s "$1" --arg l "$2" '.sessions = (.sessions? // {}) + {($s): $l}'
+}
+
+# Drop session $1's link; it falls back to the global chain.
+unlink_session() {
+    [[ -n "$1" ]] || return 1
+    _update_session_file --arg s "$1" 'if .sessions? then .sessions |= with_entries(select(.key != $s)) else . end'
+}
+
+# Point every link at list $1 to list $2 (list rename).
+relink_sessions_for_list() {
+    [[ -f "$SESSION_FILE" ]] || return 0
+    _update_session_file --arg old "$1" --arg new "$2" \
+        'if .sessions? then .sessions |= with_entries(if .value == $old then .value = $new else . end) else . end'
+}
+
+# Drop every link at list $1 (list deleted).
+prune_links_for_list() {
+    [[ -f "$SESSION_FILE" ]] || return 0
+    _update_session_file --arg l "$1" \
+        'if .sessions? then .sessions |= with_entries(select(.value != $l)) else . end'
+}
+
+# Session names linked to list $1, one per line.
+sessions_for_list() {
+    [[ -f "$SESSION_FILE" ]] || return 0
+    command -v jq &>/dev/null || return 0
+    jq -r --arg l "$1" '(.sessions? // {}) | to_entries[] | select(.value == $l) | .key' "$SESSION_FILE" 2>/dev/null
+}
+
+get_active_list_name() {
+    local list_name="" ensure="" sess link
+
+    if [[ -n "$DOIT_PINNED_LIST" ]]; then
+        # pinned popup (e.g. the daily view): fixed list, created on first use
+        list_name="$DOIT_PINNED_LIST"
+        ensure=1
+    elif [[ -n "$DOIT_ACTIVE_LIST" ]]; then
         list_name="$DOIT_ACTIVE_LIST"
-    elif project_lists_enabled; then
+    fi
+
+    if [[ -z "$list_name" ]]; then
+        sess=$(get_tmux_session_name 2>/dev/null) || sess=""
+        if [[ -n "$sess" ]]; then
+            link=$(get_session_link "$sess") || link=""
+            # a link to a deleted list is ignored so the chain keeps resolving
+            [[ -n "$link" && -f "$LISTS_DIR/${link}.json" ]] && list_name="$link"
+        fi
+    fi
+
+    if [[ -z "$list_name" ]] && project_lists_enabled; then
         local pane_cwd
         # run-shell bindings do not inherit the pane's cwd, so ask tmux for it
         pane_cwd=$(tmux display-message -p '#{pane_current_path}' 2>/dev/null)
         list_name=$(derive_project_list "${pane_cwd:-$PWD}") || list_name=""
-        [[ -n "$list_name" ]] && derived=1
+        [[ -n "$list_name" ]] && ensure=1
     fi
 
     if [[ -z "$list_name" ]] && [[ -f "$SESSION_FILE" ]] && command -v jq &> /dev/null; then
@@ -56,9 +137,10 @@ get_active_list_name() {
     fi
     [[ -z "$list_name" || "$list_name" == "null" ]] && list_name="daily"
 
-    # a project list is created on first use, the same way nvim's load_list does;
-    # without this the missing-file fallback below would bounce us back to daily
-    if [[ -n "$derived" && ! -f "$LISTS_DIR/${list_name}.json" ]]; then
+    # derived/pinned lists are created on first use, the same way nvim's
+    # load_list does; without this the missing-file fallback below would
+    # bounce us back to daily
+    if [[ -n "$ensure" && ! -f "$LISTS_DIR/${list_name}.json" ]]; then
         mkdir -p "$LISTS_DIR"
         printf '{"_metadata":{"created_at":%s,"updated_at":%s},"todos":[],"notes":[]}\n' \
             "$(date +%s)" "$(date +%s)" > "$LISTS_DIR/${list_name}.json"
@@ -85,6 +167,8 @@ get_active_list_path() {
     echo "$LISTS_DIR/${list_name}.json"
 }
 
+# Switch the active list: writes the global pointer, and inside tmux also
+# links the current session (every in-tmux switch updates both).
 set_active_list() {
     local list_name="$1"
     if [[ -z "$list_name" ]]; then
@@ -92,19 +176,22 @@ set_active_list() {
         return 1
     fi
 
-    # update session.json
-    if [[ -f "$SESSION_FILE" ]]; then
-        jq --arg list "$list_name" '.active_list = $list' \
-            "$SESSION_FILE" > "${SESSION_FILE}.tmp" && mv "${SESSION_FILE}.tmp" "$SESSION_FILE"
-    else
-        mkdir -p "$(dirname "$SESSION_FILE")"
-        echo "{\"active_list\": \"$list_name\"}" > "$SESSION_FILE"
-    fi
+    set_global_list "$list_name" || return 1
 
-    # update tmux environment if in tmux
-    if [[ -n "$TMUX" ]]; then
-        tmux set-environment -g DOIT_ACTIVE_LIST "$list_name"
+    local sess
+    sess=$(get_tmux_session_name 2>/dev/null) || sess=""
+    [[ -n "$sess" ]] && link_session "$sess" "$list_name"
+    return 0
+}
+
+# Global pointer only — what non-tmux contexts fall back to.
+set_global_list() {
+    local list_name="$1"
+    if [[ -z "$list_name" ]]; then
+        echo "Error: list name required" >&2
+        return 1
     fi
+    _update_session_file --arg list "$list_name" '.active_list = $list'
 }
 
 get_available_lists() {

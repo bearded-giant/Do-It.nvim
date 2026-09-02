@@ -8,6 +8,27 @@ source "$SCRIPT_DIR/lib-footer.sh"
 
 DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
+# --list <name>: pin this view to one list (the daily popup) without touching
+# any session link. Exported so fzf binds that re-run this script (--format
+# reloads, todo-move.sh) stay on the pinned list.
+FORMAT_MODE=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --list)
+            [[ -n "$2" ]] && export DOIT_PINNED_LIST="$2"
+            shift
+            [[ $# -gt 0 ]] && shift
+            ;;
+        --format)
+            FORMAT_MODE=1
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 # always read from session.json, not cached env var
 unset DOIT_ACTIVE_LIST
 TODO_LIST_PATH="$(get_active_list_path)"
@@ -316,7 +337,7 @@ format_todos() {
 }
 
 # allow fzf reload to call this script for formatted output
-if [[ "$1" == "--format" ]]; then
+if [[ -n "$FORMAT_MODE" ]]; then
     format_todos
     exit 0
 fi
@@ -874,8 +895,9 @@ while true; do
         "l")
             # Open list switch
             "$SCRIPT_DIR/todo-list-switch.sh"
-            # Clear cached env var so we read fresh from session.json
+            # Clear cached env var (and any pin) so we read fresh from session.json
             unset DOIT_ACTIVE_LIST
+            unset DOIT_PINNED_LIST
             # Reload list path after switch
             TODO_LIST_PATH="$(get_active_list_path)"
             ACTIVE_LIST_NAME="$(get_active_list_name)"
@@ -884,8 +906,9 @@ while true; do
         "L"|"q")
             # L / q: go back to Lists (list manager). Esc quits the manager.
             "$SCRIPT_DIR/todo-list-manager.sh"
-            # Clear cached env var so we read fresh from session.json
+            # Clear cached env var (and any pin) so we read fresh from session.json
             unset DOIT_ACTIVE_LIST
+            unset DOIT_PINNED_LIST
             # Reload list path after switch
             TODO_LIST_PATH="$(get_active_list_path)"
             ACTIVE_LIST_NAME="$(get_active_list_name)"
