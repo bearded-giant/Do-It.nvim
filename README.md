@@ -21,6 +21,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Import/Export** - Backup or share your tasks, or export pending items to markdown with `E`
 - **Lualine Integration** - Show active tasks in your statusline
 - **Tmux Add-on** - Optional tmux integration with shared data (see below)
+- **Session-Linked Lists** - Each tmux session holds its own active list; `daily` stays one popup away
 
 ## Quick Start
 
@@ -327,6 +328,9 @@ Then install with `prefix + I`.
 | `x` | Toggle current todo done  |
 | `n` | New todo                  |
 | `N` | Start next pending todo   |
+| `l` | Switch lists (links the current session) |
+| `L` | List manager              |
+| `d` | Daily list popup (pinned to `daily`) |
 
 **Direct shortcuts (Alt+Shift):**
 
@@ -336,6 +340,8 @@ Then install with `prefix + I`.
 | `Alt+Shift+I` | Interactive manager |
 | `Alt+Shift+X` | Toggle todo done    |
 | `Alt+Shift+N` | New todo            |
+| `Alt+Shift+L` | Switch lists        |
+| `Alt+Shift+D` | Daily list popup    |
 
 **In interactive manager:**
 
@@ -381,6 +387,20 @@ set -g @doit-export-dir "~/notes/exports"
 set -g @doit-project-lists "on"
 ```
 
+### Session-Linked Lists
+
+Each tmux session can hold its own active list. The link map lives in `session.json` (`sessions: {"<tmux session>": "<list>"}`), so links survive tmux restarts, and every surface resolves the active list through the same chain:
+
+1. `DOIT_ACTIVE_LIST` environment override
+2. The current tmux session's link
+3. Per-project derivation (`@doit-project-lists`, opt-in)
+4. The global `.active_list` pointer
+5. `daily`
+
+Outside tmux the session step is skipped and everything behaves like before.
+
+In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session. Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
+
 ### Status Bar Integration
 
 If using [bearded-giant-tmux](https://github.com/bearded-giant/bearded-giant-tmux) theme, add `todo` to your status modules:
@@ -392,8 +412,10 @@ set -g @bearded_giant_status_modules_right "meetings todo"
 For other themes, use the status script directly:
 
 ```bash
-set -g status-right "#(~/.tmux/plugins/do-it.nvim/tmux/scripts/todo-status.sh)"
+set -g status-right "#(~/.tmux/plugins/do-it.nvim/tmux/scripts/todo-status.sh '#{session_name}')"
 ```
+
+Passing `#{session_name}` lets the status segment resolve the session's linked list; status commands run without a client context, so the script cannot discover the session on its own.
 
 ## MCP Server (Claude Code Integration)
 
@@ -464,9 +486,9 @@ Lists:
 
 | Tool | Description |
 |------|-------------|
-| `list_lists` | Show all lists and which one is active |
-| `switch_list` | Change the active list |
-| `create_list` | Create a new empty list |
+| `list_lists` | Show all lists, which one is active, and which tmux sessions link each |
+| `switch_list` | Change the active list. Inside tmux it links the current session and updates the global pointer; `scope` narrows the write to `session` or `global` |
+| `create_list` | Create a new empty list. Inside tmux it auto-links the new list when the session has none, and asks before relinking otherwise |
 | `rename_list` | Rename a list. Switch away from it first |
 | `delete_list` | Delete a list. Switch away from it first |
 
@@ -487,7 +509,7 @@ Duplicate detection strips that whole wrapper before comparing, so an item you t
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOIT_DATA_DIR` | `~/.local/share/nvim/doit` | Data directory path |
-| `DOIT_ACTIVE_LIST` | (from session.json) | Override active list name. Wins over per-project derivation |
+| `DOIT_ACTIVE_LIST` | (unset) | Override active list name. Wins over session links and per-project derivation |
 
 The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
 

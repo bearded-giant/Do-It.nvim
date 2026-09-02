@@ -482,6 +482,15 @@ A list name becomes a filename, so characters outside letters, digits, `.`,
 repository called `do-it.nvim` uses a list of the same name. Two repositories
 with the same directory name share a list.
 
+Session-linked lists (inside tmux):~
+When Neovim runs inside tmux, the active list restored on startup is the one
+linked to the current tmux session (the `sessions` map in session.json, see
+|doit-tmux-session-links|), which wins over per-project derivation and the
+global pointer. Switching lists from Neovim inside tmux updates both the
+session link and the global pointer; outside tmux only the global pointer is
+written and behavior is unchanged. Links are created from the tmux list UIs
+or the MCP server.
+
 
 NESTED TODOS                                                 *doit-nesting*
 
@@ -575,6 +584,7 @@ Features:
 - Quick actions (toggle, start next) without leaving your workflow
 - Status bar integration showing current todo
 - Multiple list support with shared session state
+- Per-tmux-session active lists (|doit-tmux-session-links|)
 
 Quick Start:~
 Add to ~/.tmux.conf with TPM: >tmux

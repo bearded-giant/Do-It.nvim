@@ -10,7 +10,8 @@ CONTENTS                                                *doit-tmux-contents*
   5. Interactive Manager ......................... |doit-tmux-interactive|
   6. Status Bar ........................................ |doit-tmux-status|
   7. Shared Storage ................................... |doit-tmux-storage|
-  8. Configuration .............................. |doit-tmux-configuration|
+  8. Session-Linked Lists ....................... |doit-tmux-session-links|
+  9. Configuration .............................. |doit-tmux-configuration|
 
 ==============================================================================
 INTRODUCTION                                               *doit-tmux-intro*
@@ -23,6 +24,7 @@ Key features:
 - Full CRUD operations (create, read, update, delete)
 - Interactive fzf-based manager
 - Multiple list support with switching
+- Per-tmux-session active lists (see |doit-tmux-session-links|)
 - Undo support for accidental deletes
 - Status bar integration
 - Shared storage with Neovim (session.json)
@@ -76,8 +78,10 @@ Quick Actions~
     prefix + d + N     Start next pending todo
 
 List Management~
-    prefix + d + l     Switch between lists
+    prefix + d + l     Switch between lists (links the current session)
     prefix + d + L     List manager (create/rename/delete lists)
+    prefix + d + d     Daily list popup (interactive manager pinned to the
+                       daily list, without touching this session's link)
 
 Alt+Shift Shortcuts (no prefix)~
     Alt+Shift+T        Quick popup viewer
@@ -85,6 +89,7 @@ Alt+Shift Shortcuts (no prefix)~
     Alt+Shift+X        Toggle current todo
     Alt+Shift+N        New todo
     Alt+Shift+L        Switch lists
+    Alt+Shift+D        Daily list popup
 
 Disable alt bindings in tmux.conf: >tmux
     set -g @doit-alt-bindings off
@@ -177,8 +182,13 @@ STATUS BAR                                              *doit-tmux-status*
 Add the current todo to your tmux status bar.
 
 In your tmux.conf: >tmux
-    set -g status-right '#($DOIT_TMUX_DIR/status/todo.sh)'
+    set -g status-right '#($DOIT_TMUX_DIR/status/todo.sh "#{session_name}")'
 <
+
+Passing `#{session_name}` makes the status resolve the session's linked list
+(|doit-tmux-session-links|); status commands run without a client context, so
+the script cannot discover the session on its own. Omit the argument for the
+old global behavior.
 
 Or with custom formatting: >tmux
     set -g status-right '#{?#{!=:#($DOIT_TMUX_DIR/status/todo.sh),},#[fg=yellow] #($DOIT_TMUX_DIR/status/todo.sh),}'
@@ -197,7 +207,9 @@ Todo Lists:~
 
 Session State:~
     Location: ~/.local/share/nvim/doit/session.json
-    Tracks which list is currently active.
+    Tracks the global active list (`.active_list`) and the per-tmux-session
+    links (`.sessions`, a `{"<tmux session>": "<list>"}` map — see
+    |doit-tmux-session-links|).
 
 When you switch lists in tmux, Neovim sees the change on next refresh.
 When you switch lists in Neovim, tmux picks it up immediately.
@@ -222,6 +234,44 @@ JSON Schema:~
       }
     }
 <
+
+==============================================================================
+SESSION-LINKED LISTS                              *doit-tmux-session-links*
+
+Each tmux session can hold its own active list, so hopping between sessions
+no longer stomps a single global pointer. Links live in the `sessions` map of
+session.json, keyed by tmux session name, and survive tmux server restarts.
+
+Every surface (tmux scripts, the status bar, the MCP server, and Neovim when
+it runs inside tmux) resolves the active list through the same chain:
+
+    1. DOIT_ACTIVE_LIST         explicit environment override
+    2. sessions[<tmux session>] the session link
+    3. project-list derivation  opt-in, |doit-tmux-configuration|
+    4. .active_list             the global pointer
+    5. daily
+
+Outside tmux, step 2 is skipped and behavior is identical to older versions.
+
+In the list switcher (prefix + d + l) and list manager (prefix + d + L):
+
+    ENTER              Link the selected list to the current session (also
+                       refreshes the global pointer)
+    g                  Set the global pointer only, touch no link
+    u                  Unlink the current session (falls back to the global
+                       chain)
+
+Rows show which sessions link each list, e.g. `work  [api infra]`. Sessions
+that no longer exist in `tmux list-sessions` render dimmed. The daily list is
+pinned to the top with its pending count.
+
+Switching lists inside tmux — from the tmux UI, from Neovim, or through the
+MCP server — writes BOTH the session link and the global pointer. Non-tmux
+switches write the global pointer only.
+
+The daily popup (prefix + d + d, or Alt+Shift+D) opens the interactive
+manager pinned to the daily list from any session without changing any link
+or pointer.
 
 ==============================================================================
 CONFIGURATION                                      *doit-tmux-configuration*
@@ -280,7 +330,12 @@ Environment Variables:~
 The plugin sets these environment variables automatically:
 - DOIT_TMUX_DIR: Path to tmux plugin directory
 - DOIT_SCRIPTS_DIR: Path to scripts directory
-- DOIT_ACTIVE_LIST: Currently active list name (overrides per-project lists)
+
+Manual overrides (never set by the plugin):
+- DOIT_ACTIVE_LIST: Forces the active list, winning over session links and
+  per-project lists. Older versions seeded this globally on every switch;
+  that seeding is gone (it would pin every session to one list), and the
+  plugin now unsets any stale global copy when it loads.
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:
