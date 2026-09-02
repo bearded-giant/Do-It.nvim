@@ -65,6 +65,7 @@ M.defaults = {
         toggle_list_window = "<leader>dl",
         toggle_list_manager = "L",
         new_todo = "<CR>",
+        new_child_todo = "a",
         new_note = "gn",
         toggle_todo = "c",
         revert_to_pending = "X",

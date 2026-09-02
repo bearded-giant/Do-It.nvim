@@ -28,6 +28,7 @@
 | Key | Description |
 |-----|-------------|
 | `<CR>` | Add new todo |
+| `a` | Add a child todo nested under the current one |
 | `c` | Toggle todo status (pending→in-progress→done) |
 | `X` | Revert todo to pending (not started) |
 | `p` | Set/change priority (critical/urgent/important) |

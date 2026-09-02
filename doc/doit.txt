@@ -16,6 +16,7 @@ Table of Contents                                          *doit-contents*
   - Calendar Module (icalbuddy)                      |doit-calendar-module|
   - Priority System                                         |doit-priorities|
   - Todo Lists                                                  |doit-lists|
+  - Nested Todos                                              |doit-nesting|
   - Import/Export                                             |doit-import|
   - Project Notes                                              |doit-notes|
   - Tmux Integration                                       |doit-tmux-intro|
@@ -268,6 +269,7 @@ Main Window~
     <leader>dl   Toggle active to-dos list window
     <leader>dn   Toggle project notes window
     <CR>        Add new to-do
+    a           Add a child to-do under the current one
     c           Toggle to-do status
     X           Revert to-do to pending
     d           Delete current to-do (or list note, on a note row)
@@ -480,6 +482,24 @@ A list name becomes a filename, so characters outside letters, digits, `.`,
 repository called `do-it.nvim` uses a list of the same name. Two repositories
 with the same directory name share a list.
 
+
+NESTED TODOS                                                 *doit-nesting*
+
+A to-do can hang under another one. Press `a` on a to-do to create a child of
+it. The child renders indented two spaces per level below its parent and
+follows the parent wherever the parent sorts. A subtree never splits: children
+sit in their parent's priority group and section even when their own status
+or priority differs, so a checked-off subtask stays under its parent instead
+of dropping to the completed block.
+
+Deleting a parent promotes its direct children to the top level; their own
+children stay attached to them. Completing a parent does not complete its
+children. Reordering (`r`, then `j`/`k`) swaps a to-do with its nearest
+sibling, so a parent moves together with its whole subtree.
+
+Nesting is shared with the tmux UI (|doit-tmux-interactive|) and the MCP
+server (`parent` on add_todo / update_todo). Markdown export (`E`) writes
+children as an indented list under their parent.
 
 IMPORT/EXPORT                                                 *doit-import*
 

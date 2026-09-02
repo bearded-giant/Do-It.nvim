@@ -83,4 +83,25 @@ echo '{"todos":[{"id":"1","text":"done","done":true,"order_index":1}]}' > "$EMPT
 "$EXPORT_SH" "$TEST_TMPDIR/empty.md" "$EMPTY" > /dev/null
 assert_file_contains "$TEST_TMPDIR/empty.md" "_no pending items_"
 
+# same fixture and golden as export_markdown_spec.lua "nests children"
+it "nests children under their parent (golden shared with the nvim exporter)"
+NESTED="$TEST_TMPDIR/nest.json"
+cat > "$NESTED" <<'EOF'
+{
+  "todos": [
+    {"id":"p","text":"parent","done":false,"order_index":1},
+    {"id":"c2","text":"second child","done":false,"order_index":3,"parent_id":"p"},
+    {"id":"c1","text":"first child\nmore","done":false,"order_index":2,"parent_id":"p","description":"child note"},
+    {"id":"g","text":"grandchild","done":false,"order_index":4,"parent_id":"c1"},
+    {"id":"dp","text":"done parent","done":true,"order_index":5},
+    {"id":"oc","text":"orphaned child","done":false,"order_index":6,"parent_id":"dp","priorities":"urgent"},
+    {"id":"dc","text":"done child","done":true,"order_index":7,"parent_id":"p"},
+    {"id":"u","text":"urgent root","done":false,"order_index":8,"priorities":"urgent"}
+  ]
+}
+EOF
+"$EXPORT_SH" "$TEST_TMPDIR/nest.md" "$NESTED" > /dev/null
+GOLDEN=$'# nest\n\n_exported STAMP_\n\n## Urgent\n\n- [ ] orphaned child\n\n- [ ] urgent root\n\n## Default\n\n- [ ] parent\n\n  - [ ] first child\n    more\n\n    child note\n\n    - [ ] grandchild\n\n  - [ ] second child'
+assert_eq "$GOLDEN" "$(sed 's/^_exported .*_$/_exported STAMP_/' "$TEST_TMPDIR/nest.md")"
+
 report

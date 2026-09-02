@@ -1,3 +1,5 @@
+local sorting = require("doit.modules.todos.state.sorting")
+
 local M = {}
 
 function M.setup(parent_module)
@@ -160,26 +162,32 @@ function M.setup(parent_module)
         table.insert(lines, string.format("  ✓ Done: %d", done))
         table.insert(lines, "")
         
-        -- preview: open items first (sorted by order_index), then done
+        -- preview: same subtree order as the main pane; a subtree sits in its
+        -- root's section, so a checked-off subtask stays under its parent
         if #todos > 0 then
             local open_todos = {}
             local done_todos = {}
-            for _, todo in ipairs(todos) do
-                if todo.done then
+            local root = nil
+            for _, todo in ipairs(sorting.structure_aware(todos)) do
+                if (todo.depth or 0) == 0 then
+                    root = todo
+                end
+                if (root or todo).done then
                     table.insert(done_todos, todo)
                 else
                     table.insert(open_todos, todo)
                 end
             end
 
-            table.sort(open_todos, function(a, b)
-                if (a.in_progress and not b.in_progress) then return true end
-                if (b.in_progress and not a.in_progress) then return false end
-                return (a.order_index or 0) < (b.order_index or 0)
-            end)
-            table.sort(done_todos, function(a, b)
-                return (a.order_index or 0) < (b.order_index or 0)
-            end)
+            local function preview_line(todo)
+                local icon = todo.done and "✓" or (todo.in_progress and "◐" or "○")
+                local indent = string.rep("  ", todo.depth or 0)
+                local text = todo.text
+                if #text > 40 then
+                    text = text:sub(1, 37) .. "..."
+                end
+                return string.format("  %s%s %s", indent, icon, text)
+            end
 
             local max_preview = 10
             local count = 0
@@ -189,12 +197,7 @@ function M.setup(parent_module)
                 table.insert(lines, "  " .. string.rep("─", 12))
                 for _, todo in ipairs(open_todos) do
                     if count >= max_preview then break end
-                    local icon = todo.in_progress and "◐" or "○"
-                    local text = todo.text
-                    if #text > 40 then
-                        text = text:sub(1, 37) .. "..."
-                    end
-                    table.insert(lines, string.format("  %s %s", icon, text))
+                    table.insert(lines, preview_line(todo))
                     count = count + 1
                 end
             end
@@ -207,11 +210,7 @@ function M.setup(parent_module)
                 local done_count = 0
                 for _, todo in ipairs(done_todos) do
                     if done_count >= done_slots then break end
-                    local text = todo.text
-                    if #text > 40 then
-                        text = text:sub(1, 37) .. "..."
-                    end
-                    table.insert(lines, string.format("  ✓ %s", text))
+                    table.insert(lines, preview_line(todo))
                     done_count = done_count + 1
                 end
             end

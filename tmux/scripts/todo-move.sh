@@ -1,8 +1,11 @@
 #!/bin/bash
 # fzf bind helper: reorder a todo within its priority group and keep the cursor
 # on it. Called from todo-interactive.sh via a `transform` bind for K/J reorder.
-# Swaps order_index with the nearest same-group neighbor (same in_progress flag +
-# same priority), then prints fzf actions: reload(format)+pos(new line of todo).
+# Swaps order_index with the nearest same-group SIBLING (same parent, same
+# in_progress flag, same priority), then prints fzf actions:
+# reload(format)+pos(new line of todo). Siblings only: a child rides with its
+# parent in the tree order, so swapping with another parent's child moves nothing
+# and swapping two siblings moves their whole subtrees.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
@@ -27,6 +30,7 @@ if [[ -n "$TODO_ID" && "$TODO_ID" != note_* ]]; then
             (\$me.order_index) as \$cur |
             ([.todos[] | select(
                 .done == false
+                and ((.parent_id // \"\") == (\$me.parent_id // \"\"))
                 and ((.in_progress // false) == (\$me.in_progress // false))
                 and ((.priorities // \"\") == (\$me.priorities // \"\"))
                 and $OP)] | $PICK) as \$swap |

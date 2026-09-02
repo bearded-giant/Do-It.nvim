@@ -12,6 +12,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 
 - **Modular Framework** - Use only the components you need
 - **Task Management** - Create, organize, and track to-dos
+- **Nested To-dos** - Break a task into subtasks with `a`; a subtree stays together in nvim, tmux, and the MCP server
 - **Project Notes** - Maintain project-specific documentation
 - **Tags & Filtering** - Categorize tasks with #tags
 - **Due Dates** - Set deadlines with calendar integration
@@ -134,6 +135,7 @@ _Calendar (macOS only):_
 **Basic Keys (in todo window):**
 
 - `n` - Add new todo
+- `a` - Add a child todo under the current one
 - `x` - Toggle status
 - `d` - Delete todo
 - `?` - Show full help
@@ -150,6 +152,7 @@ The todos module provides task management functionality:
 [Full Documentation](docs/modules/todos.md)
 
 - Create, edit, and organize to-dos
+- Nested subtasks, rendered indented under their parent
 - Tag-based filtering and organization
 - Priority-based sorting
 - Due dates with calendar integration
@@ -339,6 +342,7 @@ Then install with `prefix + I`.
 | Key     | Action                |
 |---------|-----------------------|
 | `Enter` | Toggle done           |
+| `K`/`J` | Reorder (a parent moves with its subtree) |
 | `s`     | Start/In-progress     |
 | `x`     | Stop in-progress      |
 | `X`     | Revert to pending     |
@@ -435,8 +439,8 @@ Todo items:
 | `list_todos` | List items from a list, filtered by status, priority, #tag and/or due date |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
-| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due` |
-| `update_todo` | Edit text, description, status, priority, due date, or order. Needs an id |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due` and `parent` (nest under another item) |
+| `update_todo` | Edit text, description, status, priority, due date, order, or `parent`. Needs an id |
 | `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
 | `complete_todo` | Mark an item done. Fuzzy text query; with no args it looks at in-progress items |
 | `revert_todo` | Send an item back to pending |

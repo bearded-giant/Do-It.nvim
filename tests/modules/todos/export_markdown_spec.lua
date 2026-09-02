@@ -77,6 +77,46 @@ describe("todos export_markdown", function()
         assert.is_not_nil(empty:find("_no pending items_", 1, true))
     end)
 
+    -- same fixture and golden as tests/tmux/test_export.sh "nests children"
+    it("nests children under their parent, byte for byte with the tmux exporter", function()
+        local nested = {
+            { id = "p", text = "parent", done = false, order_index = 1 },
+            { id = "c2", text = "second child", done = false, order_index = 3, parent_id = "p" },
+            { id = "c1", text = "first child\nmore", done = false, order_index = 2, parent_id = "p", description = "child note" },
+            { id = "g", text = "grandchild", done = false, order_index = 4, parent_id = "c1" },
+            { id = "dp", text = "done parent", done = true, order_index = 5 },
+            { id = "oc", text = "orphaned child", done = false, order_index = 6, parent_id = "dp", priorities = "urgent" },
+            { id = "dc", text = "done child", done = true, order_index = 7, parent_id = "p" },
+            { id = "u", text = "urgent root", done = false, order_index = 8, priorities = "urgent" },
+        }
+        local expected = table.concat({
+            "# nest",
+            "",
+            "_exported 2026-07-30 10:00_",
+            "",
+            "## Urgent",
+            "",
+            "- [ ] orphaned child",
+            "",
+            "- [ ] urgent root",
+            "",
+            "## Default",
+            "",
+            "- [ ] parent",
+            "",
+            "  - [ ] first child",
+            "    more",
+            "",
+            "    child note",
+            "",
+            "    - [ ] grandchild",
+            "",
+            "  - [ ] second child",
+            "",
+        }, "\n")
+        assert.are.equal(expected, export_markdown.build(nested, "nest", "2026-07-30 10:00"))
+    end)
+
     it("writes the file and reports the pending count", function()
         local path = vim.fn.tempname() .. ".md"
         local ok, msg = export_markdown.write(path, FIXTURE, "work")

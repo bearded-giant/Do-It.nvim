@@ -357,8 +357,19 @@ function M.build_render_rows()
 
 	local prev_group = nil
 	local done_started = false
+	local root = nil
 	for i, todo in ipairs(state.todos) do
-		if todo.done and not show_completed then
+		if (todo.depth or 0) == 0 then
+			root = todo
+		end
+		-- a subtree renders in its root's section, so a checked-off subtask stays
+		-- under its parent instead of dragging the done divider into the list.
+		-- a root hidden by show_completed leaves each child to its own status.
+		local head = root or todo
+		if head.done and not show_completed then
+			head = todo
+		end
+		if head.done and not show_completed then
 			goto continue
 		end
 
@@ -367,7 +378,7 @@ function M.build_render_rows()
 		if show_by_tag then
 			-- group separators (mirror tmux): blank line between priority groups,
 			-- blank + divider + blank before the completed block
-			if todo.done then
+			if head.done then
 				if not done_started then
 					done_started = true
 					if not notes_emitted then
@@ -378,8 +389,8 @@ function M.build_render_rows()
 					push("")
 				end
 			else
-				local section = todo.in_progress and "ip" or "pd"
-				local prio = todo_priority_name(todo) or "default"
+				local section = head.in_progress and "ip" or "pd"
+				local prio = todo_priority_name(head) or "default"
 				local group = section .. ":" .. prio
 				if group ~= prev_group then
 					if section == "pd" then
@@ -1043,6 +1054,12 @@ local function create_window()
 
 	setup_keymap("new_todo", function()
 		todo_actions.new_todo(function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("new_child_todo", function()
+		todo_actions.new_child_todo(win_id, function()
 			M.render_todos()
 		end)
 	end)

@@ -13,6 +13,7 @@ M.keymaps = {
 	todo_window = {
 		basic = {
 			{ key = "<CR>", desc = "Add new todo" },
+			{ key = "a", desc = "Add a child todo nested under the current one" },
 			{ key = "c", desc = "Toggle todo status (pending→in-progress→done)" },
 		{ key = "X", desc = "Revert todo to pending (not started)" },
 			{ key = "p", desc = "Set/change priority (critical/urgent/important)" },

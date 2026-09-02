@@ -98,7 +98,17 @@ with fzf. Press `?` within the manager to see all keybindings.
 
 Navigation~
     j/k or arrows      Move up/down in list
-    K/J                Reorder todo (move up/down)
+    K/J                Reorder todo (move up/down; a parent moves with its
+                       whole subtree)
+
+Nested Todos~
+    Children created in nvim (`a` on the parent) or through the MCP server
+    render indented two spaces per level under their parent, inside the
+    parent's section and priority group. A done subtask stays under its open
+    parent; a pending child of a completed parent follows it below the
+    divider. K/J swap a todo with its nearest sibling, so a subtree moves as
+    one. Markdown export (E) writes children as an indented list under their
+    parent.
 
 Status Changes~
     Enter              Toggle done/pending
@@ -151,7 +161,8 @@ Export~
 
     Writes the current list's non-completed todos to a markdown file: one
     `##` header per priority (Critical, Urgent, Important, Default), items
-    in list order, each item's note indented under it. The path prompt is
+    in list order, children indented under their parent, each item's note
+    indented under it. The path prompt is
     prefilled with `{@doit-export-dir}/{list}.md` (default dir: the popup's
     working directory).
 

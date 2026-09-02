@@ -98,6 +98,77 @@ describe("structure-aware ordering", function()
 	end)
 end)
 
+describe("nesting render", function()
+	local doit_state
+
+	before_each(function()
+		package.loaded["doit.state"] = nil
+		local doit = require("doit")
+		doit.setup({ modules = { todos = { enabled = true } } })
+		doit_state = require("doit.state")
+		doit_state.todos = {}
+		doit_state.save_to_disk = function() end
+		doit_state.save_todos = function() end
+	end)
+
+	local function line_of(rows, todo)
+		for i, row in ipairs(rows) do
+			if row.todo == todo and row.is_first then
+				return i
+			end
+		end
+		return nil
+	end
+
+	it("keeps a done subtask under its open parent, above the completed divider", function()
+		local parent = doit_state.add_todo("parent", {})
+		local child = doit_state.add_todo("child", {}, parent.id)
+		local other = doit_state.add_todo("other", {})
+		child.done = true
+
+		local rows = require("doit.ui.main_window").build_render_rows()
+
+		assert.are.equal(line_of(rows, parent) + 1, line_of(rows, child))
+		assert.is_truthy(rows[line_of(rows, child)].display:find("^  "))
+		local divider
+		for i, row in ipairs(rows) do
+			if row.kind == "divider" then
+				divider = i
+			end
+		end
+		assert.is_nil(divider)
+		assert.is_true(line_of(rows, other) > line_of(rows, child))
+	end)
+
+	it("does not open a new priority header between an urgent parent and its default child", function()
+		local urgent = doit_state.add_todo("urgent parent", "urgent")
+		local child = doit_state.add_todo("plain child", {}, urgent.id)
+		doit_state.add_todo("plain root", {})
+
+		local rows = require("doit.ui.main_window").build_render_rows()
+
+		assert.are.equal(line_of(rows, urgent) + 1, line_of(rows, child))
+		local headers = 0
+		for _, row in ipairs(rows) do
+			if row.kind == "priority_header" then
+				headers = headers + 1
+			end
+		end
+		assert.are.equal(2, headers)
+	end)
+
+	it("resolves the cursor line of an indented child to that child", function()
+		local parent = doit_state.add_todo("parent", {})
+		local child = doit_state.add_todo("child", {}, parent.id)
+
+		local main_window = require("doit.ui.main_window")
+		local rows = main_window.build_render_rows()
+		main_window._rendered_rows = rows
+
+		assert.are.equal(child, rows[line_of(rows, child)].todo)
+	end)
+end)
+
 describe("nesting mutations", function()
 	local doit_state
 

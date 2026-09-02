@@ -44,6 +44,12 @@ build_markdown() {
             elif .priorities == "important" then 2
             else 3 end;
         def indent: split("\n") | map(if . == "" then "" else "  " + . end) | join("\n");
+        # child items nest as an indented markdown list under their parent
+        def pad($d):
+            if $d == 0 then . else
+                ([range($d)] | map("  ") | add) as $p
+                | split("\n") | map(if . == "" then "" else $p + . end) | join("\n")
+            end;
         def item:
             (.text // "") as $t |
             ((.description // "") | strip_footer | trim) as $d |
@@ -51,12 +57,28 @@ build_markdown() {
             "- [ ] " + $tl[0]
             + (if ($tl | length) > 1 then "\n" + ($tl[1:] | join("\n") | indent) else "" end)
             + (if $d == "" then "" else "\n\n" + ($d | indent) end);
+        def by_key: [prio_rank, (if .in_progress then 0 else 1 end), .order_index];
+        # tree order over the pending set (mirrors export_markdown.lua nest()):
+        # a child rides with its parent into the parent'"'"'s section, a child whose
+        # parent is done or missing is a root, a parent cycle is still emitted
+        def nest:
+            . as $all
+            | (map(select(.id != null) | {key: .id, value: true}) | from_entries) as $ids
+            | def kids($pid; $d; $rank):
+                [$all[] | select(.parent_id == $pid and .id != $pid)] | sort_by(by_key)
+                | map(. as $k | [$k + {depth: $d, rank: $rank}] + kids($k.id; $d + 1; $rank)) | add // [];
+            ([.[] | select(.parent_id == null or $ids[.parent_id] == null or .parent_id == .id)]
+                | sort_by(by_key)
+                | map(. as $r | [$r + {depth: 0, rank: ($r | prio_rank)}] + kids($r.id; 1; ($r | prio_rank)))
+                | add // []) as $rows
+            | ($rows | map(.id)) as $seen
+            | $rows + [$all[] | select([.id] | inside($seen) | not) | . + {depth: 0, rank: prio_rank}];
 
         ["Critical", "Urgent", "Important", "Default"] as $labels |
         ([.todos[] | select(.done != true)]
-            | sort_by(prio_rank, (if .in_progress then 0 else 1 end), .order_index)
-            | group_by(prio_rank)
-            | map("## " + $labels[.[0] | prio_rank] + "\n\n" + (map(item) | join("\n\n")))
+            | nest
+            | group_by(.rank)
+            | map("## " + $labels[.[0].rank] + "\n\n" + (map(.depth as $d | item | pad($d)) | join("\n\n")))
         ) as $sections |
         # jq -r appends the final newline, so no trailing "\n" here
         "# " + $list + "\n\n_exported " + $now + "_\n\n"

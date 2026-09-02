@@ -166,15 +166,24 @@ local function resolve_at_line(line_num)
 		return nil
 	end
 
+	local root = nil
 	for i, todo in ipairs(state.todos) do
-		if todo.done and not show_completed then
+		if (todo.depth or 0) == 0 then
+			root = todo
+		end
+		-- mirrors build_render_rows: a subtree sits in its root's section
+		local head = root or todo
+		if head.done and not show_completed then
+			head = todo
+		end
+		if head.done and not show_completed then
 			goto continue
 		end
 
 		local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
 
 		if show_by_tag then
-			if todo.done then
+			if head.done then
 				if not done_started then
 					done_started = true
 					if not notes_emitted then
@@ -184,8 +193,8 @@ local function resolve_at_line(line_num)
 					cur = cur + 3  -- blank + divider + blank
 				end
 			else
-				local section = todo.in_progress and "ip" or "pd"
-				local group = section .. ":" .. (priority_name(todo) or "default")
+				local section = head.in_progress and "ip" or "pd"
+				local group = section .. ":" .. (priority_name(head) or "default")
 				if group ~= prev_group then
 					if section == "pd" then
 						if prev_group then cur = cur + 1 end  -- blank between groups
@@ -375,11 +384,11 @@ local function setup_priority_close_buttons(select_buf, select_win, keymaps)
 	vim.keymap.set("n", "<Esc>", close_window, { buffer = select_buf, nowait = true })
 end
 
-function M.new_todo(on_render)
+function M.new_todo(on_render, parent_id)
 	ensure_state_loaded()
 
 	multiline_input.create({
-		prompt = "New to-do",
+		prompt = parent_id and "New child to-do" or "New to-do",
 		on_submit = function(input)
 			vim.cmd("echo ''")
 
@@ -401,7 +410,7 @@ function M.new_todo(on_render)
 							priorities,
 							selected_priority,
 							function(selected_priority_name)
-								state.add_todo(input, selected_priority_name)
+								state.add_todo(input, selected_priority_name, parent_id)
 								maybe_render(on_render)
 							end
 						)
@@ -409,7 +418,7 @@ function M.new_todo(on_render)
 						setup_priority_close_buttons(select_buf, select_win, keymaps)
 					end)
 				else
-					state.add_todo(input)
+					state.add_todo(input, nil, parent_id)
 					maybe_render(on_render)
 				end
 			end
@@ -418,6 +427,22 @@ function M.new_todo(on_render)
 			vim.cmd("echo ''")
 		end
 	})
+end
+
+function M.new_child_todo(win_id, on_render)
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local idx = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
+	local parent = idx and state.todos[idx]
+	if not parent then
+		vim.notify("Place the cursor on a to-do to add a child", vim.log.levels.WARN)
+		return
+	end
+
+	M.new_todo(on_render, parent.id)
 end
 
 -- List-scoped scratch notes ------------------------------------------------
@@ -1235,13 +1260,15 @@ function M.reorder_todo(win_id, on_render)
 			return
 		end
 
-		-- nearest visible neighbor in `direction`; only swap if it shares the group
+		-- nearest visible sibling in `direction`; only swap if it shares the group.
+		-- non-siblings are skipped, not swapped with: a subtree rides with its
+		-- parent, so swapping order_index with another parent's child moves nothing
 		local step = (direction == "down") and 1 or -1
 		local target
 		local i = idx + step
 		while i >= 1 and i <= #state.todos do
 			local cand = state.todos[i]
-			if cand and not cand.done and is_visible(cand) then
+			if cand and not cand.done and is_visible(cand) and cand.parent_id == me.parent_id then
 				if group_key(cand) == group_key(me) then
 					target = i
 				end
