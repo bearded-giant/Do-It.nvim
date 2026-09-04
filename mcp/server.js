@@ -385,6 +385,7 @@ Session-linked lists: when this server runs inside tmux, the active list is PER 
 - switch_list inside tmux links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link.
 - create_list: the result text reports link state — if it auto-linked the new list to the current session, tell the user; if the session is already linked to another list, ASK the user before calling switch_list to relink. Never relink silently.
 - list_lists shows which tmux sessions link each list — use it to answer "which session works on what".
+- list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)" when that env var decided it. Tell the user: a stale export in the shell that launched this server pins every session to one list, and the tmux link is what they expect.
 
 Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
 
@@ -1248,6 +1249,9 @@ server.tool(
     async () => {
         const files = fs.readdirSync(LISTS_DIR).filter(f => f.endsWith(".json"));
         const active = getActiveListName();
+        const activeVia = process.env.DOIT_ACTIVE_LIST
+            ? " (via DOIT_ACTIVE_LIST env override, not the session link)"
+            : "";
 
         const linksByList = {};
         for (const [sess, list] of Object.entries(readSession().sessions || {})) {
@@ -1260,7 +1264,7 @@ server.tool(
             const total = (data.todos || []).length;
             const pending = (data.todos || []).filter(t => !t.done).length;
             const linked = linksByList[name] ? ` (linked: ${linksByList[name].join(", ")})` : "";
-            const marker = name === active ? " <-- active" : "";
+            const marker = name === active ? ` <-- active${activeVia}` : "";
             return `${name}: ${pending} pending / ${total} total${linked}${marker}`;
         });
 
