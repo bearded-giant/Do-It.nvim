@@ -154,4 +154,31 @@ assert_eq "alpha gamma " "$LINKED"
 it "empty for an unlinked list"
 assert_eq "" "$(helper "sessions_for_list work")"
 
+describe "get_tmux_session_name targeting"
+
+FAKE_BIN="$TEST_TMPDIR/bin"
+mkdir -p "$FAKE_BIN"
+cat > "$FAKE_BIN/tmux" << 'EOF'
+#!/bin/bash
+# fake tmux: report which -t target display-message was given
+target="untargeted"
+while (( $# )); do [[ "$1" == "-t" ]] && target="$2"; shift; done
+echo "$target"
+EOF
+chmod +x "$FAKE_BIN/tmux"
+
+session_target() {
+    env -u DOIT_SESSION_NAME -u TMUX_PANE PATH="$FAKE_BIN:$PATH" "$@" \
+        bash -c "source '$SCRIPTS/get-active-list.sh'; get_tmux_session_name"
+}
+
+it "a pane targets itself via TMUX_PANE"
+assert_eq '%7' "$(session_target TMUX=/tmp/sock,1,3 TMUX_PANE=%7)"
+
+it "a popup (no TMUX_PANE) targets the session id carried in \$TMUX"
+assert_eq '$3' "$(session_target TMUX=/tmp/sock,1,3)"
+
+it "an unparseable \$TMUX falls back to the untargeted call"
+assert_eq 'untargeted' "$(session_target TMUX=/tmp/sock)"
+
 report

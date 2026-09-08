@@ -59,7 +59,10 @@ function writeJSON(filepath, data) {
 function getTmuxSessionName() {
     if (!process.env.TMUX) return null;
     try {
-        const target = process.env.TMUX_PANE ? ["-t", process.env.TMUX_PANE] : [];
+        // popups have no TMUX_PANE; $TMUX ends in the session id, which beats the most-recent-session guess
+        const sid = process.env.TMUX.split(",").pop();
+        const target = process.env.TMUX_PANE ? ["-t", process.env.TMUX_PANE]
+            : /^\d+$/.test(sid) ? ["-t", `$${sid}`] : [];
         const out = execFileSync("tmux", ["display-message", "-p", ...target, "#S"], {
             encoding: "utf-8",
             stdio: ["ignore", "pipe", "ignore"],

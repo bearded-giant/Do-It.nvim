@@ -51,6 +51,12 @@ get_tmux_session_name() {
     command -v tmux &>/dev/null || return 1
     if [[ -n "$TMUX_PANE" ]]; then
         tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null
+        return 0
+    fi
+    # popups have no TMUX_PANE; $TMUX ends in the session id, which beats the most-recent-session guess
+    local sid="${TMUX##*,}"
+    if [[ "$sid" =~ ^[0-9]+$ ]]; then
+        tmux display-message -p -t "\$$sid" '#S' 2>/dev/null
     else
         tmux display-message -p '#S' 2>/dev/null
     fi
