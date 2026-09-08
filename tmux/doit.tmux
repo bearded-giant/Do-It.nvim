@@ -20,7 +20,7 @@ default_key="d"
 doit_key=$(tmux show-option -gqv "@doit-key")
 doit_key="${doit_key:-$default_key}"
 
-# Interactive manager popup dimensions (override with @doit-interactive-popup-w / -h)
+# Interactive manager + list switcher/manager popup dimensions (override with @doit-interactive-popup-w / -h)
 # Accepts tmux size syntax: absolute cells (120) or terminal-relative (80%)
 interactive_w=$(tmux show-option -gqv "@doit-interactive-popup-w")
 interactive_w="${interactive_w:-80%}"
@@ -46,10 +46,10 @@ tmux bind-key -T doit-menu n display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-cre
 tmux bind-key -T doit-menu N run-shell "$SCRIPTS_DIR/todo-next.sh"
 
 # Switch todo list (prefix + d + l)
-tmux bind-key -T doit-menu l display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
+tmux bind-key -T doit-menu l display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-list-switch.sh"
 
 # List manager - create/rename/delete (prefix + d + L)
-tmux bind-key -T doit-menu L display-popup -E -w 70 -h 25 "$SCRIPTS_DIR/todo-list-manager.sh"
+tmux bind-key -T doit-menu L display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-list-manager.sh"
 
 # Daily list popup: interactive manager pinned to the daily list, without
 # touching this session's link (prefix + d + d)
@@ -85,6 +85,6 @@ if [[ "$alt_bindings" != "off" ]]; then
     tmux bind-key -n M-I display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh"
     tmux bind-key -n M-X run-shell "$SCRIPTS_DIR/todo-toggle.sh"
     tmux bind-key -n M-N display-popup -E -w 80 -h 30 "$SCRIPTS_DIR/todo-create.sh"
-    tmux bind-key -n M-L display-popup -E -w 60 -h 20 "$SCRIPTS_DIR/todo-list-switch.sh"
+    tmux bind-key -n M-L display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-list-switch.sh"
     tmux bind-key -n M-D display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh --list daily"
 fi

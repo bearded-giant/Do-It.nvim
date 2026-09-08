@@ -315,7 +315,9 @@ Interactive manager popup dimensions (default: 80% x 80%): >tmux
     set -g @doit-interactive-popup-h "80%"
 <
 Controls the size of the fzf interactive manager popup (prefix + d + i,
-or Alt+Shift+I). Accepts tmux size syntax: absolute cells ("120") or
+or Alt+Shift+I) and of the list switcher and list manager popups
+(prefix + d + l / L, Alt+Shift+L). Accepts tmux size syntax: absolute
+cells ("120") or
 terminal-relative percentages ("80%"). Percentages scale with the
 terminal, so they keep a consistent feel across laptop and ultrawide
 displays.
