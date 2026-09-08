@@ -332,10 +332,6 @@ function storage.setup(M)
                         storage.save_to_disk()
                     end
 
-                    -- Save session for persistence
-                    local session = require("doit.modules.todos.state.session")
-                    session.save_session(list_name)
-                    
                     return true, "Loaded list '" .. list_name .. "'"
                 end
             end
@@ -350,6 +346,15 @@ function storage.setup(M)
         return false, "Failed to load list or list is empty"
     end
     
+    -- persists the link; load_list alone must not, it also runs for startup restore, previews and moves
+    storage.switch_list = function(list_name)
+        local ok, msg = storage.load_list(list_name)
+        if ok then
+            require("doit.modules.todos.state.session").save_session(list_name)
+        end
+        return ok, msg
+    end
+
     -- Delete a todo list
     storage.delete_list = function(list_name)
         if not list_name or list_name == "" then
@@ -610,7 +615,7 @@ function storage.setup(M)
             end
             
             -- Switch to the new list
-            storage.load_list(list_name)
+            storage.switch_list(list_name)
             return true, string.format("Created new list '%s' with %d imported todos", list_name, #imported_todos)
         end
         

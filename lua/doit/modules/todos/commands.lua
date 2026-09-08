@@ -309,7 +309,7 @@ function M.setup(module)
                     return
                 end
                 
-                local success, msg = module.state.load_list(list_name)
+                local success, msg = module.state.switch_list(list_name)
                 vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
                 
                 -- Refresh main window if open

@@ -61,6 +61,7 @@ function M.setup(parent_module)
     -- Forward storage list management functions to M
     M.create_list = storage.create_list
     M.load_list = storage.load_list
+    M.switch_list = storage.switch_list
     M.delete_list = storage.delete_list
     M.rename_list = storage.rename_list
     M.get_available_lists = storage.get_available_lists

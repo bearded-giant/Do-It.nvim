@@ -394,7 +394,7 @@ function M.setup(parent_module)
     
     local function switch_to_list(list_name)
         -- Load the list and get feedback
-        local success, msg = todo_module.state.load_list(list_name)
+        local success, msg = todo_module.state.switch_list(list_name)
 
         if success then
             -- Close windows after successful switch
@@ -563,7 +563,7 @@ function M.setup(parent_module)
             local success, msg = todo_module.state.create_list(input, {})
             if success then
                 vim.notify(msg, vim.log.levels.INFO)
-                todo_module.state.load_list(input)
+                todo_module.state.switch_list(input)
                 
                 local main_window = todo_module.ui.main_window
                 if main_window and main_window.render_todos then
