@@ -368,6 +368,7 @@ Then install with `prefix + I`.
 | `E`       | Export pending to markdown |
 | `O`       | Send to Obsidian daily note |
 | `y` / `Y` | Copy todo text / list name |
+| `i`       | Copy item id (the MCP resolves it across lists) |
 | `?`       | Show help             |
 | `q` / `Esc` | Back to lists / quit |
 
@@ -410,7 +411,7 @@ Each tmux session can hold its own active list. The link map lives in `session.j
 
 Outside tmux the session step is skipped and everything behaves like before.
 
-In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
+In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager shows the same count as `name (N todos, M overdue)`. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
 
 ### Status Bar Integration
 
@@ -470,6 +471,7 @@ Todo items:
 | Tool | Description |
 |------|-------------|
 | `list_todos` | List items from a list, filtered by status, priority, #tag and/or due date |
+| `get_todo` | Fetch one item by id from whichever list holds it, no list name needed |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
 | `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due` and `parent` (nest under another item) |
@@ -481,6 +483,11 @@ Todo items:
 | `clear_done` | Delete every completed item in a list, keeping the last 10 for undo |
 | `dedupe_todos` | Remove items whose text matches after normalization. Dry run by default |
 | `move_todo` | Move an item to another list |
+
+Ids are global. Copy one from the tmux item view (`i`) or the nvim item view
+(`y`), paste it at the model, and `get_todo`, `start_todo`, `complete_todo`,
+`revert_todo`, `update_todo`, `add_note`, `delete_todo` and `move_todo` all
+find the list that holds it.
 
 Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
 

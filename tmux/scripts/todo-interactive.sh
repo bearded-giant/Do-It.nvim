@@ -156,6 +156,7 @@ preview_todo() {
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
             "\nPriority: " + (.priorities // "none") +
+            "\nID: " + (.id // "-") +
             (if .due_date then "\nDue: " + .due_date + " (" + (.due_date | due_label) + ")" else "" end) +
             (if .obsidian_ref then "\nObsidian:  " + (.obsidian_ref.date // "linked") else "" end) +
             "\n────────────────────────────────" +
@@ -594,7 +595,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)${TAG_FILTER:+   ·   filter: #$TAG_FILTER [c] clear}   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,p,B,O,q,?,/,g,t,c,h \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,i,p,B,O,q,?,/,g,t,c,h \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -685,7 +686,7 @@ while true; do
 
                 NOTES_MARKER="── notes (editable below) ──────────────"
                 {
-                    echo "[$VIEW_STATUS] [$VIEW_PRIORITY]"
+                    echo "[$VIEW_STATUS] [$VIEW_PRIORITY] [id:$TODO_ID]"
                     echo "$VIEW_TEXT"
                     echo "$NOTES_MARKER"
                     [[ -n "$VIEW_DESC" ]] && echo "$VIEW_DESC"
@@ -1010,6 +1011,24 @@ while true; do
             fi
             sleep 0.5
             ;;
+        "i")
+            # copy the item id — the handle the MCP resolves across lists
+            if [[ -n "$NOTE_ID" ]]; then
+                COPY_ID="${NOTE_ID#note_}"
+            else
+                COPY_ID="$TODO_ID"
+            fi
+            if [[ -n "$COPY_ID" ]]; then
+                if printf '%s' "$COPY_ID" | to_clip; then
+                    echo "Copied id: $COPY_ID"
+                else
+                    echo "No clipboard tool found (pbcopy/xclip/xsel)"
+                fi
+            else
+                echo "No item under cursor"
+            fi
+            sleep 0.5
+            ;;
         "Y")
             # copy the active list name to system clipboard
             if printf '%s' "$ACTIVE_LIST_NAME" | to_clip; then
@@ -1327,7 +1346,8 @@ while true; do
             help_row ""                                  "  h      Set / clear due date"
             help_row "  Enter    Open item / note (nvim)" "  E      Export pending to markdown"
             help_row "  y        Copy text"              "OBSIDIAN"
-            help_row "  C-y      Copy note text"         "  O      Send to daily note"
+            help_row "  i        Copy item id"           "  O      Send to daily note"
+            help_row "  C-y      Copy note text"         ""
             help_row "  Y        Copy list name"         ""
             help_row "  q        Back (Lists)"           ""
             help_row "  Esc      Quit"                   ""

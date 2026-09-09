@@ -9,7 +9,7 @@ M.defaults = {
     -- Must stay in sync with core/config.lua's modules.todos default and the
     -- tmux @doit-project-lists option.
     project_lists = false,
-    -- one-line overdue/due-today nudge on startup; :DoItDue lists them
+    -- startup overdue/due-today nudge; :DoItDue lists them
     due_notify = true,
     save_path = vim.fn.stdpath("data") .. "/doit_todos.json",
     import_export_path = vim.fn.expand("~/todos.json"),
@@ -98,6 +98,7 @@ M.defaults = {
         open_todo_scratchpad = "<leader>p",
         open_linked_note = "o",
         view_detail = "K",
+        copy_todo_id = "y",
         reorder_todo = "r",
         move_todo_up = "k",
         move_todo_down = "j",

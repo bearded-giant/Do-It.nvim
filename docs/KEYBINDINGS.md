@@ -60,7 +60,8 @@
 | `r` | Reorder current todo (use j/k to move) |
 | `T` | Add time estimation |
 | `R` | Remove time estimation |
-| `K` | View todo detail (full text + description) |
+| `K` | View todo detail (full text + description, including the item id) |
+| `y` | Copy the item id (the doit MCP resolves it across lists) |
 | `o` | Open linked note |
 | `<leader>p` | Open scratchpad for todo |
 

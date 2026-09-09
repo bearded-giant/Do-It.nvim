@@ -115,6 +115,28 @@ function loadList(listName) {
     return { name: resolved, filepath, data: readJSON(filepath) };
 }
 
+// A copied id identifies an item globally, so an id-addressed call resolves the
+// list that holds it instead of failing on whichever list happens to be active.
+function findListByTodoId(id) {
+    if (!id || !fs.existsSync(LISTS_DIR)) return null;
+    for (const f of fs.readdirSync(LISTS_DIR).filter(f => f.endsWith(".json"))) {
+        const filepath = path.join(LISTS_DIR, f);
+        const data = readJSON(filepath);
+        if ((data.todos || []).some(t => t.id === id)) {
+            return { name: f.replace(/\.json$/, ""), filepath, data };
+        }
+    }
+    return null;
+}
+
+function loadListForTodo(listName, id) {
+    if (!listName && id) {
+        const found = findListByTodoId(id);
+        if (found) return found;
+    }
+    return loadList(listName);
+}
+
 function saveList(filepath, data) {
     data._metadata = data._metadata || {};
     data._metadata.updated_at = Math.floor(Date.now() / 1000);
@@ -417,6 +439,7 @@ Behavior:
 - "clear done" / "remove completed" → clear_done
 - "move X to work list" → move_todo with query + target list
 - "search for X" → search_todos
+- user pastes or names an id ("work 1757012345_4821", "fetch this todo: <id>") → get_todo — it finds the item in WHICHEVER list holds it and names that list
 - "show my lists" / "which lists" → list_lists
 - "switch to X list" → switch_list (in tmux: links this session + sets global; pass scope to narrow)
 - "set the global list without touching this session" → switch_list with scope="global" (unlinking a session is done in the tmux UI with the u key)
@@ -459,7 +482,9 @@ The 'list' parameter is optional on MOST tools — omit it to use the active lis
 
 Most tools that act on a single todo accept fuzzy text matching via 'query', so the user does not need the exact text or ID: start_todo, complete_todo, revert_todo, add_note, delete_todo, move_todo, and the note tools get_note / update_note / delete_note.
 
-update_todo is the exception — it REQUIRES an id and has no 'query'. To act on an item the user described rather than identified, either use one of the fuzzy tools above, or call list_todos / search_todos first to get the id.`,
+update_todo is the exception — it REQUIRES an id and has no 'query'. To act on an item the user described rather than identified, either use one of the fuzzy tools above, or call list_todos / search_todos first to get the id.
+
+Ids are global, not per-list: the user copies one out of the tmux item view (i) or the nvim item view (y) to hand you a task from any list. get_todo, start_todo, complete_todo, revert_todo, update_todo, add_note, delete_todo and move_todo resolve a bare id by finding the list that holds it, so never guess a 'list' for a pasted id and never report an id missing because it is not on the active list. A 'claude:' item fetched by id is burned down the same way as one found via list_todos.`,
     }
 );
 
@@ -600,6 +625,48 @@ server.tool(
     }
 );
 
+server.tool(
+    "get_todo",
+    "Fetch one todo item by id from whichever list holds it — no list name needed. Use this when the user pastes or names an id (ids are copyable from the tmux and nvim item views). The result names the list, so follow-up tools can be scoped to it; start_todo, complete_todo, revert_todo, update_todo, add_note, delete_todo and move_todo also accept a bare id and find the list themselves.",
+    {
+        id: z.string().describe("Todo id, as copied from the tmux (i) or nvim (y) item view, or shown as [id:...] by list_todos"),
+    },
+    async ({ id }) => {
+        const found = findListByTodoId(id);
+        if (!found) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `No todo with id "${id}" in any list. Use search_todos to find it by text.`,
+                }],
+            };
+        }
+
+        const todos = found.data.todos || [];
+        const todo = todos.find(t => t.id === id);
+        const parent = todo.parent_id ? todos.find(t => t.id === todo.parent_id) : null;
+        const children = todos.filter(t => t.parent_id === id);
+        const tags = parseTags(todo.text || "");
+
+        const lines = [
+            `List: ${found.name}`,
+            `Status: ${todo.done ? "Done" : todo.in_progress ? "In Progress" : "Pending"}`,
+            `Priority: ${todo.priorities || "none"}`,
+        ];
+        if (todo.due_date) lines.push(`Due: ${todo.due_date} (${renderDue(todo.due_date)})`);
+        if (tags.length) lines.push(`Tags: ${tags.map(t => `#${t}`).join(" ")}`);
+        if (parent) lines.push(`Parent: ${formatTodoLine(parent)}`);
+        if (children.length) {
+            lines.push(`Children (${children.length}):`);
+            for (const child of children) lines.push(`  ${formatTodoLine(child)}`);
+        }
+        lines.push("", todo.text || "");
+        if (todo.description) lines.push("", "Notes:", todo.description);
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+    }
+);
+
 // --- CREATE ---
 
 server.tool(
@@ -675,7 +742,7 @@ server.tool(
         parent: z.union([z.number(), z.string()]).optional().describe("Re-nest under this item (rank number or id). Use an empty string to move it back to the top level."),
     },
     async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index, due, parent }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
 
@@ -745,7 +812,7 @@ server.tool(
         list: z.string().optional().describe("List name (default: active list)"),
     },
     async ({ id, query, list }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const result = resolveTodo(data, name, {
             id, query,
             fallbackFilter: t => !t.done && !t.in_progress,
@@ -784,7 +851,7 @@ server.tool(
         list: z.string().optional().describe("List name (default: active list)"),
     },
     async ({ id, query, list }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const result = resolveTodo(data, name, {
             id, query,
             fallbackFilter: t => t.in_progress && !t.done,
@@ -820,7 +887,7 @@ server.tool(
         list: z.string().optional().describe("List name (default: active list)"),
     },
     async ({ id, query, list }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const result = resolveTodo(data, name, {
             id, query,
             fallbackFilter: t => t.done || t.in_progress,
@@ -858,7 +925,7 @@ server.tool(
         mode: z.enum(["append", "replace"]).optional().describe("'append' (default) adds to existing notes, 'replace' overwrites them."),
     },
     async ({ id, query, note, list, mode = "append" }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const result = resolveTodo(data, name, { id, query });
 
         if (result.noMatch) {
@@ -896,7 +963,7 @@ server.tool(
         list: z.string().optional().describe("List name (default: active list)"),
     },
     async ({ id, query, list }) => {
-        const { name, filepath, data } = loadList(list);
+        const { name, filepath, data } = loadListForTodo(list, id);
         const result = resolveTodo(data, name, { id, query });
 
         if (result.noMatch) {
@@ -1202,7 +1269,7 @@ server.tool(
         to_list: z.string().describe("Target list name to move the item to"),
     },
     async ({ id, query, from_list, to_list }) => {
-        const source = loadList(from_list);
+        const source = loadListForTodo(from_list, id);
         const result = resolveTodo(source.data, source.name, { id, query });
 
         if (result.noMatch) {

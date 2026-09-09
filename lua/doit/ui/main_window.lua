@@ -764,6 +764,9 @@ function M.open_todo_details()
 	local lines = {}
 	lines[#lines + 1] = "Status:   " .. status
 	lines[#lines + 1] = "Priority: " .. priority
+	if todo.id then
+		lines[#lines + 1] = "ID:       " .. todo.id
+	end
 	if todo.obsidian_ref then
 		lines[#lines + 1] = "Obsidian: " .. ((todo.obsidian_ref.date) or "linked")
 	end
@@ -810,6 +813,22 @@ function M.open_todo_details()
 			end
 		end, { buffer = pbuf, nowait = true })
 	end
+
+	vim.keymap.set("n", "y", function()
+		M.copy_todo_id(todo)
+	end, { buffer = pbuf, nowait = true, desc = "Copy todo id" })
+end
+
+-- The id is the cross-list handle: the MCP resolves it without a list name.
+function M.copy_todo_id(todo)
+	todo = todo or M.get_todo_at_cursor()
+	if not todo or not todo.id then
+		vim.notify("No todo id under cursor", vim.log.levels.WARN)
+		return
+	end
+	vim.fn.setreg("+", todo.id)
+	vim.fn.setreg('"', todo.id)
+	vim.notify("Copied id: " .. todo.id, vim.log.levels.INFO)
 end
 
 local function create_window()
@@ -1197,6 +1216,10 @@ local function create_window()
 	-- Detail popup for the todo under the cursor
 	setup_keymap("view_detail", function()
 		M.open_todo_details()
+	end)
+
+	setup_keymap("copy_todo_id", function()
+		M.copy_todo_id()
 	end)
 	
 	-- Add keymap for linking to notes
