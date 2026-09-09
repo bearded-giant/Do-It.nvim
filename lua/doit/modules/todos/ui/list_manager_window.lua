@@ -1,4 +1,13 @@
 local sorting = require("doit.modules.todos.state.sorting")
+local due_dates = require("doit.modules.todos.state.due_dates")
+
+local function overdue_suffix(metadata)
+    local count = metadata and metadata.overdue_count or 0
+    if count == 0 then
+        return ""
+    end
+    return string.format(", %d overdue", count)
+end
 
 local M = {}
 
@@ -143,6 +152,7 @@ function M.setup(parent_module)
         local done = 0
         local in_progress = 0
         local pending = 0
+        local overdue = 0
 
         for _, todo in ipairs(todos) do
             if todo.done then
@@ -152,6 +162,9 @@ function M.setup(parent_module)
             else
                 pending = pending + 1
             end
+            if not todo.done and todo.due_date and due_dates.status(todo.due_date) == "overdue" then
+                overdue = overdue + 1
+            end
         end
 
         local active_total = pending + in_progress  -- Active todos only
@@ -160,6 +173,9 @@ function M.setup(parent_module)
         table.insert(lines, string.format("  ○ Pending: %d", pending))
         table.insert(lines, string.format("  ◐ In Progress: %d", in_progress))
         table.insert(lines, string.format("  ✓ Done: %d", done))
+        if overdue > 0 then
+            table.insert(lines, string.format("  ! Overdue: %d", overdue))
+        end
         table.insert(lines, "")
         
         -- preview: same subtree order as the main pane; a subtree sits in its
@@ -246,6 +262,12 @@ function M.setup(parent_module)
                 end
             end
         end
+
+        for i, line in ipairs(lines) do
+            if line:match("Overdue") then
+                api.nvim_buf_add_highlight(preview_buf_id, namespace, "DiagnosticError", i - 1, 0, -1)
+            end
+        end
     end
     
     local function render_lists()
@@ -303,8 +325,8 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s[%s] %s (%d todos) %s", 
-                        selection_marker, num, list.name, todo_count, active_marker))
+                    table.insert(lines, string.format("%s[%s] %s (%d todos%s) %s", 
+                        selection_marker, num, list.name, todo_count, overdue_suffix(metadata), active_marker))
                 else
                     -- Lists beyond 10
                     local active_marker = list.name == active_list and "[active]" or ""
@@ -313,8 +335,8 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s    %s (%d todos) %s", 
-                        selection_marker, list.name, todo_count, active_marker))
+                    table.insert(lines, string.format("%s    %s (%d todos%s) %s", 
+                        selection_marker, list.name, todo_count, overdue_suffix(metadata), active_marker))
                 end
             end
         end
@@ -375,6 +397,12 @@ function M.setup(parent_module)
                 api.nvim_buf_add_highlight(buf_id, namespace, "PmenuSel", i - 1, 0, -1)
             elseif line and line:match("%*") then
                 api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticOk", i - 1, 0, -1)
+            end
+
+            local overdue_start = line and line:find("%d+ overdue")
+            if overdue_start then
+                local overdue_end = line:find("overdue", overdue_start, true) + 7
+                api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticError", i - 1, overdue_start - 1, overdue_end - 1)
             end
         end
         

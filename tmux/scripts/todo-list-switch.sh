@@ -22,6 +22,7 @@ if ! command -v fzf &> /dev/null; then
 fi
 
 COLOR_DIM=$'\e[2m'
+COLOR_RED=$'\e[1;31m'
 COLOR_RESET=$'\e[0m'
 
 CURRENT_LIST=$(get_active_list_name)
@@ -40,7 +41,9 @@ preview_list() {
         local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false)] | length' "$list_file" 2>/dev/null || echo 0)
         local in_progress=$(jq '[.todos[] | select(.in_progress == true)] | length' "$list_file" 2>/dev/null || echo 0)
+        local overdue=$(jq -r --arg today "$(date +%F)" '[.todos[]? | select((.done | not) and ((.due_date // "") != "") and .due_date < $today)] | length' "$list_file" 2>/dev/null || echo 0)
         echo "Total: $total | Pending: $pending | In Progress: $in_progress"
+        [[ "$overdue" -gt 0 ]] 2>/dev/null && printf '%s%s overdue%s\n' "$COLOR_RED" "$overdue" "$COLOR_RESET"
         echo ""
         echo "Recent items:"
         jq -r --argjson w "$text_w" '.todos | sort_by(.order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:$w])"' "$list_file" 2>/dev/null
@@ -48,6 +51,17 @@ preview_list() {
 }
 export -f preview_list
 export LISTS_DIR
+export COLOR_RED
+export COLOR_RESET
+
+# " !2 overdue" when the list has open items past their due date
+overdue_badge_for_list() {
+    local n
+    n=$(overdue_count_for_list "$1")
+    [[ "$n" =~ ^[0-9]+$ ]] || return 0
+    (( n > 0 )) && printf ' %s!%s overdue%s' "$COLOR_RED" "$n" "$COLOR_RESET"
+    return 0
+}
 
 # " [sess1 sess2]" for lists some session links; dead sessions render dim
 badge_for_list() {
@@ -68,11 +82,13 @@ build_rows() {
     local name pending
     if [[ -f "$LISTS_DIR/daily.json" ]]; then
         pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
-        printf 'daily (%s pending)%s\n' "$pending" "$(badge_for_list daily)"
+        printf 'daily (%s pending)%s%s\n' "$pending" \
+            "$(overdue_badge_for_list daily)" "$(badge_for_list daily)"
     fi
     while IFS= read -r name; do
         [[ -z "$name" || "$name" == "daily" ]] && continue
-        printf '%s%s\n' "$name" "$(badge_for_list "$name")"
+        printf '%s%s%s\n' "$name" \
+            "$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
     done < <(get_available_lists)
 }
 

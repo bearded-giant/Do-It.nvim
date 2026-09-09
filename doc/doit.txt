@@ -445,6 +445,11 @@ Press L in the main todo window to open the list manager where you can:
 - Delete lists (except the active one)
 - Preview list contents and statistics
 
+Rows read "name (N todos, M overdue)" when a list holds open items past their
+due date, and the preview repeats the count. The startup nudge names the list
+and the item text for each overdue item across every list, not just the active
+one; :DoItDue lists the active list's due items and jumps to one.
+
 Moving Todos Between Lists:~
 1. Select a todo in the main window
 2. Press m to open the list selector

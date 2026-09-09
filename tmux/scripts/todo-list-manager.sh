@@ -46,7 +46,9 @@ preview_list() {
         local pending=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$list_file" 2>/dev/null || echo 0)
         local in_progress=$(jq '[.todos[] | select(.in_progress == true)] | length' "$list_file" 2>/dev/null || echo 0)
         local done_count=$(jq '[.todos[] | select(.done == true)] | length' "$list_file" 2>/dev/null || echo 0)
+        local overdue=$(jq -r --arg today "$(date +%F)" '[.todos[]? | select((.done | not) and ((.due_date // "") != "") and .due_date < $today)] | length' "$list_file" 2>/dev/null || echo 0)
         echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
+        [[ "$overdue" -gt 0 ]] 2>/dev/null && printf '%s%s overdue%s\n' "$COLOR_RED" "$overdue" "$COLOR_RESET"
         echo ""
         # show in-progress first, then pending
         jq -r --argjson w "$text_w" '
@@ -74,7 +76,17 @@ export -f preview_list
 export LISTS_DIR
 export SHOW_COMPLETED
 export COLOR_DIM
+export COLOR_RED
 export COLOR_RESET
+
+# " !2 overdue" when the list has open items past their due date
+overdue_badge_for_list() {
+    local n
+    n=$(overdue_count_for_list "$1")
+    [[ "$n" =~ ^[0-9]+$ ]] || return 0
+    (( n > 0 )) && printf ' %s!%s overdue%s' "$COLOR_RED" "$n" "$COLOR_RESET"
+    return 0
+}
 
 # " [sess1 sess2]" for lists some session links; dead sessions render dim
 badge_for_list() {
@@ -96,12 +108,14 @@ build_rows() {
     if [[ -f "$LISTS_DIR/daily.json" ]]; then
         pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
         marker="  "; [[ "daily" == "$CURRENT_LIST" ]] && marker="* "
-        printf '%sdaily (%s pending)%s\n' "$marker" "$pending" "$(badge_for_list daily)"
+        printf '%sdaily (%s pending)%s%s\n' "$marker" "$pending" \
+            "$(overdue_badge_for_list daily)" "$(badge_for_list daily)"
     fi
     while IFS= read -r name; do
         [[ -z "$name" || "$name" == "daily" ]] && continue
         marker="  "; [[ "$name" == "$CURRENT_LIST" ]] && marker="* "
-        printf '%s%s%s\n' "$marker" "$name" "$(badge_for_list "$name")"
+        printf '%s%s%s%s\n' "$marker" "$name" \
+            "$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
     done < <(get_available_lists)
 }
 

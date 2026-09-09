@@ -35,28 +35,44 @@ function M.setup(opts)
     M.state = state_module.setup(M)
     M.state.load_todos()
 
-    -- One-line nudge at startup; :DoItDue lists them. Deferred so it lands after
-    -- the intro screen instead of being cleared by it.
+    -- deferred so it lands after the intro screen instead of being cleared by it
     if M.config.due_notify ~= false then
         vim.schedule(function()
             local due_dates = require("doit.modules.todos.state.due_dates")
+            -- every list, not just the active one: the list name is the part you
+            -- cannot recover from the item text alone
             local overdue, today = 0, 0
-            for _, todo in ipairs(M.state.todos or {}) do
-                if not todo.done and todo.due_date then
-                    local status = due_dates.status(todo.due_date)
-                    if status == "overdue" then
-                        overdue = overdue + 1
-                    elseif status == "today" then
-                        today = today + 1
-                    end
+            local overdue_rows = {}
+            for _, list in ipairs(M.state.get_available_lists() or {}) do
+                local metadata = list.metadata or {}
+                overdue = overdue + (metadata.overdue_count or 0)
+                today = today + (metadata.due_today_count or 0)
+                for _, item in ipairs(metadata.overdue_items or {}) do
+                    table.insert(overdue_rows, {
+                        list = list.name,
+                        text = item.text,
+                        days = due_dates.days_until(item.due_date) or 0,
+                    })
                 end
             end
             if overdue > 0 or today > 0 then
                 local parts = {}
                 if overdue > 0 then table.insert(parts, overdue .. " overdue") end
                 if today > 0 then table.insert(parts, today .. " due today") end
+                local msg = { "doit: " .. table.concat(parts, ", ") }
+
+                table.sort(overdue_rows, function(a, b) return a.days < b.days end)
+                local max_rows = 5
+                for i, row in ipairs(overdue_rows) do
+                    if i > max_rows then
+                        table.insert(msg, string.format("  +%d more", #overdue_rows - max_rows))
+                        break
+                    end
+                    table.insert(msg, string.format("  [%s] overdue %dd - %s", row.list, -row.days, row.text))
+                end
+                table.insert(msg, "(:DoItDue)")
                 vim.notify(
-                    "doit: " .. table.concat(parts, ", ") .. " (:DoItDue)",
+                    table.concat(msg, "\n"),
                     overdue > 0 and vim.log.levels.WARN or vim.log.levels.INFO
                 )
             end

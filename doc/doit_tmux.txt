@@ -145,6 +145,9 @@ View/Copy~
                        priority and text, edit its note in place
     y                  Copy todo text to clipboard
     Ctrl-y             Copy the todo's note text
+    i                  Copy the item id — paste it at the model and the
+                       doit MCP fetches the item from whichever list holds
+                       it (get_todo), no list name needed
     Y                  Copy the list name
 
 Delete/Undo~
@@ -268,6 +271,10 @@ In the list switcher (prefix + d + l) and list manager (prefix + d + L):
     g / ctrl-g         Set the global pointer only, touch no link
     u / ctrl-u         Unlink the current session (falls back to the global
                        chain)
+
+Both views badge a list with "!N overdue" when it holds open items past their
+due date, and the preview pane repeats the count, so an overdue item is
+attributable to a list without opening each one.
 
 The manager uses the bare keys (g, u); the switcher uses ctrl-g and ctrl-u so
 plain letters keep filtering the list as you type.

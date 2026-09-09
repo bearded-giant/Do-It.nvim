@@ -200,6 +200,19 @@ set_global_list() {
     _update_session_file --arg list "$list_name" '.active_list = $list'
 }
 
+# Open todos past their due date in list $1, for the list views' overdue badge.
+# ISO dates compare correctly as strings, so no date math in jq.
+overdue_count_for_list() {
+    local file="$LISTS_DIR/${1}.json"
+    if [[ ! -f "$file" ]] || ! command -v jq &>/dev/null; then
+        printf '0'
+        return
+    fi
+    jq -r --arg today "$(date +%F)" \
+        '[.todos[]? | select((.done | not) and ((.due_date // "") != "") and .due_date < $today)] | length' \
+        "$file" 2>/dev/null || printf '0'
+}
+
 get_available_lists() {
     ls -1 "$LISTS_DIR"/*.json 2>/dev/null | xargs -n1 basename | sed 's/\.json$//'
 }

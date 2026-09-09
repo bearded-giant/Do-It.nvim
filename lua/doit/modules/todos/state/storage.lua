@@ -1,6 +1,8 @@
 -- Handles loading/saving from disk, plus importing/exporting.
 local vim = vim
 
+local due_dates = require("doit.modules.todos.state.due_dates")
+
 local storage = {
     -- Pre-define the functions to prevent nil value errors
     load_from_disk = function() end,
@@ -131,6 +133,9 @@ function storage.setup(M)
                     if content and content ~= "" then
                         local metadata = {}
                         local todo_count = 0
+                        local overdue_count = 0
+                        local due_today_count = 0
+                        local overdue_items = {}
                         pcall(function()
                             local data = vim.fn.json_decode(content)
                             if data._metadata then
@@ -141,6 +146,16 @@ function storage.setup(M)
                                 for _, todo in ipairs(data.todos) do
                                     if not todo.done then
                                         todo_count = todo_count + 1
+                                        local due_status = todo.due_date and due_dates.status(todo.due_date)
+                                        if due_status == "overdue" then
+                                            overdue_count = overdue_count + 1
+                                            table.insert(overdue_items, {
+                                                text = vim.split(todo.text or "", "\n", { plain = true })[1],
+                                                due_date = todo.due_date,
+                                            })
+                                        elseif due_status == "today" then
+                                            due_today_count = due_today_count + 1
+                                        end
                                     end
                                 end
                             end
@@ -148,6 +163,9 @@ function storage.setup(M)
 
                         -- Add active todo count to metadata
                         metadata.todo_count = todo_count
+                        metadata.overdue_count = overdue_count
+                        metadata.due_today_count = due_today_count
+                        metadata.overdue_items = overdue_items
                         
                         table.insert(lists, {
                             name = name,
