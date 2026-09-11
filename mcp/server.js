@@ -421,7 +421,7 @@ Item text convention — MANDATORY for every item you create:
 - [type] — short lowercase work-type tag (decision, gate, loader, comms, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
 - N. — do-order rank across the whole list. Priority is the bucket (critical > urgent > important > default); N is the order INSIDE and ACROSS buckets, since a bucket with several items has no other visible ordering. add_todo assigns the next N automatically — do not write it into 'text'.
 - (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
-- claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag.
+- claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
 
 Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its rank is preserved.
 
@@ -733,6 +733,7 @@ server.tool(
         text: z.string().optional().describe("New text. The item's existing [type] prefix and rank number carry over — pass the body only."),
         type: z.string().optional().describe("Change the work type." + TYPE_HINT),
         deps: z.array(z.union([z.number(), z.string()])).optional().describe("Replace the blocking rank numbers." + DEPS_HINT),
+        claude: z.boolean().optional().describe("Toggle the leading 'claude:' burn-down marker. Pass false to drop it when an item stops being model work — rewriting 'text' alone will not remove it."),
         description: z.string().optional().describe("New description/notes." + NOTE_FORMAT_HINT),
         priority: z.enum(["critical", "urgent", "important", "none"]).optional().describe("Set priority level. Use 'none' to remove priority."),
         done: z.boolean().optional().describe("Set done status"),
@@ -741,15 +742,16 @@ server.tool(
         due: z.string().optional().describe("Set due date as YYYY-MM-DD. Use an empty string to clear it."),
         parent: z.union([z.number(), z.string()]).optional().describe("Re-nest under this item (rank number or id). Use an empty string to move it back to the top level."),
     },
-    async ({ id, list, text, type, deps, description, priority, done, in_progress, order_index, due, parent }) => {
+    async ({ id, list, text, type, deps, claude, description, priority, done, in_progress, order_index, due, parent }) => {
         const { name, filepath, data } = loadListForTodo(list, id);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
 
-        if (text !== undefined || type !== undefined || deps !== undefined) {
+        if (text !== undefined || type !== undefined || deps !== undefined || claude !== undefined) {
             todo.text = composeTodoText(text !== undefined ? text : todo.text, {
                 type,
                 deps,
+                claude,
                 inherit: todo.text,
             });
         }

@@ -49,6 +49,16 @@ assert.equal(
     "[gate] 3. x (dep on #9)"
 );
 assert.equal(composeTodoText("[gate] 3. x (dep on #1)", { deps: [] }), "[gate] 3. x");
+// claude:false drops the marker the inherit path used to re-apply
+assert.equal(
+    composeTodoText("old body", { claude: false, inherit: "claude: [comms] 28. old body" }),
+    "[comms] 28. old body"
+);
+assert.equal(composeTodoText("claude: [gate] 3. x", { claude: false }), "[gate] 3. x");
+assert.equal(
+    composeTodoText("plain body", { claude: true, inherit: "[gate] 3. plain body" }),
+    "claude: [gate] 3. plain body"
+);
 
 // --- normalizeTodoText (dedupe) ---
 // NORMALIZE_FIXTURES is mirrored in tests/modules/todos/normalize_spec.lua.

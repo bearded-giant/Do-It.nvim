@@ -43,12 +43,14 @@ export function nextRank(todos) {
 }
 
 // ponytail: parts already present in `text` win over the params, so composing a
-// second time is a no-op instead of stacking prefixes.
-export function composeTodoText(text, { type, deps, rank, inherit } = {}) {
+// second time is a no-op instead of stacking prefixes. `claude` is the one
+// override that can turn a part OFF — inherit alone made the marker unremovable.
+export function composeTodoText(text, { type, deps, rank, inherit, claude } = {}) {
     const parsed = parseTodoText(text);
     const prior = inherit ? parseTodoText(inherit) : null;
 
-    const isClaude = parsed.claude || Boolean(prior && prior.claude);
+    const isClaude =
+        claude !== undefined ? claude : parsed.claude || Boolean(prior && prior.claude);
     const finalType = type || parsed.type || (prior && prior.type) || null;
     const rankLabel =
         parsed.rankLabel || (prior && prior.rankLabel) || (rank != null ? String(rank) : null);
