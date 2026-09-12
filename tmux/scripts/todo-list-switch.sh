@@ -23,6 +23,8 @@ fi
 
 COLOR_DIM=$'\e[2m'
 COLOR_RED=$'\e[1;31m'
+COLOR_YELLOW=$'\e[1;33m'
+COLOR_DIM_YELLOW=$'\e[2;33m'
 COLOR_RESET=$'\e[0m'
 
 CURRENT_LIST=$(get_active_list_name)
@@ -69,9 +71,9 @@ badge_for_list() {
     while IFS= read -r s; do
         [[ -z "$s" ]] && continue
         if grep -qxF -- "$s" <<< "$LIVE_SESSIONS"; then
-            badge+=" $s"
+            badge+=" ${COLOR_YELLOW}${s}${COLOR_RESET}"
         else
-            badge+=" ${COLOR_DIM}${s}${COLOR_RESET}"
+            badge+=" ${COLOR_DIM_YELLOW}${s}${COLOR_RESET}"
         fi
     done < <(sessions_for_list "$1")
     [[ -n "$badge" ]] && printf ' [%s]' "${badge# }"
