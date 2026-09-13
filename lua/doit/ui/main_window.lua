@@ -526,6 +526,17 @@ function M.render_todos()
 				end
 			end
 
+			-- due badge: red while it still needs action, so it reads at a glance
+			do
+				local s_idx, e_idx = line:find("%[overdue %d+d%]")
+				if not s_idx then
+					s_idx, e_idx = line:find("%[due today%]", 1)
+				end
+				if s_idx and not todo.done then
+					vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DiagnosticError", line_nr, s_idx - 1, e_idx)
+				end
+			end
+
 			-- Notes marker (dim so it doesn't break the title scan)
 			do
 				local s = line:find("%- %[NOTES%]")
@@ -585,15 +596,15 @@ function M.format_todo_line(todo)
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			}
 		}
 	end
@@ -864,15 +875,15 @@ local function create_window()
 		config.options.formatting = {
 			pending = {
 				icon = "○",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			},
 			in_progress = {
 				icon = "◐",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			},
 			done = {
 				icon = "✓",
-				format = { "icon", "text", "ect", "due_date", "notes_marker", "relative_time" }
+				format = { "icon", "due_date", "text", "ect", "notes_marker", "relative_time" }
 			}
 		}
 	end
