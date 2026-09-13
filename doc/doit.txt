@@ -445,8 +445,9 @@ Press L in the main todo window to open the list manager where you can:
 - Delete lists (except the active one)
 - Preview list contents and statistics
 
-Rows read "name (N todos, M overdue)" when a list holds open items past their
-due date, and the preview repeats the count. The startup nudge names the list
+Rows read "!M name (N todos)" when a list holds open items past their due
+date: the red "!M" badge sits left of the name so it stays visible even when
+a long name fills the panel, and the preview repeats the count. The startup nudge names the list
 and the item text for each overdue item across every list, not just the active
 one; :DoItDue lists the active list's due items and jumps to one.
 

@@ -69,17 +69,30 @@ local function resolve_key(key_option)
 	return key
 end
 
-local function get_todo_icon_pattern()
-	local done_icon = config.options.formatting.done.icon
-	local pending_icon = config.options.formatting.pending.icon
-	local in_progress_icon = config.options.formatting.in_progress.icon
-	-- pattern allows optional notes icon (any non-space chars) before status icon
-	return "^%s+.-%s*[" .. done_icon .. pending_icon .. in_progress_icon .. "]"
+-- a byte class over multibyte icons matches stray bytes (the divider rule, box
+-- drawing), and the render prefixes rows with !/>/* markers, so match the whole
+-- icon and require only markers or indent ahead of it
+local function line_has_todo_icon(line)
+	if not line then
+		return false
+	end
+	local icons = {
+		config.options.formatting.done.icon,
+		config.options.formatting.pending.icon,
+		config.options.formatting.in_progress.icon,
+	}
+	for _, icon in ipairs(icons) do
+		if icon and icon ~= "" then
+			local start_idx = line:find(icon, 1, true)
+			if start_idx and line:sub(1, start_idx - 1):match("^[%s!>*]*$") then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function find_bullet_line_for_cursor(buf_id, line_num)
-	local icon_pattern = get_todo_icon_pattern()
-
 	local current_line = line_num
 	while current_line > 0 do
 		local line_content = vim.api.nvim_buf_get_lines(buf_id, current_line - 1, current_line, false)[1]
@@ -87,7 +100,7 @@ local function find_bullet_line_for_cursor(buf_id, line_num)
 			break
 		end
 
-		if line_content:match(icon_pattern) then
+		if line_has_todo_icon(line_content) then
 			return current_line
 		end
 
@@ -119,111 +132,17 @@ end
 -- (blank + "Notes" header + note rows or "(no notes)") emitted before the done
 -- divider (or after the loop when there are no done todos), and blank+divider+
 -- blank before the completed block.
+-- the render publishes the authoritative line -> todo map; re-deriving the
+-- layout here drifted from it and silently no-op'd every action
 local function resolve_at_line(line_num)
 	ensure_state_loaded()
-	state.sort_todos()
-
-	local notes = {}
-	if state.get_notes then
-		notes = state.get_notes()
-	elseif state.todo_lists and state.todo_lists.notes then
-		notes = state.todo_lists.notes
+	local main_window = require("doit.ui.main_window")
+	local rows = main_window.build_render_rows()
+	local row = rows and rows[line_num]
+	if not row then
+		return nil, nil
 	end
-
-	local show_completed = true
-	local show_descriptions = false
-	if config.options and config.options.modules and config.options.modules.todos then
-		if config.options.modules.todos.show_completed == false then
-			show_completed = false
-		end
-		if config.options.modules.todos.show_descriptions == true then
-			show_descriptions = true
-		end
-	end
-
-	local cur = 2  -- line 1 is the top blank; content starts at line 2
-	if state.active_filter then cur = cur + 2 end
-
-	local prev_group = nil
-	local done_started = false
-	local notes_emitted = false
-
-	-- walks the notes section; returns a note if line_num lands on one
-	local function walk_notes()
-		notes_emitted = true
-		cur = cur + 1  -- blank before Notes
-		cur = cur + 1  -- "Notes" header
-		if #notes == 0 then
-			cur = cur + 1  -- "(no notes)"
-		else
-			for _, note in ipairs(notes) do
-				if line_num == cur then
-					return note
-				end
-				cur = cur + 1
-			end
-		end
-		return nil
-	end
-
-	local root = nil
-	for i, todo in ipairs(state.todos) do
-		if (todo.depth or 0) == 0 then
-			root = todo
-		end
-		-- mirrors build_render_rows: a subtree sits in its root's section
-		local head = root or todo
-		if head.done and not show_completed then
-			head = todo
-		end
-		if head.done and not show_completed then
-			goto continue
-		end
-
-		local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
-
-		if show_by_tag then
-			if head.done then
-				if not done_started then
-					done_started = true
-					if not notes_emitted then
-						local n = walk_notes()
-						if n then return nil, n end
-					end
-					cur = cur + 3  -- blank + divider + blank
-				end
-			else
-				local section = head.in_progress and "ip" or "pd"
-				local group = section .. ":" .. (priority_name(head) or "default")
-				if group ~= prev_group then
-					if section == "pd" then
-						if prev_group then cur = cur + 1 end  -- blank between groups
-						cur = cur + 1  -- priority header
-					elseif prev_group then
-						cur = cur + 1  -- blank between in-progress groups
-					end
-				end
-				prev_group = group
-			end
-
-			local num_lines = #vim.split(todo.text, "\n", { plain = true })
-			if show_descriptions and todo.description and todo.description ~= "" then
-				num_lines = num_lines + #vim.split(todo.description, "\n", { plain = true })
-			end
-
-			if line_num >= cur and line_num < cur + num_lines then
-				return i, nil
-			end
-			cur = cur + num_lines
-		end
-		::continue::
-	end
-
-	if not notes_emitted then
-		local n = walk_notes()
-		if n then return nil, n end
-	end
-	return nil, nil
+	return row.todo_index, row.note
 end
 
 local function get_real_todo_index(line_num)
@@ -547,7 +466,7 @@ function M.toggle_todo(win_id, on_render)
 			-- Find the first non-empty line with a todo
 			local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
 			for i, line in ipairs(buf_lines) do
-				if line:match(get_todo_icon_pattern()) then
+				if line_has_todo_icon(line) then
 					first_line = i
 					break
 				end
@@ -692,7 +611,7 @@ function M.delete_todo(win_id, on_render)
 			-- Find the first non-empty line with a todo
 			local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
 			for i, line in ipairs(buf_lines) do
-				if line:match(get_todo_icon_pattern()) then
+				if line_has_todo_icon(line) then
 					first_line = i
 					break
 				end
@@ -749,7 +668,7 @@ function M.delete_completed(on_render)
 			-- Find the first non-empty line with a todo
 			local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
 			for i, line in ipairs(buf_lines) do
-				if line:match(get_todo_icon_pattern()) then
+				if line_has_todo_icon(line) then
 					first_line = i
 					break
 				end

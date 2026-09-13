@@ -1,12 +1,13 @@
 local sorting = require("doit.modules.todos.state.sorting")
 local due_dates = require("doit.modules.todos.state.due_dates")
 
-local function overdue_suffix(metadata)
+-- badge sits left of the name so it survives truncation in a narrow panel
+local function overdue_badge(metadata)
     local count = metadata and metadata.overdue_count or 0
     if count == 0 then
         return ""
     end
-    return string.format(", %d overdue", count)
+    return string.format("!%d ", count)
 end
 
 local M = {}
@@ -52,10 +53,18 @@ function M.setup(parent_module)
         local height_ratio = config.list_manager and config.list_manager.height_ratio or 0.8
         local list_panel_ratio = config.list_manager and config.list_manager.list_panel_ratio or 0.4
         
-        local total_width = math.min(100, math.floor(ui.width * width_ratio))
+        local total_width = math.min(160, math.floor(ui.width * width_ratio))
         -- cap by rows available, not a fixed 40, so tall terminals use the space
         local total_height = math.max(10, math.min(ui.height - 4, math.floor(ui.height * height_ratio)))
         local list_width = preview_enabled and math.floor(total_width * list_panel_ratio) or total_width
+        if preview_enabled then
+            -- grow the panel so the longest list name plus its badges still fit
+            local longest = 0
+            for _, list in ipairs(todo_module.state.get_available_lists() or {}) do
+                longest = math.max(longest, #list.name)
+            end
+            list_width = math.max(list_width, math.min(longest + 26, total_width - 34))
+        end
         local preview_width = total_width - list_width - 3
         
         local row = math.floor((ui.height - total_height) / 2)
@@ -296,6 +305,7 @@ function M.setup(parent_module)
         end
         
         local lines = {}
+        local rule_width = math.max(20, api.nvim_win_get_width(win_id) - 4)
         
         -- Start with Available Lists at the top
         if search_query ~= "" then
@@ -303,9 +313,10 @@ function M.setup(parent_module)
         else
             table.insert(lines, "  Todo Lists")
         end
-        table.insert(lines, "  ══════════════════════════════════")
+        table.insert(lines, "  " .. string.rep("═", rule_width))
         table.insert(lines, "")
 
+        local first_list_line = #lines + 1
         if #displayed_lists == 0 then
             if search_query ~= "" then
                 table.insert(lines, "  No matching lists")
@@ -325,8 +336,8 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s[%s] %s (%d todos%s) %s", 
-                        selection_marker, num, list.name, todo_count, overdue_suffix(metadata), active_marker))
+                    table.insert(lines, string.format("%s[%s] %s%s (%d todos) %s", 
+                        selection_marker, num, overdue_badge(metadata), list.name, todo_count, active_marker))
                 else
                     -- Lists beyond 10
                     local active_marker = list.name == active_list and "[active]" or ""
@@ -335,15 +346,18 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s    %s (%d todos%s) %s", 
-                        selection_marker, list.name, todo_count, overdue_suffix(metadata), active_marker))
+                    table.insert(lines, string.format("%s    %s%s (%d todos) %s", 
+                        selection_marker, overdue_badge(metadata), list.name, todo_count, active_marker))
                 end
             end
         end
         
+        local last_list_line = #lines
+
         -- Add help at the bottom
         table.insert(lines, "")
-        table.insert(lines, "  ──────────────────────────────────")
+        table.insert(lines, "  " .. string.rep("─", rule_width))
+        local keys_line = #lines + 1
         table.insert(lines, "  Keys:")
         table.insert(lines, "  [1-9/0] Select   [Enter] Switch & Open")
         table.insert(lines, "  [n] New          [d] Delete")
@@ -375,7 +389,7 @@ function M.setup(parent_module)
         end
         
         -- Highlight keybindings
-        for i = 2, 13 do
+        for i = keys_line + 1, #lines do
             local line = lines[i]
             if line and line:match("^  %w") then
                 api.nvim_buf_add_highlight(buf_id, namespace, "Special", i - 1, 2, 6)
@@ -383,7 +397,7 @@ function M.setup(parent_module)
         end
         
         -- Highlight active and selected list
-        for i = 18, #lines do
+        for i = first_list_line, last_list_line do
             local line = lines[i]
             if line and line:match("^  %[%d%]") then
                 -- Number in brackets
@@ -399,10 +413,11 @@ function M.setup(parent_module)
                 api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticOk", i - 1, 0, -1)
             end
 
-            local overdue_start = line and line:find("%d+ overdue")
-            if overdue_start then
-                local overdue_end = line:find("overdue", overdue_start, true) + 7
-                api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticError", i - 1, overdue_start - 1, overdue_end - 1)
+            if line then
+                local badge_start, badge_end = line:find("!%d+ ")
+                if badge_start and badge_start <= 8 then
+                    api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticError", i - 1, badge_start - 1, badge_end - 1)
+                end
             end
         end
         
@@ -413,7 +428,7 @@ function M.setup(parent_module)
 
         -- Move cursor to selected line
         if #displayed_lists > 0 then
-            local cursor_line = 18 + selected_index
+            local cursor_line = first_list_line + selected_index - 1
             if cursor_line <= #lines then
                 api.nvim_win_set_cursor(win_id, {cursor_line, 0})
             end

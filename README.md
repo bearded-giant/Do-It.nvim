@@ -411,7 +411,7 @@ Each tmux session can hold its own active list. The link map lives in `session.j
 
 Outside tmux the session step is skipped and everything behaves like before.
 
-In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager shows the same count as `name (N todos, M overdue)`. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
+In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
 
 ### Status Bar Integration
 

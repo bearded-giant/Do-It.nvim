@@ -8,6 +8,8 @@ describe("todo_actions", function()
     before_each(function()
         -- Clear module cache
         package.loaded["doit.ui.todo_actions"] = nil
+        -- main_window caches the todo module; reload it so it picks up this mock state
+        package.loaded["doit.ui.main_window"] = nil
         package.loaded["doit.config"] = nil
         package.loaded["doit.calendar"] = nil
         package.loaded["doit.core.ui.multiline_input"] = nil
@@ -16,19 +18,9 @@ describe("todo_actions", function()
         mock_buf_id = 1
         mock_win_id = 100
 
-        -- Mock config
-        package.loaded["doit.config"] = {
-            options = {
-                formatting = {
-                    pending = { icon = "○" },
-                    in_progress = { icon = "◐" },
-                    done = { icon = "✓" }
-                },
-                keymaps = {
-                    toggle_priority = "p"
-                }
-            }
-        }
+        -- real config: the render is the source of truth for cursor mapping,
+        -- and a stub config can't drive it
+        require("doit.config").setup({})
 
         -- Mock calendar
         package.loaded["doit.calendar"] = {}
@@ -94,71 +86,12 @@ describe("todo_actions", function()
         end
         vim.api.nvim_win_set_cursor = function(win, pos) end  -- Mock cursor set
         vim.api.nvim_buf_get_lines = function(buf, start, end_, strict)
-            -- Mirror main_window.build_render_rows layout so cursor mapping tests are faithful:
-            -- blank top; named priority headers for the pending block (blank before each
-            -- except the first); blank between in-progress groups; always-shown Notes
-            -- section (blank + "Notes" + note rows or "(no notes)") before the done block;
-            -- blank+divider+blank before completed.
-            local function prio(todo)
-                local p = todo.priorities
-                if type(p) == "string" and p ~= "" then return p end
-                return nil
+            local rows = require("doit.ui.main_window").build_render_rows()
+            local lines = {}
+            for _, row in ipairs(rows) do
+                lines[#lines + 1] = row.display
             end
-            local HEADER = { critical = "Critical", urgent = "Urgent", important = "Important", default = "Default" }
-            local notes = (mock_state.todo_lists and mock_state.todo_lists.notes) or {}
-            local lines = { "" }  -- blank line at top
-            local prev_group = nil
-            local done_started = false
-            local notes_emitted = false
-            local function emit_notes()
-                notes_emitted = true
-                table.insert(lines, "")
-                table.insert(lines, "Notes")
-                if #notes == 0 then
-                    table.insert(lines, "  (no notes)")
-                else
-                    for _, note in ipairs(notes) do
-                        local title = note.title
-                        if not title or title == "" then title = "(untitled)" end
-                        table.insert(lines, "  • " .. title)
-                    end
-                end
-            end
-            for _, todo in ipairs(mock_state.todos) do
-                if todo.done then
-                    if not done_started then
-                        done_started = true
-                        if not notes_emitted then emit_notes() end
-                        table.insert(lines, "")
-                        table.insert(lines, "────────")
-                        table.insert(lines, "")
-                    end
-                else
-                    local section = (todo.in_progress and "ip" or "pd")
-                    local group = section .. ":" .. (prio(todo) or "default")
-                    if group ~= prev_group then
-                        if section == "pd" then
-                            if prev_group then table.insert(lines, "") end
-                            table.insert(lines, HEADER[prio(todo) or "default"] or "Default")
-                        elseif prev_group then
-                            table.insert(lines, "")
-                        end
-                    end
-                    prev_group = group
-                end
-                local text_lines = vim.split(todo.text, "\n", { plain = true })
-                for i, line in ipairs(text_lines) do
-                    if i == 1 then
-                        table.insert(lines, "  ○ " .. line)
-                    else
-                        table.insert(lines, "    " .. line)
-                    end
-                end
-            end
-            if not notes_emitted then emit_notes() end
-            table.insert(lines, "")  -- blank line at bottom
 
-            -- Handle slicing
             if start >= 0 and end_ >= 0 then
                 local result = {}
                 for i = start + 1, math.min(end_, #lines) do
@@ -167,22 +100,6 @@ describe("todo_actions", function()
                 return result
             end
             return lines
-        end
-
-        vim.split = function(text, sep, opts)
-            local result = {}
-            local current = ""
-            for i = 1, #text do
-                local char = text:sub(i, i)
-                if char == sep then
-                    table.insert(result, current)
-                    current = ""
-                else
-                    current = current .. char
-                end
-            end
-            table.insert(result, current)
-            return result
         end
 
         vim.notify = function() end
