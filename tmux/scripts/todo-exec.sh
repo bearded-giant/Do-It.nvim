@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Get the current in-progress todo from active list.
-# When nothing is in_progress, keep the chip's icon + width visible
-# (neutral color, blank text) so layout doesn't shift —
-# the user makes a todo active via nvim `c` / tmux `s` to populate it.
+# Get the current in-progress todo from the active list. When nothing is
+# in_progress the chip names the resolved list so a wrong link is visible.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
@@ -11,7 +9,8 @@ source "$SCRIPT_DIR/get-active-list.sh"
 # status line passes #{session_name} as $1 — #() has no client context
 [[ -n "$1" ]] && export DOIT_SESSION_NAME="$1"
 
-TODO_LIST_PATH="$(get_active_list_path)"
+ACTIVE_LIST_NAME="$(get_active_list_name)"
+TODO_LIST_PATH="$LISTS_DIR/${ACTIVE_LIST_NAME}.json"
 CHAR_LIMIT=25
 ICON_TASK=$'\xef\x82\xae'
 
@@ -22,7 +21,7 @@ idle_chip() {
     [[ -n "$idle" ]] && tmux set -gq @doit-todo-fg "$idle"
     [[ -n "$text_bg" ]] && tmux set -gq @doit-todo-text-bg "$text_bg"
     tmux set -gq @doit-todo-icon "$ICON_TASK"
-    echo "< NO ACTIVE TODO >"
+    echo "${ACTIVE_LIST_NAME}: no active"
     exit 0
 }
 
