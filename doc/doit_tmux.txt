@@ -259,18 +259,17 @@ it runs inside tmux) resolves the active list through the same chain:
     1. DOIT_ACTIVE_LIST         explicit environment override
     2. sessions[<tmux session>] the session link
     3. project-list derivation  opt-in, |doit-tmux-configuration|
-    4. .active_list             the global pointer
-    5. daily
+    4. daily
 
-Outside tmux, step 2 is skipped and behavior is identical to older versions.
+An unlinked tmux session always lands on daily. Outside tmux, step 2 is
+skipped and the global .active_list pointer takes the place of daily.
 
 In the list switcher (prefix + d + l) and list manager (prefix + d + L):
 
     ENTER              Link the selected list to the current session (also
                        refreshes the global pointer)
     g / ctrl-g         Set the global pointer only, touch no link
-    u / ctrl-u         Unlink the current session (falls back to the global
-                       chain)
+    u / ctrl-u         Unlink the current session (falls back to daily)
 
 Both views badge a list with "!N overdue" when it holds open items past their
 due date, and the preview pane repeats the count, so an overdue item is

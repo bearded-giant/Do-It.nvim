@@ -119,7 +119,7 @@ case "$KEY" in
     "ctrl-u")
         if [[ -n "$SESS" ]]; then
             unlink_session "$SESS"
-            echo "Unlinked session '$SESS' (falls back to global list)"
+            echo "Unlinked session '$SESS' (falls back to daily)"
         fi
         ;;
     "ctrl-g")

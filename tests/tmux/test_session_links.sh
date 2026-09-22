@@ -53,11 +53,17 @@ assert_eq "play" "$(resolve DOIT_SESSION_NAME=alpha)"
 it "DOIT_ACTIVE_LIST env beats the session link"
 assert_eq "work" "$(resolve DOIT_SESSION_NAME=alpha DOIT_ACTIVE_LIST=work)"
 
-it "unlinked session falls back to the global pointer"
-assert_eq "work" "$(resolve DOIT_SESSION_NAME=unknown)"
+it "unlinked session inside tmux resolves daily, not the global pointer"
+assert_eq "daily" "$(resolve DOIT_SESSION_NAME=unknown)"
 
-it "a link to a deleted list is skipped, chain resolves global"
-assert_eq "work" "$(resolve DOIT_SESSION_NAME=beta)"
+it "a link to a deleted list is skipped, chain resolves daily"
+assert_eq "daily" "$(resolve DOIT_SESSION_NAME=beta)"
+
+it "daily is created when an unlinked session lands on it"
+rm -f "$DATA/lists/daily.json"
+assert_eq "daily" "$(resolve DOIT_SESSION_NAME=unknown)"
+assert_eq "daily exists" "$([[ -f "$DATA/lists/daily.json" ]] && echo 'daily exists')"
+mklist daily 3
 
 it "no tmux context resolves the global pointer exactly like before"
 assert_eq "work" "$(resolve)"

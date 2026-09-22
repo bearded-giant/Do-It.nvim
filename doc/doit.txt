@@ -491,8 +491,9 @@ with the same directory name share a list.
 Session-linked lists (inside tmux):~
 When Neovim runs inside tmux, the active list restored on startup is the one
 linked to the current tmux session (the `sessions` map in session.json, see
-|doit-tmux-session-links|), which wins over per-project derivation and the
-global pointer. Switching lists from Neovim inside tmux updates both the
+|doit-tmux-session-links|), which wins over per-project derivation. An
+unlinked session restores the default list (`daily`), never the global
+pointer. Switching lists from Neovim inside tmux updates both the
 session link and the global pointer; outside tmux only the global pointer is
 written and behavior is unchanged. Links are created from the tmux list UIs
 or the MCP server.

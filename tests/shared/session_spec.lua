@@ -111,12 +111,12 @@ describe("session links", function()
 		assert.is_true(from_link)
 	end)
 
-	it("load_session inside tmux without a link falls back to the global pointer", function()
+	it("load_session inside tmux without a link returns nil, never the global pointer", function()
 		write_session({ active_list = "work", sessions = { beta = "play" } })
 		enter_fake_tmux("alpha")
 
 		local list, from_link = session.load_session()
-		assert.are.equal("work", list)
+		assert.is_nil(list)
 		assert.is_false(from_link)
 	end)
 

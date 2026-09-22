@@ -88,13 +88,15 @@ function updateSession(mutate) {
     writeJSON(SESSION_FILE, session);
 }
 
-// env override > per-tmux-session link > global .active_list > daily
+// env override > per-tmux-session link > daily. The global .active_list
+// pointer is the outside-tmux default only.
 function getActiveListName() {
     if (process.env.DOIT_ACTIVE_LIST) return process.env.DOIT_ACTIVE_LIST;
     const session = readSession();
     const sess = getTmuxSessionName();
     const link = sess && session.sessions ? session.sessions[sess] : null;
     if (link && fs.existsSync(getListPath(link))) return link;
+    if (sess) return "daily";
     return session.active_list || "daily";
 }
 
@@ -110,7 +112,10 @@ function loadList(listName) {
     const resolved = resolveList(listName);
     const filepath = getListPath(resolved);
     if (!fs.existsSync(filepath)) {
-        throw new Error(`List "${resolved}" not found at ${filepath}`);
+        if (resolved !== "daily") throw new Error(`List "${resolved}" not found at ${filepath}`);
+        // daily is the fallback every surface lands on, so it self-creates like nvim's load_list
+        const now = Math.floor(Date.now() / 1000);
+        writeJSON(filepath, { todos: [], _metadata: { created_at: now, updated_at: now } });
     }
     return { name: resolved, filepath, data: readJSON(filepath) };
 }
@@ -406,7 +411,7 @@ IMPORTANT: Always use these MCP tools for todo operations. NEVER use bash, grep,
 
 There is always an active list (usually "daily"). When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
 
-Session-linked lists: when this server runs inside tmux, the active list is PER TMUX SESSION. Resolution: DOIT_ACTIVE_LIST env > the current tmux session's link (the 'sessions' map in session.json) > the global pointer > "daily". Outside tmux only the global pointer applies.
+Session-linked lists: when this server runs inside tmux, the active list is PER TMUX SESSION. Resolution: DOIT_ACTIVE_LIST env > the current tmux session's link (the 'sessions' map in session.json) > "daily". An unlinked tmux session is always "daily", never the global pointer. Outside tmux: the global pointer > "daily".
 - switch_list inside tmux links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link.
 - create_list: the result text reports link state — if it auto-linked the new list to the current session, tell the user; if the session is already linked to another list, ASK the user before calling switch_list to relink. Never relink silently.
 - list_lists shows which tmux sessions link each list — use it to answer "which session works on what".

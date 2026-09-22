@@ -83,15 +83,19 @@ function M.save_session(list_name)
     end
 end
 
--- Load last selected list. Returns (list_name, from_link): inside tmux the
--- session's linked list wins over the global pointer, and from_link tells the
--- caller the choice was an explicit link (which outranks project derivation).
+-- Load last selected list. Returns (list_name, from_link). Inside tmux only
+-- the session link counts: an unlinked session gets nil (the caller's default
+-- list), never the global pointer, which is the outside-tmux default. from_link
+-- tells the caller the choice was an explicit link (outranks project derivation).
 function M.load_session()
     local data = read_session()
 
     local sess = tmux_session_name()
-    if sess and type(data.sessions) == "table" and data.sessions[sess] then
-        return data.sessions[sess], true
+    if sess then
+        if type(data.sessions) == "table" and data.sessions[sess] then
+            return data.sessions[sess], true
+        end
+        return nil, false
     end
 
     return data.active_list, false

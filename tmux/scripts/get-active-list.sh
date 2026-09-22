@@ -2,8 +2,8 @@
 
 # get the active todo list path from session.json or environment
 # priority: DOIT_PINNED_LIST > DOIT_ACTIVE_LIST env var > per-tmux-session link
-#           (sessions map in session.json) > derived project list > global
-#           .active_list > default (daily)
+#           (sessions map in session.json) > derived project list > daily.
+#           the global .active_list pointer only applies outside tmux.
 
 DOIT_DATA_DIR="${DOIT_DATA_DIR:-$HOME/.local/share/nvim/doit}"
 SESSION_FILE="$DOIT_DATA_DIR/session.json"
@@ -138,10 +138,14 @@ get_active_list_name() {
         [[ -n "$list_name" ]] && ensure=1
     fi
 
-    if [[ -z "$list_name" ]] && [[ -f "$SESSION_FILE" ]] && command -v jq &> /dev/null; then
+    # inside tmux an unlinked session is daily, not whatever list was switched
+    # to last somewhere else; the global pointer is the outside-tmux default
+    if [[ -z "$list_name" && -z "$sess" ]] && [[ -f "$SESSION_FILE" ]] && command -v jq &> /dev/null; then
         list_name=$(jq -r '.active_list // "daily"' "$SESSION_FILE" 2>/dev/null)
     fi
     [[ -z "$list_name" || "$list_name" == "null" ]] && list_name="daily"
+    # daily self-creates like nvim's load_list, so the default never bounces to some other list
+    [[ "$list_name" == "daily" ]] && ensure=1
 
     # derived/pinned lists are created on first use, the same way nvim's
     # load_list does; without this the missing-file fallback below would

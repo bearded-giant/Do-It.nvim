@@ -317,7 +317,7 @@ while true; do
         "u")
             if [[ -n "$SESS" ]]; then
                 unlink_session "$SESS"
-                echo "${COLOR_GREEN}Unlinked session '$SESS' (falls back to global list)${COLOR_RESET}"
+                echo "${COLOR_GREEN}Unlinked session '$SESS' (falls back to daily)${COLOR_RESET}"
                 sleep 0.5
             fi
             ;;

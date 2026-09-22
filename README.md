@@ -406,10 +406,9 @@ Each tmux session can hold its own active list. The link map lives in `session.j
 1. `DOIT_ACTIVE_LIST` environment override
 2. The current tmux session's link
 3. Per-project derivation (`@doit-project-lists`, opt-in)
-4. The global `.active_list` pointer
-5. `daily`
+4. `daily`
 
-Outside tmux the session step is skipped and everything behaves like before.
+An unlinked tmux session always lands on `daily`, never on whichever list was switched to last elsewhere. Outside tmux the session step is skipped and the global `.active_list` pointer takes the place of `daily` (falling back to `daily` when unset).
 
 In the list switcher (`prefix + d + l`) and list manager (`prefix + d + L`), `Enter` links the selected list to the current session (and refreshes the global pointer), `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
 

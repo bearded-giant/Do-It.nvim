@@ -77,10 +77,10 @@ describe("list switch persistence", function()
 		vim.fn.delete(tmpdir, "rf")
 	end)
 
-	it("startup restore of the global fallback writes no link for this session", function()
+	it("startup restore of an unlinked session lands on daily and writes no link", function()
 		state.load_from_disk()
 
-		assert.are.equal("work", state.todo_lists.active)
+		assert.are.equal("daily", state.todo_lists.active)
 		local data = read_session()
 		assert.is_nil(data.sessions.alpha)
 		assert.are.equal("play", data.sessions.beta)
