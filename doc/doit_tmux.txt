@@ -205,7 +205,9 @@ Or with custom formatting: >tmux
     set -g status-right '#{?#{!=:#($DOIT_TMUX_DIR/status/todo.sh),},#[fg=yellow] #($DOIT_TMUX_DIR/status/todo.sh),}'
 <
 
-The status shows the currently in-progress todo text (truncated).
+The status shows `<list>: <todo>`: the active list name, cut at
+`@doit-list-chars` characters (default 10), then the in-progress todo text
+(truncated). With nothing in progress it shows `<list>: no active`.
 
 ==============================================================================
 SHARED STORAGE                                          *doit-tmux-storage*

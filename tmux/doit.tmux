@@ -71,6 +71,9 @@ tmux bind-key -T doit-menu d display-popup -E -w "$interactive_w" -h "$interacti
 # Markdown export directory for the E key (default: popup's working dir)
 # set -g @doit-export-dir "~/notes/exports"
 
+# List name shown before the status-bar todo, cut at this many chars (default: 10)
+# set -g @doit-list-chars "10"
+
 # Per-project lists (default: off). When on, a pane inside a git repo resolves
 # to a list named after the repo directory, created on first use. Panes outside
 # a repo fall back to the session's active list. DOIT_ACTIVE_LIST still wins.

@@ -12,6 +12,10 @@ source "$SCRIPT_DIR/get-active-list.sh"
 ACTIVE_LIST_NAME="$(get_active_list_name)"
 TODO_LIST_PATH="$LISTS_DIR/${ACTIVE_LIST_NAME}.json"
 CHAR_LIMIT=25
+LIST_CHAR_LIMIT=$(tmux show -gqv @doit-list-chars 2>/dev/null)
+LIST_CHAR_LIMIT=${LIST_CHAR_LIMIT:-10}
+LIST_LABEL="$ACTIVE_LIST_NAME"
+[[ ${#LIST_LABEL} -gt $LIST_CHAR_LIMIT ]] && LIST_LABEL="${LIST_LABEL:0:$LIST_CHAR_LIMIT}..."
 ICON_TASK=$'\xef\x82\xae'
 
 idle_chip() {
@@ -21,7 +25,7 @@ idle_chip() {
     [[ -n "$idle" ]] && tmux set -gq @doit-todo-fg "$idle"
     [[ -n "$text_bg" ]] && tmux set -gq @doit-todo-text-bg "$text_bg"
     tmux set -gq @doit-todo-icon "$ICON_TASK"
-    echo "${ACTIVE_LIST_NAME}: no active"
+    echo "${LIST_LABEL}: no active"
     exit 0
 }
 
@@ -60,4 +64,4 @@ if [[ ${#todo_text} -gt $CHAR_LIMIT ]]; then
     todo_text="${todo_text:0:$CHAR_LIMIT}..."
 fi
 
-printf '%s\n' "$todo_text"
+printf '%s: %s\n' "$LIST_LABEL" "$todo_text"
