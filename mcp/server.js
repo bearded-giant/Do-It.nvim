@@ -41,7 +41,7 @@ const DEPS_HINT =
     " Reference the leading N. of the blocking item, not its id. Pass [] to clear.";
 
 const SEQUENCE_HINT =
-    " Run-queue position (1 = first). Pending items with a sequence run in this order" +
+    "Run-queue position (1 = first). Pending items with a sequence run in this order" +
     " across priorities; items already at this position and after it shift down one." +
     " To set a whole list's order at once, use sequence_todos.";
 
