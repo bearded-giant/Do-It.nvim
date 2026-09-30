@@ -6,6 +6,7 @@ local multiline_input = require("doit.core.ui.multiline_input")
 
 local footer = require("doit.core.utils.footer")
 local tags_util = require("doit.modules.todos.state.tags")
+local sorting = require("doit.modules.todos.state.sorting")
 
 -- Lazy loading of todo module and state
 local todo_module = nil
@@ -1033,6 +1034,40 @@ function M.add_time_estimation(win_id, on_render)
 	end)
 end
 
+function M.set_sequence(win_id, on_render)
+	ensure_state_loaded()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+
+	local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
+	local bullet_line = find_bullet_line_for_cursor(vim.api.nvim_win_get_buf(win_id), line_num)
+	local todo_index = bullet_line and get_real_todo_index(bullet_line)
+	local todo = todo_index and state.todos[todo_index]
+	if not todo then
+		return
+	end
+
+	vim.ui.input({
+		prompt = "Sequence (empty to clear): ",
+		default = todo.sequence and tostring(todo.sequence) or "",
+	}, function(input)
+		vim.cmd("echo ''")
+		if input == nil then
+			return
+		end
+		local pos = tonumber(input)
+		if input ~= "" and (not pos or pos < 1 or pos % 1 ~= 0) then
+			vim.notify("Sequence must be a positive whole number", vim.log.levels.WARN)
+			return
+		end
+		sorting.set_sequence(state.todos, todo, pos)
+		state.sort_todos()
+		state.save_to_disk()
+		maybe_render(on_render)
+	end)
+end
+
 function M.remove_time_estimation(win_id, on_render)
 	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
@@ -1140,6 +1175,9 @@ function M.reorder_todo(win_id, on_render)
 	-- group key mirrors the rendered grouping: in-progress flag + priority name.
 	-- reorder only swaps within a group so it matches "set rank within a grouping".
 	local function group_key(todo)
+		if sorting.sequenced(todo) then
+			return "sequence"
+		end
 		return tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
 	end
 
@@ -1200,7 +1238,11 @@ function M.reorder_todo(win_id, on_render)
 		end
 
 		local other = state.todos[target]
-		me.order_index, other.order_index = (other.order_index or target), (me.order_index or idx)
+		if sorting.sequenced(me) then
+			me.sequence, other.sequence = other.sequence, me.sequence
+		else
+			me.order_index, other.order_index = (other.order_index or target), (me.order_index or idx)
+		end
 		state.sort_todos()
 		state.save_to_disk()
 

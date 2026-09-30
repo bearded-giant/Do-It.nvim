@@ -8,6 +8,7 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { composeTodoText, nextRank, normalizeTodoText, parseTodoText } from "./todo-text.js";
+import { isSequenced, setSequence } from "./sequence.js";
 
 // Root VERSION is the single source of truth, read at runtime exactly as the
 // nvim (init.lua read_version) and tmux (DOIT_VERSION) surfaces do, so a release
@@ -38,6 +39,11 @@ const TYPE_HINT =
 const DEPS_HINT =
     " Rank numbers this item depends on, e.g. [12, 28] renders '(dep on #12, #28)'." +
     " Reference the leading N. of the blocking item, not its id. Pass [] to clear.";
+
+const SEQUENCE_HINT =
+    " Run-queue position (1 = first). Pending items with a sequence run in this order" +
+    " across priorities; items already at this position and after it shift down one." +
+    " To set a whole list's order at once, use sequence_todos.";
 
 const NOTE_FORMAT_HINT =
     " Format for a human reader: each labeled section on its own line, a blank" +
@@ -218,7 +224,10 @@ function structureAware(todos) {
         }
     }
 
-    const byOrder = (a, b) => (a.order_index || 0) - (b.order_index || 0);
+    const byOrder = (a, b) =>
+        isSequenced(b) - isSequenced(a) ||
+        (isSequenced(a) ? a.sequence - b.sequence : 0) ||
+        (a.order_index || 0) - (b.order_index || 0);
     roots.sort(byOrder);
     for (const group of children.values()) group.sort(byOrder);
 
@@ -424,15 +433,18 @@ Item text convention — MANDATORY for every item you create:
     claude: [type] N. body (dep on #M, #K)
 
 - [type] — short lowercase work-type tag (decision, gate, loader, comms, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
-- N. — do-order rank across the whole list. Priority is the bucket (critical > urgent > important > default); N is the order INSIDE and ACROSS buckets, since a bucket with several items has no other visible ordering. add_todo assigns the next N automatically — do not write it into 'text'.
+- N. — the item's fixed handle, unique across the list and assigned at creation (add_todo does it, so don't write it into 'text'). Deps and #N references point at it. It is never renumbered, so it is NOT the work order.
 - (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
 - claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
 
 Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its rank is preserved.
 
+Sequence (work order): priority is criticality, and the optional 'sequence' field is work order. Pending items with a sequence render in a "Sequence" section above the priority sections, in sequence order across priorities, and list_todos lists them first. When working a list (including /burn), take sequenced items in sequence order before falling back to priority. When items have to run in a specific order (deps, rollout steps), set it with sequence_todos(order: [ranks in run order]). Don't encode order through priority, and don't delete and recreate items to renumber them. To move one item, use update_todo's 'sequence'; 0 clears it.
+
 Behavior:
 - "show todos" / "list todos" / "what's on my list" → list_todos (uses active list automatically)
-- "what's next" / "next todo" → list_todos with filter="pending" (first item is next)
+- "what's next" / "next todo" → list_todos with filter="pending" (first item is next; sequenced items come first)
+- "do these in order: #3, #8, #10" / "sequence these" → sequence_todos with the ranks in order
 - "critical items" / "show urgent" / "what's important" → list_todos with priority filter
 - "add todo: ..." / "remind me to ..." → add_todo
 - "start the orch todo" / "work on X" → start_todo with query (sets in_progress)
@@ -536,8 +548,9 @@ server.tool(
             const status = t.done ? "[x]" : t.in_progress ? "[~]" : "[ ]";
             const prio = t.priorities ? ` ${PRIORITY_LABELS[t.priorities] || t.priorities}` : "";
             const dueLabel = t.due_date ? ` [${renderDue(t.due_date)}]` : "";
+            const seqLabel = isSequenced(t) ? ` [seq ${t.sequence}]` : "";
             const indent = "  ".repeat(depth);
-            let line = `${indent}${status}${prio} ${t.text}${dueLabel}  [id:${t.id}]`;
+            let line = `${indent}${status}${prio} ${t.text}${dueLabel}${seqLabel}  [id:${t.id}]`;
             if (t.description) {
                 const notePreview = t.description.split("\n").map(l => `    ${l}`).join("\n");
                 line += `\n    notes:\n${notePreview}`;
@@ -658,6 +671,7 @@ server.tool(
             `Status: ${todo.done ? "Done" : todo.in_progress ? "In Progress" : "Pending"}`,
             `Priority: ${todo.priorities || "none"}`,
         ];
+        if (todo.sequence) lines.push(`Sequence: ${todo.sequence}`);
         if (todo.due_date) lines.push(`Due: ${todo.due_date} (${renderDue(todo.due_date)})`);
         if (tags.length) lines.push(`Tags: ${tags.map(t => `#${t}`).join(" ")}`);
         if (parent) lines.push(`Parent: ${formatTodoLine(parent)}`);
@@ -687,8 +701,9 @@ server.tool(
         due: z.string().optional().describe("Due date as YYYY-MM-DD. Shared with the nvim and tmux views."),
         parent: z.union([z.number(), z.string()]).optional().describe("Nest under this item: its rank number (the leading N.) or its id. Ranks stay flat and unique across the whole list."),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
+        sequence: z.number().int().positive().optional().describe(SEQUENCE_HINT),
     },
-    async ({ text, list, type, deps, description, priority, due, parent, start }) => {
+    async ({ text, list, type, deps, description, priority, due, parent, start, sequence }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
         const composed = composeTodoText(text, { type, deps, rank: nextRank(data.todos || []) });
@@ -715,6 +730,7 @@ server.tool(
 
         data.todos = data.todos || [];
         data.todos.push(newTodo);
+        if (sequence) setSequence(data.todos, newTodo, sequence);
         saveList(filepath, data);
 
         const status = start ? " (in_progress)" : "";
@@ -743,11 +759,12 @@ server.tool(
         priority: z.enum(["critical", "urgent", "important", "none"]).optional().describe("Set priority level. Use 'none' to remove priority."),
         done: z.boolean().optional().describe("Set done status"),
         in_progress: z.boolean().optional().describe("Set in_progress status"),
-        order_index: z.number().optional().describe("Set order position"),
+        order_index: z.number().optional().describe("Set order position inside the item's priority section. For run order across priorities use 'sequence'."),
+        sequence: z.number().int().min(0).optional().describe(SEQUENCE_HINT + " 0 clears it."),
         due: z.string().optional().describe("Set due date as YYYY-MM-DD. Use an empty string to clear it."),
         parent: z.union([z.number(), z.string()]).optional().describe("Re-nest under this item (rank number or id). Use an empty string to move it back to the top level."),
     },
-    async ({ id, list, text, type, deps, claude, description, priority, done, in_progress, order_index, due, parent }) => {
+    async ({ id, list, text, type, deps, claude, description, priority, done, in_progress, order_index, sequence, due, parent }) => {
         const { name, filepath, data } = loadListForTodo(list, id);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
@@ -774,6 +791,7 @@ server.tool(
             if (in_progress) todo.done = false;
         }
         if (order_index !== undefined) todo.order_index = order_index;
+        if (sequence !== undefined) setSequence(data.todos, todo, sequence);
         if (parent !== undefined) {
             if (parent === "") {
                 delete todo.parent_id;
@@ -804,9 +822,38 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Updated in "${name}": ${todo.text} [done:${todo.done}, in_progress:${todo.in_progress}]`,
+                text: `Updated in "${name}": ${todo.text} [done:${todo.done}, in_progress:${todo.in_progress}${todo.sequence ? `, sequence:${todo.sequence}` : ""}]`,
             }],
         };
+    }
+);
+
+server.tool(
+    "sequence_todos",
+    "Set a list's whole run order in one call. Items in 'order' get sequence 1..n and every other item's sequence is cleared. Pending sequenced items render in a Sequence section above the priority sections and run in this order across priorities. Each item's rank N is unchanged, so deps and #N references keep working.",
+    {
+        order: z.array(z.union([z.number(), z.string()])).min(1).describe("Items in run order, by rank number (the leading N.) or id."),
+        list: z.string().optional().describe("List name (default: active list)"),
+    },
+    async ({ order, list }) => {
+        const { name, filepath, data } = loadList(list);
+        const todos = data.todos || [];
+        const picked = order.map(ref => {
+            const todo = resolveTodoRef(todos, ref);
+            if (!todo) throw new Error(`"${ref}" not found in list "${name}".`);
+            return todo;
+        });
+        if (new Set(picked).size !== picked.length) throw new Error("An item appears more than once in 'order'.");
+
+        for (const t of todos) delete t.sequence;
+        picked.forEach((t, i) => { t.sequence = i + 1; });
+        saveList(filepath, data);
+
+        const lines = picked.map((t, i) => {
+            const status = t.done ? " (done, ignored until reverted)" : t.in_progress ? " (in progress, shows under In Progress)" : "";
+            return `${i + 1}) ${t.text}${status}`;
+        });
+        return { content: [{ type: "text", text: `Sequenced "${name}":\n${lines.join("\n")}` }] };
     }
 );
 
@@ -1302,6 +1349,7 @@ server.tool(
 
         // add to target
         moved.order_index = getMaxOrder(targetData.todos || []) + 1;
+        delete moved.sequence;
         targetData.todos = targetData.todos || [];
         targetData.todos.push(moved);
 

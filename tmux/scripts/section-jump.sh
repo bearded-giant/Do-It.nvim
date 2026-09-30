@@ -2,7 +2,7 @@
 
 # Emit an fzf `pos(N)` action to jump the cursor to the next/previous section
 # header in the interactive todo list. Sections = the named headers rendered by
-# format_todos: Critical / Urgent / Important / Default / Notes.
+# format_todos: Sequence / Critical / Urgent / Important / Default / Notes.
 #
 # Usage (from an fzf transform bind): section-jump.sh <down|up> {n}
 #   {n} = fzf's current 0-based item index.
@@ -17,7 +17,7 @@ cur=$(( cur0 + 1 ))  # 1-based line/item number
 # stays correct after reorders that shifted positions
 H=( $("$SCRIPT_DIR/todo-interactive.sh" --format 2>/dev/null \
         | sed 's/\x1b\[[0-9;]*m//g' \
-        | grep -nxE 'Critical|Urgent|Important|Default|Notes' \
+        | grep -nxE 'Sequence|Critical|Urgent|Important|Default|Notes' \
         | cut -d: -f1) )
 
 [ ${#H[@]} -eq 0 ] && exit 0

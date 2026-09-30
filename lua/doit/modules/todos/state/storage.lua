@@ -813,6 +813,8 @@ function storage.setup(M)
         -- Prepare destination data (without modifying M.todos yet)
         local updated_todo = strip_transient(vim.deepcopy(todo_to_move))
         updated_todo.order_index = #dest_todos + 1
+        -- a run-queue position means nothing in another list's queue
+        updated_todo.sequence = nil
         table.insert(dest_todos, updated_todo)
 
         dest_data.todos = dest_todos

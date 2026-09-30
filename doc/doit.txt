@@ -17,6 +17,7 @@ Table of Contents                                          *doit-contents*
   - Priority System                                         |doit-priorities|
   - Todo Lists                                                  |doit-lists|
   - Nested Todos                                              |doit-nesting|
+  - Sequence                                                 |doit-sequence|
   - Import/Export                                             |doit-import|
   - Project Notes                                              |doit-notes|
   - Tmux Integration                                       |doit-tmux-intro|
@@ -296,6 +297,7 @@ Main Window~
     <Space>     Toggle priority
     <leader>p   Open scratchpad
     r           Enter reordering mode
+    S           Set or clear sequence (see |doit-sequence|)
 
 Reordering to-dos~
     k           Move to-do up
@@ -516,6 +518,25 @@ sibling, so a parent moves together with its whole subtree.
 Nesting is shared with the tmux UI (|doit-tmux-interactive|) and the MCP
 server (`parent` on add_todo / update_todo). Markdown export (`E`) writes
 children as an indented list under their parent.
+
+SEQUENCE                                                     *doit-sequence*
+
+Priority says how critical a to-do is; sequence says what order to do things
+in. Press `S` on a to-do and enter a position (1 is first), or leave it empty
+to clear it. Pending to-dos with a sequence show in a Sequence section above
+the priority groups, sorted by position whatever their priority, and each row
+shows its position after the priority glyph (`* 2) ...`).
+
+Taking a position that is already used pushes that to-do, and any right
+behind it, down one, so the rest keep their numbers. Reordering (`r`, then
+`j`/`k`) inside the Sequence section swaps positions. In-progress and
+completed to-dos keep their sequence but show in their usual sections.
+Moving a to-do to another list clears it.
+
+The rank in an MCP-created title (`claude: [gate] 41. ...`) is a fixed
+handle that deps point at, not the work order. Sequence is shared with the
+tmux UI (|doit-tmux-interactive|) and the MCP server (`sequence_todos`, and
+`sequence` on add_todo / update_todo).
 
 IMPORT/EXPORT                                                 *doit-import*
 

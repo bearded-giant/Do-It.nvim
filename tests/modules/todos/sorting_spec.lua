@@ -170,4 +170,41 @@ describe("todos sorting", function()
             assert.are.equal("Done #tag", filtered[2].text)
         end)
     end)
+
+    describe("sequence", function()
+        local function texts(todos)
+            local out = {}
+            for i, t in ipairs(todos) do
+                out[i] = t.text
+            end
+            return out
+        end
+
+        it("runs sequenced pending items first, across priority", function()
+            state.todos = {
+                { text = "critical", done = false, in_progress = false, priorities = "critical", order_index = 1 },
+                { text = "seq 2", done = false, in_progress = false, sequence = 2, order_index = 2 },
+                { text = "seq 1 important", done = false, in_progress = false, priorities = "important", sequence = 1, order_index = 3 },
+                { text = "active seq", done = false, in_progress = true, sequence = 1, order_index = 4 },
+            }
+
+            sorting.sort_todos()
+
+            assert.are.same({ "active seq", "seq 1 important", "seq 2", "critical" }, texts(state.todos))
+        end)
+
+        it("shifts only the colliding run when setting a position", function()
+            local a = { text = "a", sequence = 1 }
+            local b = { text = "b", sequence = 2 }
+            local c = { text = "c", sequence = 5 }
+            local x = { text = "x" }
+            local todos = { a, b, c, x }
+
+            sorting_module.set_sequence(todos, x, 2)
+            assert.are.same({ 1, 3, 5, 2 }, { a.sequence, b.sequence, c.sequence, x.sequence })
+
+            sorting_module.set_sequence(todos, x, nil)
+            assert.is_nil(x.sequence)
+        end)
+    end)
 end)

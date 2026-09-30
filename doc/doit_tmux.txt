@@ -115,6 +115,13 @@ Nested Todos~
     one. Markdown export (E) writes children as an indented list under their
     parent.
 
+Sequence~
+    Pending todos with a sequence render in a Sequence section above the
+    priority groups, in position order across priorities, each labeled with
+    its position after the priority glyph. S sets or clears a position, and a
+    taken position pushes the colliding todos down one. K/J inside the
+    section swap positions. See |doit-sequence|.
+
 Status Changes~
     s                  Start (mark in-progress)
     x                  Complete (mark done)
@@ -127,6 +134,7 @@ Editing~
     P                  Set priority
     N                  Edit the todo's note (description)
     h                  Set or clear due date
+    S                  Set or clear sequence (run order)
     g                  Open list notes modal (create/edit/delete notes)
 
     In new/edit mode: Enter to save, Esc to cancel

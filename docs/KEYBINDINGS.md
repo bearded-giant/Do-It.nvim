@@ -58,6 +58,7 @@
 | `h` | Remove due date |
 | `H` | Add/edit due date (calendar) |
 | `r` | Reorder current todo (use j/k to move) |
+| `S` | Set or clear sequence (run order across priorities) |
 | `T` | Add time estimation |
 | `R` | Remove time estimation |
 | `K` | View todo detail (full text + description, including the item id) |

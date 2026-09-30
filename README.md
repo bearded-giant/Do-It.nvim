@@ -362,6 +362,7 @@ Then install with `prefix + I`.
 | `l` / `L` | Switch list / list manager |
 | `t` / `c` | Filter by #tag / clear filter |
 | `h`       | Set or clear due date |
+| `S`       | Set or clear sequence (run order across priorities) |
 | `/`       | Search                |
 | `d` / `D` | Delete todo / clear all completed |
 | `u`       | Undo last delete      |
@@ -473,8 +474,9 @@ Todo items:
 | `get_todo` | Fetch one item by id from whichever list holds it, no list name needed |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
-| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due` and `parent` (nest under another item) |
-| `update_todo` | Edit text, description, status, priority, due date, order, or `parent`. Needs an id |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item) and `sequence` |
+| `update_todo` | Edit text, description, status, priority, due date, order, `sequence`, or `parent`. Needs an id |
+| `sequence_todos` | Set a list's whole run order in one call from ranks or ids. Everything not named loses its sequence |
 | `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
 | `complete_todo` | Mark an item done. Fuzzy text query; with no args it looks at in-progress items |
 | `revert_todo` | Send an item back to pending |
@@ -517,7 +519,7 @@ Items the MCP server creates get a scannable title instead of a bare sentence:
 claude: [gate] 41. pre-store gate check (dep on #40)
 ```
 
-You pass `type` (a short free-form tag like `gate`, `decision`, `comms`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list, so priority stays the bucket and the number tells you the order inside it. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. The `claude:` burn-down marker carries over too, so pass `claude: false` to drop it once an item is no longer model work. Composing is idempotent, so prefixes never stack.
+You pass `type` (a short free-form tag like `gate`, `decision`, `comms`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list and never changes, so deps and `#N` references stay valid. It's a handle, not the work order. When items need to run in a set order, give them a sequence (`sequence_todos`, or `S` in nvim and tmux). Sequenced pending items get their own Sequence section above the priority groups and run in that order no matter their priority, and `/burn`-style workers see them first in `list_todos`. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. The `claude:` burn-down marker carries over too, so pass `claude: false` to drop it once an item is no longer model work. Composing is idempotent, so prefixes never stack.
 
 Duplicate detection strips that whole wrapper before comparing, so an item you typed in Neovim as `buy milk` matches the one MCP stored as `claude: [chore] 3. buy milk (dep on #1)`. Comparison ignores the `claude:` marker, the `[type]` tag, the rank prefix, the `(dep on #N)` suffix, case, and whitespace. A `[[note link]]` prefix is not a type tag and survives, and a number without a following space (`3.buy milk`, `1.5x throughput`) is not a rank. When duplicates are collapsed the copy carrying real notes wins, and the rest go to the undo stack — `<leader>D` in Neovim confirms first, and `dedupe_todos` is a dry run unless you pass `dry_run:false`.
 

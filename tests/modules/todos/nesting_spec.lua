@@ -157,6 +157,28 @@ describe("nesting render", function()
 		assert.are.equal(2, headers)
 	end)
 
+	it("renders sequenced items in a Sequence section above the priority headers", function()
+		local urgent = doit_state.add_todo("urgent", "urgent")
+		local second = doit_state.add_todo("second", {})
+		local first = doit_state.add_todo("first", "important")
+		second.sequence = 2
+		first.sequence = 1
+		doit_state.sort_todos()
+
+		local rows = require("doit.ui.main_window").build_render_rows()
+
+		local headers = {}
+		for _, row in ipairs(rows) do
+			if row.kind == "priority_header" then
+				headers[#headers + 1] = vim.trim(row.display)
+			end
+		end
+		assert.are.same({ "Sequence", "Urgent" }, headers)
+		assert.is_true(line_of(rows, first) < line_of(rows, second))
+		assert.is_true(line_of(rows, second) < line_of(rows, urgent))
+		assert.is_truthy(rows[line_of(rows, first)].display:find("^%* 1%) "))
+	end)
+
 	it("resolves the cursor line of an indented child to that child", function()
 		local parent = doit_state.add_todo("parent", {})
 		local child = doit_state.add_todo("child", {}, parent.id)

@@ -100,6 +100,7 @@ M.defaults = {
         view_detail = "K",
         copy_todo_id = "y",
         reorder_todo = "r",
+        set_sequence = "S",
         move_todo_up = "k",
         move_todo_down = "j",
         move_todo_to_list = "m",

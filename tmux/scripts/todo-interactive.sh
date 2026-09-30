@@ -67,6 +67,7 @@ priority_header_label() {
         critical)  echo "Critical" ;;
         urgent)    echo "Urgent" ;;
         important) echo "Important" ;;
+        sequence)  echo "Sequence" ;;
         *)         echo "Default" ;;
     esac
 }
@@ -122,15 +123,18 @@ export DUE_JQ
 # root_prio) so the three sections split by subtree, never mid-subtree.
 NEST_JQ='
 def prio_rank: if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end;
+def seqd: (.sequence | type) == "number" and (.done | not) and (.in_progress | not);
+def seq_key: if seqd then [0, .sequence] else [1, 0] end;
 def tag_ok($tagf): $tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null);
 def rows(rootkey):
     . as $all
     | (map(select(.id != null) | {key: .id, value: true}) | from_entries) as $ids
     | def kids($pid; $d; $root):
         [$all[] | select(.parent_id == $pid and .id != $pid)]
-        | sort_by((if .done then 1 else 0 end), (if .in_progress then 0 else 1 end), prio_rank, .order_index)
+        | sort_by((if .done then 1 else 0 end), (if .in_progress then 0 else 1 end), seq_key, prio_rank, .order_index)
         | map(. as $k | [$k + {depth: $d} + $root] + kids($k.id; $d + 1; $root)) | add // [];
-    def bucket: {root_ip: (.in_progress == true), root_done: (.done == true), root_prio: (.priorities // "")};
+    def bucket: {root_ip: (.in_progress == true), root_done: (.done == true),
+        root_prio: (if seqd then "sequence" else (.priorities // "") end)};
     ([.[] | select(.parent_id == null or $ids[.parent_id] == null or .parent_id == .id)]
         | sort_by(rootkey)
         | map(. as $r | ($r | bucket) as $b | [$r + {depth: 0} + $b] + kids($r.id; 1; $b))
@@ -156,6 +160,7 @@ preview_todo() {
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
             "\nPriority: " + (.priorities // "none") +
+            (if .sequence then "\nSequence: \(.sequence)" else "" end) +
             "\nID: " + (.id // "-") +
             (if .due_date then "\nDue: " + .due_date + " (" + (.due_date | due_label) + ")" else "" end) +
             (if .obsidian_ref then "\nObsidian:  " + (.obsidian_ref.date // "linked") else "" end) +
@@ -223,7 +228,8 @@ format_todos() {
     # under its parent instead of dropping to the completed block.
     local row_fields='
         .depth as $d |
-        (.text | split("\n")[0][0:($tw - 2 * $d)]) as $first_line |
+        (if seqd and .root_prio == "sequence" then "\(.sequence)) " else "" end) as $sl |
+        ($sl + (.text | split("\n")[0][0:($tw - 2 * $d - ($sl | length))])) as $first_line |
         (.text | contains("\n")) as $multiline |
         (if .obsidian_ref then "true" else "false" end) as $obs |
         (if .due_date then (.due_date | due_label) else "" end) as $due |
@@ -262,7 +268,7 @@ format_todos() {
             *)           printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac; fi
     done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
-        map(select(tag_ok($tagf))) | rows(prio_rank, .order_index) |
+        map(select(tag_ok($tagf))) | rows(seq_key, prio_rank, .order_index) |
         .[] | select(.root_ip) |'"$row_fields" "$TODO_LIST_PATH")
 
     # Then print not started todos, grouped under named priority headers
@@ -299,7 +305,7 @@ format_todos() {
             *)           printf "%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
         esac; fi
     done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
-        map(select(tag_ok($tagf))) | rows(prio_rank, .order_index) |
+        map(select(tag_ok($tagf))) | rows(seq_key, prio_rank, .order_index) |
         .[] | select((.root_done | not) and (.root_ip | not)) |'"$row_fields" "$TODO_LIST_PATH")
 
     # Notes section (always shown) between pending and completed
@@ -595,7 +601,7 @@ while true; do
         "${START_BIND[@]}" \
         --header=" Todo Manager - ${ACTIVE_LIST_NAME}${DOIT_VERSION:+  v$DOIT_VERSION}  (done: $done_count)${TAG_FILTER:+   ·   filter: #$TAG_FILTER [c] clear}   ·   [?] help" \
         --prompt="" \
-        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,i,p,B,O,q,?,/,g,t,c,h \
+        --expect=enter,s,x,X,n,r,N,P,d,D,e,E,u,l,L,m,y,Y,ctrl-y,i,p,B,O,q,?,/,g,t,c,h,S \
         --bind "K:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "ctrl-up:transform:$SCRIPT_DIR/todo-move.sh up {}" \
         --bind "J:transform:$SCRIPT_DIR/todo-move.sh down {}" \
@@ -641,6 +647,30 @@ while true; do
                     "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
             else
                 echo "Invalid date '$NEW_DUE' - use YYYY-MM-DD" >&2
+                sleep 1
+            fi
+            CURSOR_TARGET="$TODO_ID"
+        fi
+        continue
+    fi
+
+    # S sets the run-queue position; the colliding run (N, N+1, ...) shifts down
+    if [[ "$KEY" == "S" && -n "$TODO_ID" ]]; then
+        CURRENT_SEQ=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .sequence // ""' "$TODO_LIST_PATH")
+        NEW_SEQ=$(input_text "$CURRENT_SEQ" " Sequence position  ·  empty clears  ·  [esc] cancel ")
+        if [[ $? -ne 130 ]]; then
+            if [[ "$NEW_SEQ" =~ ^[0-9]*$ ]]; then
+                jq --arg id "$TODO_ID" --argjson pos "${NEW_SEQ:-0}" "$NEST_JQ"'
+                    (.todos | map(select(.id != $id and seqd) | .sequence)) as $taken |
+                    (first(range($pos; infinite) as $n | select($taken | any(. == $n) | not) | $n)) as $free |
+                    .todos |= map(
+                        if .id == $id then (if $pos > 0 then .sequence = $pos else del(.sequence) end)
+                        elif seqd and .sequence >= $pos and .sequence < $free then .sequence += 1
+                        else . end) |
+                    ._metadata.updated_at = (now | floor)
+                ' "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
+            else
+                echo "Invalid sequence '$NEW_SEQ' - use a whole number" >&2
                 sleep 1
             fi
             CURSOR_TARGET="$TODO_ID"
@@ -964,7 +994,7 @@ while true; do
 
                         # Add to target list
                         jq --argjson todo "$TODO_OBJ" '
-                            .todos += [$todo] |
+                            .todos += [$todo | del(.sequence)] |
                             ._metadata.updated_at = (now | floor)
                         ' "$TARGET_PATH" > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
 
@@ -1344,6 +1374,7 @@ while true; do
             help_row ""                                  "  t      Filter by #tag"
             help_row ""                                  "  c      Clear tag filter"
             help_row ""                                  "  h      Set / clear due date"
+            help_row ""                                  "  S      Set / clear sequence"
             help_row "  Enter    Open item / note (nvim)" "  E      Export pending to markdown"
             help_row "  y        Copy text"              "OBSIDIAN"
             help_row "  i        Copy item id"           "  O      Send to daily note"

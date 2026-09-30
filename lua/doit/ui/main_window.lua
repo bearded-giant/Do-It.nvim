@@ -11,6 +11,7 @@ local scratchpad = require("doit.ui.scratchpad")
 local list_selector = require("doit.ui.list_selector")
 local tags_util = require("doit.modules.todos.state.tags")
 local due_dates = require("doit.modules.todos.state.due_dates")
+local sorting = require("doit.modules.todos.state.sorting")
 
 local core = require("doit.core")
 
@@ -324,6 +325,7 @@ function M.build_render_rows()
 	end
 
 	local PRIORITY_HEADERS = {
+		sequence = "Sequence",
 		critical = "Critical",
 		urgent = "Urgent",
 		important = "Important",
@@ -391,6 +393,9 @@ function M.build_render_rows()
 			else
 				local section = head.in_progress and "ip" or "pd"
 				local prio = todo_priority_name(head) or "default"
+				if sorting.sequenced(head) then
+					prio = "sequence"
+				end
 				local group = section .. ":" .. prio
 				if group ~= prev_group then
 					if section == "pd" then
@@ -406,6 +411,9 @@ function M.build_render_rows()
 			end
 
 			local marker = priority_marker(todo)
+			if sorting.sequenced(todo) and sorting.sequenced(head) then
+				marker = marker .. todo.sequence .. ") "
+			end
 			local formatted = M.format_todo_line(todo)
 			-- nested todos are indented under their parent; depth is maintained by
 			-- the structure-aware sort, so the render just consumes it
@@ -1185,6 +1193,12 @@ local function create_window()
 
 	setup_keymap("edit_priorities", function()
 		todo_actions.edit_priorities(win_id, function()
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("set_sequence", function()
+		todo_actions.set_sequence(win_id, function()
 			M.render_todos()
 		end)
 	end)

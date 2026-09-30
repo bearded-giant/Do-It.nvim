@@ -26,15 +26,53 @@ function M.priority_rank(todo)
     return 1
 end
 
+-- In the run queue: pending, not started, with a sequence. In-progress and done
+-- items keep their sequence but ignore it, so those sections stay priority-grouped.
+function M.sequenced(todo)
+    return type(todo.sequence) == "number" and not todo.done and not todo.in_progress
+end
+
+-- Put `target` at run-queue position `pos`; nil or < 1 clears it. Only the
+-- colliding run (pos, pos+1, ...) shifts down, so the other labels stay put.
+function M.set_sequence(todos, target, pos)
+    target.sequence = nil
+    if not pos or pos < 1 then
+        return
+    end
+    local taken = {}
+    for _, t in ipairs(todos) do
+        if t ~= target and M.sequenced(t) then
+            taken[t.sequence] = true
+        end
+    end
+    local free = pos
+    while taken[free] do
+        free = free + 1
+    end
+    for _, t in ipairs(todos) do
+        if t ~= target and M.sequenced(t) and t.sequence >= pos and t.sequence < free then
+            t.sequence = t.sequence + 1
+        end
+    end
+    target.sequence = pos
+end
+
 -- Comparator shared by sort_todos and get_filtered_todos so ordering never drifts
--- between them: done last, in_progress first, priority rank desc, order_index,
--- due date, creation time.
+-- between them: done last, in_progress first, sequenced by sequence, priority
+-- rank desc, order_index, due date, creation time.
 local function todo_less_than(a, b)
     if a.done ~= b.done then
         return not a.done
     end
     if a.in_progress ~= b.in_progress then
         return a.in_progress
+    end
+    local a_seq, b_seq = M.sequenced(a), M.sequenced(b)
+    if a_seq ~= b_seq then
+        return a_seq
+    end
+    if a_seq and a.sequence ~= b.sequence then
+        return a.sequence < b.sequence
     end
     local a_rank = M.priority_rank(a)
     local b_rank = M.priority_rank(b)
