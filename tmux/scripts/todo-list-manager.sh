@@ -17,6 +17,20 @@ if ! command -v fzf &> /dev/null; then
 fi
 
 CURRENT_LIST=$(get_active_list_name)
+
+# Enter opens a list without touching any link. Launched from the todo manager,
+# the choice goes back through $DOIT_LM_RESULT ("view|link <name>") so the caller
+# re-renders in place instead of nesting a second manager; standalone, it
+# replaces this popup with the todo manager pinned to that list.
+finish() {
+    local action="$1" name="$2"
+    if [[ -n "$DOIT_LM_RESULT" ]]; then
+        printf '%s %s\n' "$action" "$name" > "$DOIT_LM_RESULT"
+        exit 0
+    fi
+    [[ "$action" == "view" ]] && exec "$SCRIPT_DIR/todo-interactive.sh" --list "$name"
+    exit 0
+}
 SESS=$(get_tmux_session_name 2>/dev/null) || SESS=""
 LIVE_SESSIONS=$(tmux list-sessions -F '#S' 2>/dev/null)
 
@@ -236,13 +250,13 @@ while true; do
  List Manager - Active: $CURRENT_LIST$SESSION_HINT
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup    y: Copy name
- ENTER: Link to session    g: Set global    u: Unlink session    /: Search
+ ENTER: Open    l: Link to session    g: Set global    u: Unlink session    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=100% \
         --layout=reverse \
-        --expect=n,r,d,b,y,g,u,enter,q,/ \
+        --expect=n,r,d,b,y,l,g,u,enter,q,/ \
         --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)
 
@@ -272,7 +286,7 @@ while true; do
         "/")
             # search mode: re-launch fzf with filtering enabled
             SEARCH_RESULT=$(echo "$LIST_DISPLAY" | fzf --ansi \
-                --header=" Type to filter, Enter to switch, Esc to cancel" \
+                --header=" Type to filter, Enter to open, Esc to cancel" \
                 --prompt="/ " \
                 --height=100% \
                 --layout=reverse \
@@ -281,10 +295,7 @@ while true; do
 
             if [[ -n "$SEARCH_RESULT" ]]; then
                 SEARCH_LIST=$(echo "$SEARCH_RESULT" | sed 's/^[* ]*//' | awk '{print $1}')
-                if [[ -n "$SEARCH_LIST" ]]; then
-                    set_active_list "$SEARCH_LIST"
-                    break
-                fi
+                [[ -n "$SEARCH_LIST" ]] && finish view "$SEARCH_LIST"
             fi
             ;;
         "y")
@@ -323,9 +334,12 @@ while true; do
             fi
             ;;
         "enter")
+            [[ -n "$SELECTED_LIST" ]] && finish view "$SELECTED_LIST"
+            ;;
+        "l")
             if [[ -n "$SELECTED_LIST" ]]; then
                 set_active_list "$SELECTED_LIST"
-                break
+                finish link "$SELECTED_LIST"
             fi
             ;;
     esac

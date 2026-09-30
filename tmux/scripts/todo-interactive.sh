@@ -948,11 +948,18 @@ while true; do
             ;;
         "L"|"q")
             # L / q: go back to Lists (list manager). Esc quits the manager.
-            "$SCRIPT_DIR/todo-list-manager.sh"
-            # Clear cached env var (and any pin) so we read fresh from session.json
+            LM_RESULT=$(mktemp)
+            DOIT_LM_RESULT="$LM_RESULT" "$SCRIPT_DIR/todo-list-manager.sh"
+            read -r LM_ACTION LM_LIST < "$LM_RESULT"
+            rm -f "$LM_RESULT"
             unset DOIT_ACTIVE_LIST
-            unset DOIT_PINNED_LIST
-            # Reload list path after switch
+            case "$LM_ACTION" in
+                view) export DOIT_PINNED_LIST="$LM_LIST" ;;
+                link) unset DOIT_PINNED_LIST ;;
+            esac
+            # a pin to a list renamed/deleted in the manager must drop, or the
+            # pinned-list resolver would recreate it empty
+            [[ -n "$DOIT_PINNED_LIST" && ! -f "$LISTS_DIR/${DOIT_PINNED_LIST}.json" ]] && unset DOIT_PINNED_LIST
             TODO_LIST_PATH="$(get_active_list_path)"
             ACTIVE_LIST_NAME="$(get_active_list_name)"
             export TODO_LIST_PATH
