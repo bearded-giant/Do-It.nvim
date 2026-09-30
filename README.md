@@ -351,7 +351,7 @@ Then install with `prefix + I`.
 | `s`       | Start (in-progress)   |
 | `x`       | Complete (done)       |
 | `X`       | Revert to pending     |
-| `n` / `p` | New todo / paste new from clipboard |
+| `n` / `p` | New todo (in the Notes section: new note) / paste new from clipboard |
 | `e`       | Edit todo text        |
 | `P`       | Set priority          |
 | `N`       | Edit note (description) |

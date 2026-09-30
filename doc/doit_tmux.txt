@@ -147,6 +147,8 @@ List Notes~
         e                  Edit selected note
         d                  Delete selected note
         q                  Back to the todo list
+    In the main list, `n` anywhere in the Notes section, or Enter on the
+    "Notes" header or the "(no notes)" line, creates a note directly.
 
 View/Copy~
     Enter              Open the item (or note row) in nvim: view status,

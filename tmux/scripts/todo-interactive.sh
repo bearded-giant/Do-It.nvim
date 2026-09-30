@@ -634,6 +634,18 @@ while true; do
         NOTE_ID="${TODO_ID#note_}"
         TODO_ID=""
     fi
+    # the Notes header and its "(no notes)" placeholder carry no id, so without
+    # this the section had no way to add a note short of the g modal
+    IN_NOTES=""
+    [[ -n "$NOTE_ID" ]] && IN_NOTES=1
+    case "$(sed -e 's/\x1b\[[0-9;]*m//g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<< "$TODO_LINE")" in
+        "Notes"|"(no notes)") IN_NOTES=1 ;;
+    esac
+    if [[ -n "$IN_NOTES" ]] && [[ "$KEY" == "n" || ( -z "$NOTE_ID" && ( "$KEY" == "enter" || -z "$KEY" ) ) ]]; then
+        "$SCRIPT_DIR/todo-notes.sh" --new
+        continue
+    fi
+
     # h sets or clears the due date on the highlighted todo
     if [[ "$KEY" == "h" && -n "$TODO_ID" ]]; then
         CURRENT_DUE=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .due_date // ""' "$TODO_LIST_PATH")
@@ -1369,7 +1381,8 @@ while true; do
             help_row "NOTES"                             "ORGANIZE"
             help_row "  N        Edit note (description)" "  m      Move todo to list"
             help_row "  g        List notes (modal)"      "  l      Switch list"
-            help_row "  on note: Enter/e open · d del · y copy" "  L    List manager"
+            help_row "  in Notes: n new · Enter/e open"   "  L    List manager"
+            help_row "            d delete · y copy"      ""
             help_row "VIEW / MISC"                       "  /      Search / filter"
             help_row ""                                  "  t      Filter by #tag"
             help_row ""                                  "  c      Clear tag filter"

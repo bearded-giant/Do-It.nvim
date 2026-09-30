@@ -93,6 +93,26 @@ preview_note() {
 }
 export -f preview_note
 
+# title prompt, then body editor; returns 130 when the title prompt is cancelled
+create_note() {
+    local title body
+    title=$(input_line "" "New note title (enter to save, esc to cancel)")
+    [[ $? -eq 130 ]] && return 130
+    body=$(edit_body "")
+    write_list --arg id "$(new_note_id)" --arg t "$title" --arg b "$body" '
+        .notes = ((.notes // []) + [{
+            id: $id, title: $t, body: $b,
+            created_at: (now | floor), updated_at: (now | floor)
+        }]) |
+        ._metadata.updated_at = (now | floor)'
+}
+
+# --new: create one note and return to the caller (the main manager)
+if [[ "$1" == "--new" ]]; then
+    create_note
+    exit $?
+fi
+
 while true; do
     clear
     SELECTION=$(format_notes | fzf --ansi --disabled \
@@ -117,16 +137,7 @@ while true; do
 
     case "$KEY" in
         "n")
-            TITLE=$(input_line "" "New note title (enter to save, esc to cancel)")
-            [[ $? -eq 130 ]] && continue
-            BODY=$(edit_body "")
-            NEW_ID=$(new_note_id)
-            write_list --arg id "$NEW_ID" --arg t "$TITLE" --arg b "$BODY" '
-                .notes = ((.notes // []) + [{
-                    id: $id, title: $t, body: $b,
-                    created_at: (now | floor), updated_at: (now | floor)
-                }]) |
-                ._metadata.updated_at = (now | floor)'
+            create_note
             ;;
         "e"|"enter")
             [[ -z "$NID" ]] && continue
