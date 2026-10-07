@@ -33,7 +33,7 @@ const PRIORITY_LABELS = { critical: "!!!", urgent: "!!", important: "!" };
 // todos are LLM burn-down items (machine-read) and don't need this.
 const TYPE_HINT =
     " Short lowercase tag for the kind of work, rendered as a scannable [tag]" +
-    " prefix — e.g. decision, gate, loader, comms, bug, spike, chore, research." +
+    " prefix — e.g. decision, gate, loader, bug, spike, chore, research." +
     " Free-form: coin a new one when none fit. Always set it on MCP-created items.";
 
 const DEPS_HINT =
@@ -432,7 +432,7 @@ Item text convention — MANDATORY for every item you create:
 
     claude: [type] N. body (dep on #M, #K)
 
-- [type] — short lowercase work-type tag (decision, gate, loader, comms, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
+- [type] — short lowercase work-type tag (decision, gate, loader, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
 - N. — the item's fixed handle, unique across the list and assigned at creation (add_todo does it, so don't write it into 'text'). Deps and #N references point at it. It is never renumbered, so it is NOT the work order.
 - (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
 - claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
