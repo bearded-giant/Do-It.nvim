@@ -86,7 +86,8 @@ function M.setup(module)
 
                 todo_text = vim.trim(todo_text)
                 if todo_text ~= "" then
-                    -- Actually add the todo
+                    -- tmux and MCP write the list file directly; reload so the save doesn't clobber them
+                    state.load_list(state.todo_lists.active)
                     state.add_todo(todo_text, priorities)
 
                     local msg = "Todo created: " .. todo_text

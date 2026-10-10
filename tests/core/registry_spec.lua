@@ -38,7 +38,22 @@ describe("core", function()
         
         assert.are.equal(test_module, core.get_module("test"))
     end)
-    
+
+    it("should replace a fallback command registered by an earlier bare setup()", function()
+        core.setup({})
+        -- plugin/doit.vim's setup() leaves an nargs=0 fallback; :DoIt add then hit E488
+        vim.api.nvim_create_user_command("DoItRegistryTest", function() end, {})
+
+        core.register_module("cmdtest", {
+            commands = {
+                DoItRegistryTest = { callback = function() end, opts = { nargs = "*" } },
+            },
+        })
+
+        assert.are.equal("*", vim.api.nvim_get_commands({}).DoItRegistryTest.nargs)
+        vim.api.nvim_del_user_command("DoItRegistryTest")
+    end)
+
     it("should handle events", function()
         core.setup({})
         
