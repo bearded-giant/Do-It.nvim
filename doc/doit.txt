@@ -451,7 +451,9 @@ Rows read "!M name (N todos)" when a list holds open items past their due
 date: the red "!M" badge sits left of the name so it stays visible even when
 a long name fills the panel, and the preview repeats the count. The startup nudge names the list
 and the item text for each overdue item across every list, not just the active
-one; :DoItDue lists the active list's due items and jumps to one.
+one; :DoItDue lists the active list's due items and jumps to one. Set
+`modules.todos.due_notify = false` to skip the startup nudge; :DoItDue and the
+badges keep working.
 
 Moving Todos Between Lists:~
 1. Select a todo in the main window
