@@ -14,9 +14,8 @@ TODO_LIST_PATH="$LISTS_DIR/${ACTIVE_LIST_NAME}.json"
 CHAR_LIMIT=$(tmux show -gqv @doit-todo-chars 2>/dev/null)
 CHAR_LIMIT=${CHAR_LIMIT:-25}
 LIST_CHAR_LIMIT=$(tmux show -gqv @doit-list-chars 2>/dev/null)
-LIST_CHAR_LIMIT=${LIST_CHAR_LIMIT:-10}
 LIST_LABEL="$ACTIVE_LIST_NAME"
-[[ ${#LIST_LABEL} -gt $LIST_CHAR_LIMIT ]] && LIST_LABEL="${LIST_LABEL:0:$LIST_CHAR_LIMIT}..."
+[[ -n "$LIST_CHAR_LIMIT" && ${#LIST_LABEL} -gt $LIST_CHAR_LIMIT ]] && LIST_LABEL="${LIST_LABEL:0:$LIST_CHAR_LIMIT}..."
 ICON_TASK=$'\xef\x82\xae'
 
 idle_chip() {

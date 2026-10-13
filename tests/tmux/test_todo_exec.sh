@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# status-bar chip text: "<list>: <todo>" with the list name cut at
-# @doit-list-chars (default 10), todo cut at @doit-todo-chars (default 25)
+# status-bar chip text: "<list>: <todo>" with the list name whole unless
+# @doit-list-chars caps it, todo cut at @doit-todo-chars (default 25)
 # without its claude: marker, "<list>: no active" when idle.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,12 +11,13 @@ SCRIPTS="$SCRIPT_DIR/../../tmux/scripts"
 DATA="$TEST_TMPDIR/data"
 mkdir -p "$DATA/lists"
 
-# fake tmux: only @doit-todo-chars answers, from $FAKE_TODO_CHARS
+# fake tmux: only @doit-todo-chars / @doit-list-chars answer, from $FAKE_TODO_CHARS / $FAKE_LIST_CHARS
 FAKE_BIN="$TEST_TMPDIR/bin"
 mkdir -p "$FAKE_BIN"
 cat > "$FAKE_BIN/tmux" << 'SH'
 #!/bin/bash
 [[ "$*" == *@doit-todo-chars* ]] && echo "$FAKE_TODO_CHARS"
+[[ "$*" == *@doit-list-chars* ]] && echo "$FAKE_LIST_CHARS"
 exit 0
 SH
 chmod +x "$FAKE_BIN/tmux"
@@ -29,7 +30,7 @@ mklist() {
 
 chip() {
     env -u TMUX -u DOIT_ACTIVE_LIST -u DOIT_PINNED_LIST PATH="$FAKE_BIN:$PATH" \
-        DOIT_DATA_DIR="$DATA" FAKE_TODO_CHARS="${TODO_CHARS:-}" bash "$SCRIPTS/todo-exec.sh" "$1"
+        DOIT_DATA_DIR="$DATA" FAKE_TODO_CHARS="${TODO_CHARS:-}" FAKE_LIST_CHARS="${LIST_CHARS:-}" bash "$SCRIPTS/todo-exec.sh" "$1"
 }
 
 mklist daily ""
@@ -48,8 +49,11 @@ assert_eq "daily: no active" "$(chip nobody)"
 it "short list name shown whole before the todo"
 assert_eq "hello-test: ship the thing" "$(chip short)"
 
-it "long list name cut at 10 chars with ellipsis"
-assert_eq "recharge-a...: long list item" "$(chip long)"
+it "long list name shown whole by default"
+assert_eq "recharge-auth-complete-auth-service: long list item" "$(chip long)"
+
+it "@doit-list-chars caps the list name"
+assert_eq "recharge-a...: long list item" "$(LIST_CHARS=10 chip long)"
 
 it "claude: marker dropped, todo cut at 25 chars by default"
 assert_eq "marked: [decision] 12. pick the s..." "$(chip marked)"
