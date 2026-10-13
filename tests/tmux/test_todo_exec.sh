@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # status-bar chip text: "<list>: <todo>" with the list name cut at
-# @doit-list-chars (default 10), "<list>: no active" when idle.
+# @doit-list-chars (default 10), todo cut at @doit-todo-chars (default 25)
+# without its claude: marker, "<list>: no active" when idle.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test_harness.sh"
@@ -10,10 +11,14 @@ SCRIPTS="$SCRIPT_DIR/../../tmux/scripts"
 DATA="$TEST_TMPDIR/data"
 mkdir -p "$DATA/lists"
 
-# fake tmux: the chip script only reads/sets @doit-* options, none matter here
+# fake tmux: only @doit-todo-chars answers, from $FAKE_TODO_CHARS
 FAKE_BIN="$TEST_TMPDIR/bin"
 mkdir -p "$FAKE_BIN"
-printf '#!/bin/bash\nexit 0\n' > "$FAKE_BIN/tmux"
+cat > "$FAKE_BIN/tmux" << 'SH'
+#!/bin/bash
+[[ "$*" == *@doit-todo-chars* ]] && echo "$FAKE_TODO_CHARS"
+exit 0
+SH
 chmod +x "$FAKE_BIN/tmux"
 
 mklist() {
@@ -24,14 +29,15 @@ mklist() {
 
 chip() {
     env -u TMUX -u DOIT_ACTIVE_LIST -u DOIT_PINNED_LIST PATH="$FAKE_BIN:$PATH" \
-        DOIT_DATA_DIR="$DATA" bash "$SCRIPTS/todo-exec.sh" "$1"
+        DOIT_DATA_DIR="$DATA" FAKE_TODO_CHARS="${TODO_CHARS:-}" bash "$SCRIPTS/todo-exec.sh" "$1"
 }
 
 mklist daily ""
 mklist hello-test "ship the thing" true
 mklist recharge-auth-complete-auth-service "long list item" true
+mklist marked "claude: [decision] 12. pick the status bar layout (dep on #3)" true
 cat > "$DATA/session.json" << 'JSON'
-{"active_list": "daily", "sessions": {"short": "hello-test", "long": "recharge-auth-complete-auth-service"}}
+{"active_list": "daily", "sessions": {"short": "hello-test", "long": "recharge-auth-complete-auth-service", "marked": "marked"}}
 JSON
 
 describe "status chip text"
@@ -44,5 +50,11 @@ assert_eq "hello-test: ship the thing" "$(chip short)"
 
 it "long list name cut at 10 chars with ellipsis"
 assert_eq "recharge-a...: long list item" "$(chip long)"
+
+it "claude: marker dropped, todo cut at 25 chars by default"
+assert_eq "marked: [decision] 12. pick the s..." "$(chip marked)"
+
+it "@doit-todo-chars widens the todo text"
+assert_eq "marked: [decision] 12. pick the status bar layout (dep on #3)" "$(TODO_CHARS=80 chip marked)"
 
 report

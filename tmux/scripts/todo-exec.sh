@@ -11,7 +11,8 @@ source "$SCRIPT_DIR/get-active-list.sh"
 
 ACTIVE_LIST_NAME="$(get_active_list_name)"
 TODO_LIST_PATH="$LISTS_DIR/${ACTIVE_LIST_NAME}.json"
-CHAR_LIMIT=25
+CHAR_LIMIT=$(tmux show -gqv @doit-todo-chars 2>/dev/null)
+CHAR_LIMIT=${CHAR_LIMIT:-25}
 LIST_CHAR_LIMIT=$(tmux show -gqv @doit-list-chars 2>/dev/null)
 LIST_CHAR_LIMIT=${LIST_CHAR_LIMIT:-10}
 LIST_LABEL="$ACTIVE_LIST_NAME"
@@ -59,6 +60,7 @@ tmux set -gq @doit-todo-icon "$ICON_TASK"
 
 todo_text="${todo_text#"${todo_text%%[![:space:]]*}"}"
 todo_text="${todo_text%"${todo_text##*[![:space:]]}"}"
+todo_text="${todo_text#claude: }"
 
 if [[ ${#todo_text} -gt $CHAR_LIMIT ]]; then
     todo_text="${todo_text:0:$CHAR_LIMIT}..."
