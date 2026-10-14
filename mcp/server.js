@@ -25,6 +25,9 @@ function readVersion() {
 const DATA_DIR = process.env.DOIT_DATA_DIR || path.join(process.env.HOME, ".local/share/nvim/doit");
 const LISTS_DIR = path.join(DATA_DIR, "lists");
 const SESSION_FILE = path.join(DATA_DIR, "session.json");
+// the tmux chip shows list names whole, so length is capped here instead of cut there
+const MAX_LIST_NAME = 24;
+const listNameSchema = z.string().max(MAX_LIST_NAME, `List names are capped at ${MAX_LIST_NAME} chars; shorten it (drop repeated or trailing words), do not cut mid-word.`);
 
 const PRIORITY_LABELS = { critical: "!!!", urgent: "!!", important: "!" };
 
@@ -495,7 +498,7 @@ The 'list' parameter is optional on MOST tools — omit it to use the active lis
 - search_todos: no list param at all — it always searches every list.
 - move_todo: uses 'from_list' (optional, defaults to active) and 'to_list' (required).
 - switch_list: 'list' is required — it names the list to switch TO, not the one to act in.
-- create_list and delete_list take 'name'; rename_list takes 'old_name' and 'new_name'.
+- create_list and delete_list take 'name'; rename_list takes 'old_name' and 'new_name'. create_list and rename_list reject names over 24 chars.
 
 Most tools that act on a single todo accept fuzzy text matching via 'query', so the user does not need the exact text or ID: start_todo, complete_todo, revert_todo, add_note, delete_todo, move_todo, and the note tools get_note / update_note / delete_note.
 
@@ -1446,7 +1449,7 @@ server.tool(
     "create_list",
     "Create a new empty do-it todo list.",
     {
-        name: z.string().describe("List name (used as filename, no spaces — use hyphens)"),
+        name: listNameSchema.describe("List name (used as filename, no spaces — use hyphens, max 24 chars)"),
     },
     async ({ name }) => {
         const filepath = getListPath(name);
@@ -1492,7 +1495,7 @@ server.tool(
     "Rename a do-it todo list. Cannot rename the active list (switch away first).",
     {
         old_name: z.string().describe("Current list name"),
-        new_name: z.string().describe("New list name (no spaces — use hyphens)"),
+        new_name: listNameSchema.describe("New list name (no spaces — use hyphens, max 24 chars)"),
     },
     async ({ old_name, new_name }) => {
         const oldPath = getListPath(old_name);
