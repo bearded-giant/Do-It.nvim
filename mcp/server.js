@@ -161,7 +161,7 @@ function generateId() {
 const OWED_LIST = "daily";
 
 // Twins live in two files, so a change made here has to be written there too.
-// The nvim and tmux toggles do not do this; their drift is caught downstream.
+// tmux mirrors this in tmux/scripts/lib-twin.sh; the nvim toggles do not, so their drift is caught downstream.
 function syncTwin(todo, mutate) {
     if (!todo.twin || !todo.twin.list || !todo.twin.id) return "";
     const filepath = getListPath(todo.twin.list);

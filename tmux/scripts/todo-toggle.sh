@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-twin.sh"
 
 TODO_LIST_PATH="$(get_active_list_path)"
 
@@ -40,7 +41,8 @@ jq --arg id "$TODO_ID" '
     .todos |= map(
         if .id == $id then
             .done = (if .done then false else true end) |
-            .in_progress = false
+            .in_progress = false |
+            if .done then .completed_at = (now | floor) else del(.completed_at) end
         else . end
     ) |
     ._metadata.updated_at = (now | floor)
@@ -48,10 +50,14 @@ jq --arg id "$TODO_ID" '
 
 # Get the text of the toggled todo for feedback
 TODO_TEXT=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
-TODO_STATUS=$(jq -r --arg id "$TODO_ID" '.todos[] | select(.id == $id) | .done' "$TODO_LIST_PATH")
+read -r TODO_STATUS COMPLETED_AT < <(jq -r --arg id "$TODO_ID" \
+    '.todos[] | select(.id == $id) | "\(.done) \(.completed_at // "")"' "$TODO_LIST_PATH")
+TWIN_REF=$(twin_ref "$TODO_LIST_PATH" "$TODO_ID")
 
 if [[ "$TODO_STATUS" == "true" ]]; then
-    tmux display-message "✓ Completed: $TODO_TEXT"
+    TWIN_MSG=$(twin_apply "$TWIN_REF" complete "$COMPLETED_AT")
+    tmux display-message "✓ Completed: $TODO_TEXT${TWIN_MSG:+ · $TWIN_MSG}"
 else
-    tmux display-message "↻ Reopened: $TODO_TEXT"
+    TWIN_MSG=$(twin_apply "$TWIN_REF" revert)
+    tmux display-message "↻ Reopened: $TODO_TEXT${TWIN_MSG:+ · $TWIN_MSG}"
 fi

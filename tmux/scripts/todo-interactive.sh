@@ -5,6 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 source "$SCRIPT_DIR/lib-footer.sh"
+source "$SCRIPT_DIR/lib-twin.sh"
 
 DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
@@ -91,10 +92,12 @@ UNDO_ID=""
 UNDO_PREV_DONE=""
 UNDO_PREV_IN_PROGRESS=""
 UNDO_LABEL=""
+UNDO_TWIN=""
 
 snapshot_for_undo() {
     local todo_id="$1" action="$2"
     UNDO_TYPE="$action"
+    UNDO_TWIN=""
     UNDO_ID="$todo_id"
     UNDO_PREV_DONE=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .done' "$TODO_LIST_PATH")
     UNDO_PREV_IN_PROGRESS=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .in_progress // false' "$TODO_LIST_PATH")
@@ -415,6 +418,10 @@ update_todo() {
     local todo_id="$1"
     local action="$2"
     local priority="$3"
+    local ref was_done
+    ref=$(twin_ref "$TODO_LIST_PATH" "$todo_id")
+    was_done=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .done' "$TODO_LIST_PATH")
+    TWIN_MSG=""
 
     case "$action" in
         "toggle")
@@ -551,6 +558,27 @@ update_todo() {
             ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
             ;;
     esac
+
+    [[ -z "$ref" ]] && return 0
+    local done_now stamp
+    case "$action" in
+        complete|revert|toggle)
+            read -r done_now stamp < <(jq -r --arg id "$todo_id" \
+                '.todos[] | select(.id == $id) | "\(.done) \(.completed_at // "")"' "$TODO_LIST_PATH")
+            # toggle's pending -> in_progress step leaves done alone, and the MCP never syncs in_progress
+            [[ "$action" == toggle && "$done_now" == "$was_done" ]] && return 0
+            if [[ "$done_now" == true ]]; then
+                TWIN_MSG=$(twin_apply "$ref" complete "$stamp")
+            else
+                TWIN_MSG=$(twin_apply "$ref" revert)
+            fi
+            ;;
+        priority)
+            [[ "$priority" == default ]] && priority=""
+            TWIN_MSG=$(twin_apply "$ref" priority "$priority")
+            ;;
+        delete) TWIN_MSG=$(twin_apply "$ref" delete) ;;
+    esac
 }
 
 # open a list-scoped note in nvim (title on line 1, body below the marker) so the
@@ -654,9 +682,11 @@ while true; do
             if [[ -z "$NEW_DUE" ]]; then
                 jq --arg id "$TODO_ID" '(.todos[] | select(.id == $id)) |= del(.due_date)' \
                     "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
+                twin_apply "$(twin_ref "$TODO_LIST_PATH" "$TODO_ID")" due "" >/dev/null
             elif [[ "$NEW_DUE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
                 jq --arg id "$TODO_ID" --arg due "$NEW_DUE" '(.todos[] | select(.id == $id)).due_date = $due' \
                     "$TODO_LIST_PATH" > "$TODO_LIST_PATH.tmp" && mv "$TODO_LIST_PATH.tmp" "$TODO_LIST_PATH"
+                twin_apply "$(twin_ref "$TODO_LIST_PATH" "$TODO_ID")" due "$NEW_DUE" >/dev/null
             else
                 echo "Invalid date '$NEW_DUE' - use YYYY-MM-DD" >&2
                 sleep 1
@@ -760,7 +790,7 @@ while true; do
             if [[ -n "$TODO_ID" ]]; then
                 snapshot_for_undo "$TODO_ID" "complete"
                 update_todo "$TODO_ID" "complete"
-                echo "Done: $UNDO_LABEL (u to undo)"
+                echo "Done: $UNDO_LABEL (u to undo)${TWIN_MSG:+ · $TWIN_MSG}"
                 sleep 0.5
             fi
             ;;
@@ -768,7 +798,7 @@ while true; do
             if [[ -n "$TODO_ID" ]]; then
                 snapshot_for_undo "$TODO_ID" "revert"
                 update_todo "$TODO_ID" "revert"
-                echo "Reverted to pending: $UNDO_LABEL (u to undo)"
+                echo "Reverted to pending: $UNDO_LABEL (u to undo)${TWIN_MSG:+ · $TWIN_MSG}"
                 sleep 0.5
             fi
             ;;
@@ -800,7 +830,7 @@ while true; do
                 NEW_PRIORITY=$(select_priority "$CURRENT_PRIORITY" "Set Priority")
                 if [[ -n "$NEW_PRIORITY" ]]; then
                     update_todo "$TODO_ID" "priority" "$NEW_PRIORITY"
-                    echo "Priority set to: $NEW_PRIORITY"
+                    echo "Priority set to: $NEW_PRIORITY${TWIN_MSG:+ · $TWIN_MSG}"
                     sleep 0.5
                 fi
             fi
@@ -869,13 +899,15 @@ while true; do
                     UNDO_TYPE="delete"
                     UNDO_ID="$TODO_ID"
                     UNDO_LABEL="$TODO_TEXT"
+                    UNDO_TWIN=$(twin_ref "$TODO_LIST_PATH" "$TODO_ID")
                     jq --arg id "$TODO_ID" '
                         (.todos[] | select(.id == $id)) as $deleted |
                         .todos |= map(select(.id != $id)) |
                         ._metadata.deleted_todos = ([$deleted] + (._metadata.deleted_todos // []))[0:10] |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                    echo "Deleted (u to undo)"
+                    TWIN_MSG=$(twin_apply "$UNDO_TWIN" delete)
+                    echo "Deleted (u to undo)${TWIN_MSG:+ · $TWIN_MSG}"
                     sleep 0.5
                 fi
             fi
@@ -916,7 +948,8 @@ while true; do
                         ._metadata.deleted_todos = ._metadata.deleted_todos[1:] |
                         ._metadata.updated_at = (now | floor)
                     ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                    echo "Restored: $RESTORED_TEXT"
+                    TWIN_MSG=$(twin_apply "$UNDO_TWIN" restore)
+                    echo "Restored: $RESTORED_TEXT${TWIN_MSG:+ · $TWIN_MSG}"
                 fi
                 UNDO_TYPE=""
                 sleep 0.5
@@ -930,7 +963,18 @@ while true; do
                     ) |
                     ._metadata.updated_at = (now | floor)
                 ' "$TODO_LIST_PATH" > "${TODO_LIST_PATH}.tmp" && mv "${TODO_LIST_PATH}.tmp" "$TODO_LIST_PATH"
-                echo "Undid $UNDO_TYPE: $UNDO_LABEL"
+                TWIN_MSG=""
+                # start/stop never synced the twin, so undoing them must not either
+                if [[ "$UNDO_TYPE" == complete || "$UNDO_TYPE" == revert ]]; then
+                    UNDO_REF=$(twin_ref "$TODO_LIST_PATH" "$UNDO_ID")
+                    if [[ "$UNDO_PREV_DONE" == true ]]; then
+                        TWIN_MSG=$(twin_apply "$UNDO_REF" complete \
+                            "$(jq -r --arg id "$UNDO_ID" '.todos[] | select(.id == $id) | .completed_at // ""' "$TODO_LIST_PATH")")
+                    else
+                        TWIN_MSG=$(twin_apply "$UNDO_REF" revert)
+                    fi
+                fi
+                echo "Undid $UNDO_TYPE: $UNDO_LABEL${TWIN_MSG:+ · $TWIN_MSG}"
                 UNDO_TYPE=""
                 sleep 0.5
             fi
@@ -1361,7 +1405,7 @@ while true; do
                 SEARCH_ID=$(echo "$SEARCH_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '\[[^]]+\]$' | tr -d '[]')
                 if [[ -n "$SEARCH_ID" ]]; then
                     update_todo "$SEARCH_ID" "toggle"
-                    echo "Toggled: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")"
+                    echo "Toggled: $(jq -r --arg id "$SEARCH_ID" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")${TWIN_MSG:+ · $TWIN_MSG}"
                     sleep 0.5
                 fi
             fi
