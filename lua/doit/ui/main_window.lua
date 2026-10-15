@@ -289,6 +289,15 @@ local function divider_width()
 	return 50
 end
 
+local ORIGIN_LABELS = { mine = "Mine", claude = "Claude" }
+
+local function origin_banner(block, count)
+	local label = ORIGIN_LABELS[block]
+	local tail = " " .. count
+	local fill = math.max(3, divider_width() - (#label + 4) - #tail)
+	return "── " .. label .. " " .. string.rep("─", fill) .. tail
+end
+
 -- Single source of truth for the rendered layout. Both render_todos (draws +
 -- highlights) and todo_actions.get_real_todo_index (cursor -> todo) consume this,
 -- so group separators never desync the cursor mapping.
@@ -357,8 +366,7 @@ function M.build_render_rows()
 		end
 	end
 
-	local prev_group = nil
-	local done_started = false
+	local heads, counts = {}, { mine = 0, claude = 0 }
 	local root = nil
 	for i, todo in ipairs(state.todos) do
 		if (todo.depth or 0) == 0 then
@@ -371,13 +379,23 @@ function M.build_render_rows()
 		if head.done and not show_completed then
 			head = todo
 		end
-		if head.done and not show_completed then
-			goto continue
+		if not (head.done and not show_completed) and tags_util.has_tag(todo.text, state.active_filter) then
+			heads[i] = head
+			if not head.done and not todo.done then
+				local block = sorting.origin(head)
+				counts[block] = counts[block] + 1
+			end
 		end
+	end
+	-- the split shows only when both sides have open items, so an all-claude
+	-- project list renders exactly as it did before origins existed
+	local banners = counts.mine > 0 and counts.claude > 0
 
-		local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
-
-		if show_by_tag then
+	local prev_group, prev_block = nil, nil
+	local done_started = false
+	for i, todo in ipairs(state.todos) do
+		local head = heads[i]
+		if head then
 			-- group separators (mirror tmux): blank line between priority groups,
 			-- blank + divider + blank before the completed block
 			if head.done then
@@ -391,6 +409,15 @@ function M.build_render_rows()
 					push("")
 				end
 			else
+				local block = sorting.origin(head)
+				if banners and block ~= prev_block then
+					if prev_block then
+						push("")
+					end
+					push(origin_banner(block, counts[block]), { kind = "origin_header" })
+					prev_block = block
+					prev_group = nil
+				end
 				local section = head.in_progress and "ip" or "pd"
 				local prio = todo_priority_name(head) or "default"
 				if sorting.sequenced(head) then
@@ -433,7 +460,6 @@ function M.build_render_rows()
 				end
 			end
 		end
-		::continue::
 	end
 	if not notes_emitted then
 		emit_notes_section()
@@ -488,7 +514,7 @@ function M.render_todos()
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "WarningMsg", line_nr, 0, -1)
 		elseif row.kind == "divider" then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "DoItDone", line_nr, 0, -1)
-		elseif row.kind == "priority_header" or row.kind == "note_header" then
+		elseif row.kind == "priority_header" or row.kind == "note_header" or row.kind == "origin_header" then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Title", line_nr, 0, -1)
 		elseif row.kind == "note_empty" then
 			vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Comment", line_nr, 0, -1)

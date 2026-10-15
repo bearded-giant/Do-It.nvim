@@ -94,6 +94,9 @@ assert.ok(d.description.startsWith(`from: proj #2 (id ${p.id})\n\ndo:\nlog in on
 assert.equal(d.priorities, "urgent");
 assert.equal(d.due_date, "2030-01-02");
 assert.ok(!d.text.includes("dep on"), "project deps are meaningless in daily");
+// the views split Mine from Claude on this, and both twins are claude-written
+assert.equal(p.source, "mcp");
+assert.equal(d.source, "mcp");
 
 // claude: work cannot be owed
 const rejected = await callTool("add_todo", { list: "proj", text: "claude: do it", owe: true }).catch(e => String(e));
@@ -102,6 +105,7 @@ assert.match(String(rejected), /drop the leading 'claude:'/);
 // owe on daily itself is a plain daily item
 await callTool("add_todo", { list: "daily", text: "buy milk", owe: true });
 assert.equal(byText("daily", "buy milk").twin, undefined);
+assert.equal(byText("daily", "buy milk").source, "mcp");
 
 // complete and revert follow across files
 assert.match(await callTool("complete_todo", { id: d.id }), /Twin in "proj" completed/);

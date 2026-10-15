@@ -1117,13 +1117,14 @@ function M.reorder_todo(win_id, on_render)
 	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
 	local reorder_key = resolve_key("reorder_todo")
 
-	-- group key mirrors the rendered grouping: in-progress flag + priority name.
+	-- group key mirrors the rendered grouping: origin + in-progress flag + priority name.
 	-- reorder only swaps within a group so it matches "set rank within a grouping".
 	local function group_key(todo)
+		local origin = sorting.origin(todo)
 		if sorting.sequenced(todo) then
-			return "sequence"
+			return origin .. ":sequence"
 		end
-		return tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
+		return origin .. ":" .. tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
 	end
 
 	-- passes the active tag filter (mirrors resolve_at_line)

@@ -18,7 +18,8 @@ Table of Contents                                          *doit-contents*
   - Todo Lists                                                  |doit-lists|
   - Nested Todos                                              |doit-nesting|
   - Sequence                                                 |doit-sequence|
-  - Import/Export                                             |doit-import|
+  - Mine and Claude                                    |doit-origin-blocks|
+  - Import/Export                                            |doit-import|
   - Project Notes                                              |doit-notes|
   - Tmux Integration                                       |doit-tmux-intro|
 3. Colors                                                      |doit-colors|
@@ -539,6 +540,21 @@ The rank in an MCP-created title (`claude: [gate] 41. ...`) is a fixed
 handle that deps point at, not the work order. Sequence is shared with the
 tmux UI (|doit-tmux-interactive|) and the MCP server (`sequence_todos`, and
 `sequence` on add_todo / update_todo).
+
+MINE AND CLAUDE                                        *doit-origin-blocks*
+
+When a list holds both your own to-dos and ones the MCP server wrote, it
+splits into two blocks: `── Mine ──── N` on top, then `── Claude ──── N`,
+each with its own in-progress items and priority sections, and N counting
+the block's open to-dos. Notes and completed to-dos stay shared below both.
+A list with open items on one side only shows no banners at all.
+
+A to-do counts as Claude's when it carries `source: "mcp"` (every MCP
+add_todo, owed twins included) or, for older items, a `twin` link or text
+that starts with `claude:`, a `[type]` tag, or an `N.` rank. Anything typed
+in nvim, tmux, or imported from a vault note lands in Mine. A subtree goes
+with its top-level item, and reordering (`r`) never crosses the boundary.
+The tmux UI (|doit-tmux-interactive|) splits the same way.
 
 IMPORT/EXPORT                                                 *doit-import*
 

@@ -105,6 +105,8 @@ Navigation~
     j/k or arrows      Move up/down in list
     K/J                Reorder todo (move up/down; a parent moves with its
                        whole subtree)
+    [ / ]              Jump to the next / previous section header or
+                       Mine / Claude banner
 
 Nested Todos~
     Children created in nvim (`a` on the parent) or through the MCP server
@@ -121,6 +123,15 @@ Sequence~
     its position after the priority glyph. S sets or clears a position, and a
     taken position pushes the colliding todos down one. K/J inside the
     section swap positions. See |doit-sequence|.
+
+Mine and Claude~
+    When open todos come from both you and the MCP server, the list splits
+    into a Mine block above a Claude block. Each block opens with a banner
+    (`── Mine ──── N`, `── Claude ──── N`, N counting its open todos) and
+    holds its own in-progress rows and priority groups. A subtree follows its
+    top-level todo. Notes and completed todos stay below both blocks. With
+    open todos on one side only, no banners show. `[` / `]` stop on the
+    banners, and K/J never swap across them. See |doit-origin-blocks|.
 
 Status Changes~
     s                  Start (mark in-progress)

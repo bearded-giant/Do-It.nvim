@@ -753,6 +753,7 @@ server.tool(
             in_progress: start || false,
             order_index: getMaxOrder(data.todos || []) + 1,
             created_at: Math.floor(Date.now() / 1000),
+            source: "mcp",
         };
         newTodo.description = stampDescription(description || "");
         if (priority) newTodo.priorities = priority;
@@ -778,6 +779,7 @@ server.tool(
                 in_progress: false,
                 order_index: getMaxOrder(owed.data.todos || []) + 1,
                 created_at: newTodo.created_at,
+                source: "mcp",
                 description: stampDescription(`from: ${name} #${rank} (id ${id})${extra}`),
                 twin: { list: name, id },
             };

@@ -3,7 +3,8 @@
 # Called from todo-interactive.sh via a `transform` bind for K/J reorder.
 # A Sequence-section row swaps `sequence` with the nearest sequenced SIBLING
 # (crossing priority); any other row swaps order_index with the nearest sibling
-# of the same in_progress flag and priority. Then prints fzf actions:
+# of the same in_progress flag and priority. Either way the sibling must share the
+# row's Mine / Claude origin, since origin sorts first. Then prints fzf actions:
 # reload(format)+pos(new line of todo). Siblings only: a child rides with its
 # parent in the tree order, so swapping with another parent's child moves nothing
 # and swapping two siblings moves their whole subtrees.
@@ -28,6 +29,11 @@ if [[ -n "$TODO_ID" && "$TODO_ID" != note_* ]]; then
     if [[ -n "$OP" ]]; then
         jq --arg id "$TODO_ID" "
             def seqd: (.sequence | type) == \"number\" and (.done | not) and (.in_progress | not);
+            def origin:
+                if (.source | type) == \"string\" and .source != \"\" then (if .source == \"mcp\" then \"claude\" else \"mine\" end)
+                elif (.twin | type) == \"object\" then \"claude\"
+                elif ((.text // \"\") | sub(\"^[ \\\\t\\\\n\\\\x0b\\\\f\\\\r]+\"; \"\") | test(\"^(claude:|\\\\[[^\\\\]\\\\[]+\\\\]|[0-9]+[a-z]*\\\\.[ \\\\t\\\\n\\\\x0b\\\\f\\\\r])\")) then \"claude\"
+                else \"mine\" end;
             (.todos[] | select(.id == \$id)) as \$me |
             (\$me | seqd) as \$mseq |
             (if \$mseq then \"sequence\" else \"order_index\" end) as \$f |
@@ -36,6 +42,7 @@ if [[ -n "$TODO_ID" && "$TODO_ID" != note_* ]]; then
                 .done == false
                 and ((.parent_id // \"\") == (\$me.parent_id // \"\"))
                 and (seqd == \$mseq)
+                and (origin == (\$me | origin))
                 and (\$mseq or (
                     ((.in_progress // false) == (\$me.in_progress // false))
                     and ((.priorities // \"\") == (\$me.priorities // \"\"))))

@@ -122,24 +122,32 @@ export DUE_JQ
 
 # Tree order shared by the row pipelines, mirroring state/sorting.lua's
 # structure_aware(): roots sorted by the caller's key, a child rides with its
-# parent (siblings by status, priority, order_index), a child whose parent is
-# missing is a root, and a parent cycle is appended so nothing disappears.
+# parent (siblings by status, origin, priority, order_index), a child whose
+# parent is missing is a root, and a parent cycle is appended so nothing
+# disappears.
 # Every row carries depth plus its ROOT's bucket (root_ip / root_done /
-# root_prio) so the three sections split by subtree, never mid-subtree.
+# root_prio / root_origin) so sections and the Mine / Claude blocks split by
+# subtree, never mid-subtree.
 NEST_JQ='
 def prio_rank: if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end;
 def seqd: (.sequence | type) == "number" and (.done | not) and (.in_progress | not);
 def seq_key: if seqd then [0, .sequence] else [1, 0] end;
+def origin:
+    if (.source | type) == "string" and .source != "" then (if .source == "mcp" then "claude" else "mine" end)
+    elif (.twin | type) == "object" then "claude"
+    elif ((.text // "") | sub("^[ \\t\\n\\x0b\\f\\r]+"; "") | test("^(claude:|\\[[^\\]\\[]+\\]|[0-9]+[a-z]*\\.[ \\t\\n\\x0b\\f\\r])")) then "claude"
+    else "mine" end;
+def origin_rank: if (.done | not) and origin == "claude" then 1 else 0 end;
 def tag_ok($tagf): $tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null);
 def rows(rootkey):
     . as $all
     | (map(select(.id != null) | {key: .id, value: true}) | from_entries) as $ids
     | def kids($pid; $d; $root):
         [$all[] | select(.parent_id == $pid and .id != $pid)]
-        | sort_by((if .done then 1 else 0 end), (if .in_progress then 0 else 1 end), seq_key, prio_rank, .order_index)
+        | sort_by((if .done then 1 else 0 end), origin_rank, (if .in_progress then 0 else 1 end), seq_key, prio_rank, .order_index)
         | map(. as $k | [$k + {depth: $d} + $root] + kids($k.id; $d + 1; $root)) | add // [];
     def bucket: {root_ip: (.in_progress == true), root_done: (.done == true),
-        root_prio: (if seqd then "sequence" else (.priorities // "") end)};
+        root_prio: (if seqd then "sequence" else (.priorities // "") end), root_origin: origin};
     ([.[] | select(.parent_id == null or $ids[.parent_id] == null or .parent_id == .id)]
         | sort_by(rootkey)
         | map(. as $r | ($r | bucket) as $b | [$r + {depth: 0} + $b] + kids($r.id; 1; $b))
@@ -241,78 +249,100 @@ format_todos() {
         (if .due_date then (.due_date | due_label) else "" end) as $due |
         "\(.id)|\(if .in_progress then "▶" elif .done then "✓" else " " end)|\(.priorities // "")|\($first_line)|\($multiline)|\($obs)|\($due)|\(.depth)|\(.root_prio)"'
 
-    # First print in-progress todos
-    while IFS='|' read -r id status priority text multiline obs due depth gprio; do
-        # blank line between distinct priority groups
-        local group="${gprio:-default}"
-        [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
-        prev_group="$group"
-        any_rows=1
-        local ind tw
-        ind=$(printf '%*s' $(( depth * 2 )) '')
-        tw=$(( text_w - depth * 2 ))
-        # Add ... for multi-line items
-        suffix=""
-        [[ "$multiline" == "true" ]] && suffix=" ..."
-        if [[ -n "$due" ]]; then
-            # overdue shouts, everything else stays quiet
-            if [[ "$due" == overdue* ]]; then
-                suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
-            else
-                suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
-            fi
-        fi
-        obs_icon=""
-        [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
-        # Append ID at end (dimmed) for reliable extraction
-        if [[ "$status" == "✓" ]]; then
-            printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        else case "$priority" in
-            "critical")  printf "%s%s%s%s! %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s%s> %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s%s* %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-        esac; fi
-    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
-        map(select(tag_ok($tagf))) | rows(seq_key, prio_rank, .order_index) |
-        .[] | select(.root_ip) |'"$row_fields" "$TODO_LIST_PATH")
+    local n_mine n_claude banners="" blk label count fill
+    read -r n_mine n_claude < <(jq -r --arg tagf "$TAG_FILTER" "$NEST_JQ"'.todos |
+        map(select(tag_ok($tagf))) | rows(.order_index) |
+        map(select((.root_done | not) and (.done | not)) | .root_origin) |
+        "\(map(select(. == "mine")) | length) \(map(select(. == "claude")) | length)"' "$TODO_LIST_PATH")
+    (( n_mine > 0 && n_claude > 0 )) && banners=1
 
-    # Then print not started todos, grouped under named priority headers
-    while IFS='|' read -r id status priority text multiline obs due depth gprio; do
-        local group="${gprio:-default}"
-        if [[ "$group" != "$prev_pd_group" ]]; then
-            [[ -n "$any_rows" ]] && echo ""
-            printf "%s%s%s\n" "$COLOR_HEADER" "$(priority_header_label "$gprio")" "$COLOR_RESET"
-            prev_pd_group="$group"
+    for blk in mine claude; do
+        label="Mine" count="$n_mine"
+        [[ "$blk" == "claude" ]] && label="Claude" count="$n_claude"
+        (( count == 0 )) && continue
+        prev_group=""
+        prev_pd_group=""
+        any_rows=""
+        if [[ -n "$banners" ]]; then
+            [[ "$blk" == "claude" ]] && echo ""
+            fill=$(( text_w + 24 - ${#label} - 4 - ${#count} - 1 ))
+            (( fill < 3 )) && fill=3
+            printf "%s── %s %s %s%s\n" "$COLOR_HEADER" "$label" "$(printf '─%.0s' $(seq 1 $fill))" "$count" "$COLOR_RESET"
         fi
-        prev_group="$group"
-        any_rows=1
-        local ind tw
-        ind=$(printf '%*s' $(( depth * 2 )) '')
-        tw=$(( text_w - depth * 2 ))
-        suffix=""
-        [[ "$multiline" == "true" ]] && suffix=" ..."
-        if [[ -n "$due" ]]; then
-            # overdue shouts, everything else stays quiet
-            if [[ "$due" == overdue* ]]; then
-                suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
-            else
-                suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
+
+        # First print in-progress todos
+        while IFS='|' read -r id status priority text multiline obs due depth gprio; do
+            # blank line between distinct priority groups
+            local group="${gprio:-default}"
+            [[ -n "$prev_group" && "$group" != "$prev_group" ]] && echo ""
+            prev_group="$group"
+            any_rows=1
+            local ind tw
+            ind=$(printf '%*s' $(( depth * 2 )) '')
+            tw=$(( text_w - depth * 2 ))
+            # Add ... for multi-line items
+            suffix=""
+            [[ "$multiline" == "true" ]] && suffix=" ..."
+            if [[ -n "$due" ]]; then
+                # overdue shouts, everything else stays quiet
+                if [[ "$due" == overdue* ]]; then
+                    suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
+                else
+                    suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
+                fi
             fi
-        fi
-        obs_icon=""
-        [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
-        if [[ "$status" == "✓" ]]; then
-            printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        else case "$priority" in
-            "critical")  printf "%s%s%s! %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_RED" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "urgent")    printf "%s%s%s> %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            "important") printf "%s%s%s* %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-            *)           printf "%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
-        esac; fi
-    done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
-        map(select(tag_ok($tagf))) | rows(seq_key, prio_rank, .order_index) |
-        .[] | select((.root_done | not) and (.root_ip | not)) |'"$row_fields" "$TODO_LIST_PATH")
+            obs_icon=""
+            [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
+            # Append ID at end (dimmed) for reliable extraction
+            if [[ "$status" == "✓" ]]; then
+                printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
+            else case "$priority" in
+                "critical")  printf "%s%s%s%s! %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_RED" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                "urgent")    printf "%s%s%s%s> %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_YELLOW" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                "important") printf "%s%s%s%s* %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$COLOR_BLUE" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                *)           printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_GREEN" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            esac; fi
+        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg blk "$blk" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
+            map(select(tag_ok($tagf))) | rows(origin_rank, seq_key, prio_rank, .order_index) |
+            .[] | select(.root_ip and .root_origin == $blk) |'"$row_fields" "$TODO_LIST_PATH")
+
+        # Then print not started todos, grouped under named priority headers
+        while IFS='|' read -r id status priority text multiline obs due depth gprio; do
+            local group="${gprio:-default}"
+            if [[ "$group" != "$prev_pd_group" ]]; then
+                [[ -n "$any_rows" ]] && echo ""
+                printf "%s%s%s\n" "$COLOR_HEADER" "$(priority_header_label "$gprio")" "$COLOR_RESET"
+                prev_pd_group="$group"
+            fi
+            prev_group="$group"
+            any_rows=1
+            local ind tw
+            ind=$(printf '%*s' $(( depth * 2 )) '')
+            tw=$(( text_w - depth * 2 ))
+            suffix=""
+            [[ "$multiline" == "true" ]] && suffix=" ..."
+            if [[ -n "$due" ]]; then
+                # overdue shouts, everything else stays quiet
+                if [[ "$due" == overdue* ]]; then
+                    suffix="$suffix ${COLOR_RED}[$due]${COLOR_RESET}"
+                else
+                    suffix="$suffix ${COLOR_DIM}[$due]${COLOR_RESET}"
+                fi
+            fi
+            obs_icon=""
+            [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
+            if [[ "$status" == "✓" ]]; then
+                printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
+            else case "$priority" in
+                "critical")  printf "%s%s%s! %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_RED" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                "urgent")    printf "%s%s%s> %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_YELLOW" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                "important") printf "%s%s%s* %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_BLUE" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+                *)           printf "%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET" ;;
+            esac; fi
+        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg blk "$blk" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
+            map(select(tag_ok($tagf))) | rows(origin_rank, seq_key, prio_rank, .order_index) |
+            .[] | select((.root_done | not) and (.root_ip | not) and .root_origin == $blk) |'"$row_fields" "$TODO_LIST_PATH")
+    done
 
     # Notes section (always shown) between pending and completed
     echo ""

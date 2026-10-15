@@ -32,6 +32,21 @@ function M.sequenced(todo)
     return type(todo.sequence) == "number" and not todo.done and not todo.in_progress
 end
 
+-- unstamped items fall back to the text shape only the MCP writes; tmux NEST_JQ mirrors this rule
+function M.origin(todo)
+    if type(todo.source) == "string" and todo.source ~= "" then
+        return todo.source == "mcp" and "claude" or "mine"
+    end
+    if type(todo.twin) == "table" then
+        return "claude"
+    end
+    local s = (todo.text or ""):gsub("^%s+", "")
+    if s:match("^claude:") or s:match("^%[[^%[%]]+%]") or s:match("^%d+%l*%.%s") then
+        return "claude"
+    end
+    return "mine"
+end
+
 -- Put `target` at run-queue position `pos`; nil or < 1 clears it. Only the
 -- colliding run (pos, pos+1, ...) shifts down, so the other labels stay put.
 function M.set_sequence(todos, target, pos)
@@ -58,11 +73,17 @@ function M.set_sequence(todos, target, pos)
 end
 
 -- Comparator shared by sort_todos and get_filtered_todos so ordering never drifts
--- between them: done last, in_progress first, sequenced by sequence, priority
--- rank desc, order_index, due date, creation time.
+-- between them: done last, mine before claude, in_progress first, sequenced by
+-- sequence, priority rank desc, order_index, due date, creation time.
 local function todo_less_than(a, b)
     if a.done ~= b.done then
         return not a.done
+    end
+    if not a.done then
+        local a_mine, b_mine = M.origin(a) == "mine", M.origin(b) == "mine"
+        if a_mine ~= b_mine then
+            return a_mine
+        end
     end
     if a.in_progress ~= b.in_progress then
         return a.in_progress
