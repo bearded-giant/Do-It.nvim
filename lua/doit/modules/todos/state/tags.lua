@@ -12,7 +12,10 @@ M.PATTERN = "#([%w_%-/]+)"
 function M.parse(text)
     local found = {}
     for tag in (text or ""):gmatch(M.PATTERN) do
-        table.insert(found, tag)
+        -- all-digit tokens are rank refs ("owed in daily #73", "dep on #12"), not tags
+        if not tag:match("^%d+$") then
+            table.insert(found, tag)
+        end
     end
     return found
 end

@@ -191,6 +191,7 @@ pick_tag() {
     local rows
     rows=$(jq -r '
         [.todos[] | select(.done != true) | .text | scan("#([\\w/-]+)")] | flatten |
+        map(select(test("^[0-9]+$") | not)) |
         group_by(.) | map({name: .[0], count: length}) |
         sort_by(-.count, .name) | .[] | "\(.name)\t\(.count)"
     ' "$TODO_LIST_PATH" 2>/dev/null)

@@ -191,8 +191,9 @@ function removeTodo(data, id) {
 // #labels-web. Charset mirrors state/tags.lua's [%w_%-/]+.
 const TAG_PATTERN = /#([\w\-/]+)/g;
 
+// all-digit tokens are rank refs ("owed in daily #73", "dep on #12"), not tags
 function parseTags(text) {
-    return [...String(text || "").matchAll(TAG_PATTERN)].map(m => m[1]);
+    return [...String(text || "").matchAll(TAG_PATTERN)].map(m => m[1]).filter(t => !/^\d+$/.test(t));
 }
 
 function hasTag(text, tag) {
@@ -502,7 +503,7 @@ List notes: each list also has standalone scratch notes (title + body), parallel
 - "rewrite the X note" / "rename the note" → update_note (mode="replace" default)
 - "delete the X note" → delete_note with query
 
-Tags: written inline in the todo text as #tag — there is no tag field. Matching is exact, so #labels never matches #labels-web, and a tag may contain letters, digits, _, - and /.
+Tags: written inline in the todo text as #tag — there is no tag field. Matching is exact, so #labels never matches #labels-web, and a tag may contain letters, digits, _, - and /. An all-digit token like #12 is a rank reference, not a tag.
 - "what tags are on this list" → list_tags (name + how many items carry it)
 - "show the #api todos" → list_todos with tag="api" (omit the '#')
 

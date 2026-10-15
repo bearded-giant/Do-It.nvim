@@ -140,6 +140,9 @@ assert.equal(byText("proj", "ping sam").done, true);
 assert.match(await callTool("revert_todo", { id: byText("proj", "ping sam").id }), /no longer in "daily"/);
 assert.match(lone, /owed in daily #\d+: ping sam/);
 
+// "#73" in "owed in daily #73" is a rank ref, not a tag
+assert.doesNotMatch(await callTool("get_todo", { id: byText("proj", "ping sam").id }), /^Tags:/m);
+
 // daily holds every owed twin, so it can't go away or change name
 assert.match(await callTool("delete_list", { name: "daily" }), /permanent/);
 assert.match(await callTool("rename_list", { old_name: "daily", new_name: "inbox" }), /permanent/);

@@ -90,6 +90,19 @@ describe("tags", function()
 		assert.are.equal("ship #labels-web page", doit_state.todos[2].text)
 	end)
 
+	it("should not count all-digit rank refs as tags", function()
+		doit_state.todos = {
+			{ text = "[gate] 1. owed in daily #73: merge it #ops (dep on #12)", done = false },
+		}
+
+		local names = {}
+		for _, tag in ipairs(doit_state.get_all_tags()) do
+			table.insert(names, tag.name)
+		end
+
+		assert.are.same({ "ops" }, names)
+	end)
+
 	it("should support dashes, underscores and slashes in tags", function()
 		doit_state.todos = {
 			{ text = "audit #api/v2 route", done = false },
