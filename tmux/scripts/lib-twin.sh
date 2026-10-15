@@ -10,7 +10,7 @@ twin_ref() {
         | select(.list and .id) | "\(.list)\t\(.id)"' "$1" 2>/dev/null
 }
 
-# twin_apply <twin_ref> <op> [arg]; op: complete|revert|delete|restore|priority|due
+# twin_apply <twin_ref> <op> [arg]; op: complete|revert|delete|restore|priority|due|relink
 # prints one status line, nothing when there is no twin
 twin_apply() {
     local tlist tid op="$2" arg="${3:-}"
@@ -29,6 +29,7 @@ twin_apply() {
         revert)   filter='(.todos[] | select(.id == $id)) |= (.done = false | .in_progress = false | del(.completed_at))' ;;
         priority) filter='(.todos[] | select(.id == $id)) |= (if $arg == "" then del(.priorities) else .priorities = $arg end)' ;;
         due)      filter='(.todos[] | select(.id == $id)) |= (if $arg == "" then del(.due_date) else .due_date = $arg end)' ;;
+        relink)   filter='(.todos[] | select(.id == $id)).twin.list = $arg' ;;
         # no promoteChildren like the MCP: tmux's own delete doesn't promote and owed twins are top-level
         delete)   filter='(.todos[] | select(.id == $id)) as $d | .todos |= map(select(.id != $id))
                       | ._metadata.deleted_todos = ([$d] + (._metadata.deleted_todos // []))[0:10]' ;;

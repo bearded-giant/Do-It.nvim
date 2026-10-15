@@ -85,6 +85,7 @@ function M.setup(state)
         -- Set due date
         state.todos[index].due_date = date_string
         state.save_todos()
+        require("doit.modules.todos.state.twin").sync(state.todos[index], "due", date_string)
         
         return true, "Due date set to " .. date_string
     end
@@ -98,6 +99,7 @@ function M.setup(state)
         if state.todos[index].due_date then
             state.todos[index].due_date = nil
             state.save_todos()
+            require("doit.modules.todos.state.twin").sync(state.todos[index], "due", nil)
             return true, "Due date removed"
         else
             return false, "No due date set"

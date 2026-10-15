@@ -5,6 +5,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-twin.sh"
 
 if ! command -v jq &> /dev/null; then
     echo "Error: jq is required"
@@ -179,6 +180,12 @@ EOF
 rename_list() {
     local old_name="$1"
 
+    if [[ "$old_name" == daily ]]; then
+        echo "${COLOR_RED}daily is permanent; it can't be renamed.${COLOR_RESET}"
+        sleep 1
+        return
+    fi
+
     if [[ "$old_name" == "$CURRENT_LIST" ]]; then
         echo "${COLOR_YELLOW}Warning: Renaming active list${COLOR_RESET}"
     fi
@@ -201,6 +208,12 @@ rename_list() {
 
     mv "$LISTS_DIR/${old_name}.json" "$LISTS_DIR/${SAFE_NAME}.json"
     relink_sessions_for_list "$old_name" "$SAFE_NAME"
+    # a twin pair can sit inside this one list, so refs to the old name read as the new one
+    local ref
+    while IFS= read -r ref; do
+        twin_apply "$ref" relink "$SAFE_NAME" >/dev/null
+    done < <(jq -r --arg old "$old_name" --arg new "$SAFE_NAME" '.todos[] | .twin // empty | select(.list and .id)
+        | "\(if .list == $old then $new else .list end)\t\(.id)"' "$LISTS_DIR/${SAFE_NAME}.json")
 
     # update session if this was active list
     if [[ "$old_name" == "$CURRENT_LIST" ]]; then
@@ -213,6 +226,12 @@ rename_list() {
 
 delete_list() {
     local list_name="$1"
+
+    if [[ "$list_name" == daily ]]; then
+        echo "${COLOR_RED}daily is permanent; it can't be deleted.${COLOR_RESET}"
+        sleep 1
+        return
+    fi
 
     if [[ "$list_name" == "$CURRENT_LIST" ]]; then
         echo "${COLOR_RED}Cannot delete active list. Switch to another list first.${COLOR_RESET}"

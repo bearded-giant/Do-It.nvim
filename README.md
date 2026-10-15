@@ -499,10 +499,10 @@ project list as `[type] N. owed in daily #M: ...` and a twin on `daily` as
 description line pointing at the other, so `daily` collects what you owe across
 every project and each project list still shows it. `complete_todo`,
 `revert_todo`, `delete_todo`, `move_todo`, `rename_list`, and `update_todo`'s
-done / priority / due keep both twins in step. The tmux UI does the same for
-done, priority, due, and delete (undo brings the twin back too). Checking one
-off in the nvim UI only touches that one item, so the other stays open until a
-model session closes it.
+done / priority / due keep both twins in step. The tmux and nvim UIs do the
+same for done, priority, due, delete (undo brings the twin back too), move, and
+list rename. Since `daily` holds every twin, none of the three will delete or
+rename it.
 
 Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
 

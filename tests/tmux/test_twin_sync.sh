@@ -82,6 +82,11 @@ assert_eq '{"list":"proj","id":"P1"}' "$(field "$DAILY" D1 '.twin')"
 it "restore drops it from deleted_todos and keeps the rest"
 assert_eq '["OLD"]' "$(jq -c '[._metadata.deleted_todos[].id]' "$DAILY")"
 
+twin_apply "daily	D1" relink other >/dev/null
+it "relink points the twin at the new list"
+assert_eq '{"list":"other","id":"P1"}' "$(field "$DAILY" D1 '.twin')"
+twin_apply "daily	D1" relink proj >/dev/null
+
 it "restore of an id not in deleted_todos is a no-op with a message"
 assert_eq 'twin D1 no longer in "daily"' "$(twin_apply "daily	D1" restore)"
 
@@ -223,5 +228,39 @@ run_loop 'x\nmerge it [P1]' 'u\nmerge it [P1]'
 it "u after x reverts the twin"
 assert_eq '[false,null]' "$(field "$DAILY" D1 '[.done, .completed_at]')"
 assert_contains "$(cat "$TEST_TMPDIR/loop.out")" 'twin in "daily": revert'
+
+reset_fixture
+echo '{"todos":[],"_metadata":{}}' > "$LISTS_DIR/other.json"
+run_loop 'm\nmerge it [P1]' 'other'
+it "m moves the item and relinks its twin"
+assert_eq '1 {"list":"other","id":"P1"}' "$(jq '.todos | length' "$LISTS_DIR/other.json") $(field "$DAILY" D1 '.twin')"
+assert_contains "$(cat "$TEST_TMPDIR/loop.out")" 'twin in "daily": relink'
+
+describe "todo-list-manager.sh rename_list"
+
+eval "$(sed -n '/^rename_list() {/,/^}/p' "$SCRIPTS/todo-list-manager.sh")"
+CURRENT_LIST=daily
+
+reset_fixture
+rename_list proj <<< "proj2" > /dev/null
+it "rename relinks twins in other lists"
+assert_eq '{"list":"proj2","id":"P1"}' "$(field "$DAILY" D1 '.twin')"
+
+reset_fixture
+jq '.todos += [{"id":"P3","text":"a","done":false,"twin":{"list":"proj","id":"P4"}},
+               {"id":"P4","text":"b","done":false,"twin":{"list":"proj","id":"P3"}}]' "$PROJ" > "$PROJ.tmp" && mv "$PROJ.tmp" "$PROJ"
+rename_list proj <<< "proj3" > /dev/null
+it "rename relinks a pair that lives inside the renamed list"
+assert_eq '["proj3","proj3"]' "$(jq -c '[.todos[] | select(.id == "P3" or .id == "P4") | .twin.list]' "$LISTS_DIR/proj3.json")"
+
+describe "todo-list-manager.sh: daily is permanent"
+
+eval "$(sed -n '/^delete_list() {/,/^}/p' "$SCRIPTS/todo-list-manager.sh")"
+CURRENT_LIST=proj
+it "rename refuses daily"
+assert_contains "$(rename_list daily <<< "inbox")" "daily is permanent"
+it "delete refuses daily"
+assert_contains "$(delete_list daily <<< "yes")" "daily is permanent"
+assert_eq "yes" "$([[ -f "$DAILY" ]] && echo yes)" "daily.json is gone"
 
 report

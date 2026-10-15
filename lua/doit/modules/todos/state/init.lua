@@ -66,6 +66,9 @@ function M.setup(parent_module)
     M.rename_list = storage.rename_list
     M.get_available_lists = storage.get_available_lists
     M.move_todo_to_list = storage.move_todo_to_list
+    M.get_list_path = storage.get_list_path
+
+    require("doit.modules.todos.state.twin").setup(M)
 
     -- List-scoped notes
     M.get_notes = storage.get_notes

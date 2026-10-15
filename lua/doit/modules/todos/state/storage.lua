@@ -3,6 +3,9 @@ local vim = vim
 
 local due_dates = require("doit.modules.todos.state.due_dates")
 
+-- the owed-items inbox; the MCP server and tmux refuse to delete or rename it too
+local PERMANENT_LIST = "daily"
+
 local storage = {
     -- Pre-define the functions to prevent nil value errors
     load_from_disk = function() end,
@@ -14,7 +17,8 @@ local storage = {
     get_available_lists = function() return {} end,
     import_todos = function() return true, "Not implemented" end,
     export_todos = function() return true, "Not implemented" end,
-    backup_all_lists = function() return true, "Not implemented" end
+    backup_all_lists = function() return true, "Not implemented" end,
+    PERMANENT_LIST = PERMANENT_LIST,
 }
 
 -- Transient keys (`_score`, `_priority_weight`) are computed per-render and must never
@@ -195,6 +199,7 @@ function storage.setup(M)
 
         return config.lists_dir .. "/" .. list_name .. ".json"
     end
+    storage.get_list_path = get_list_path
     
     -- Create a new todo list
     storage.create_list = function(list_name, initial_todos, metadata)
@@ -378,6 +383,9 @@ function storage.setup(M)
         if not list_name or list_name == "" then
             return false, "Invalid list name"
         end
+        if list_name == PERMANENT_LIST then
+            return false, PERMANENT_LIST .. " is permanent; it can't be deleted"
+        end
         
         local list_path = get_list_path(list_name)
         
@@ -413,6 +421,9 @@ function storage.setup(M)
         if not old_name or old_name == "" or not new_name or new_name == "" then
             return false, "Invalid list name"
         end
+        if old_name == PERMANENT_LIST then
+            return false, PERMANENT_LIST .. " is permanent; it can't be renamed"
+        end
         
         local old_path = get_list_path(old_name)
         local new_path = get_list_path(new_name)
@@ -444,6 +455,8 @@ function storage.setup(M)
             local session = require("doit.modules.todos.state.session")
             session.save_session(new_name)
         end
+
+        require("doit.modules.todos.state.twin").relink_list(new_name)
         
         return true, "Renamed list '" .. old_name .. "' to '" .. new_name .. "'"
     end
@@ -883,6 +896,7 @@ function storage.setup(M)
         if M.todo_lists.metadata then
             M.todo_lists.metadata.updated_at = os.time()
         end
+        require("doit.modules.todos.state.twin").sync(todo_to_move, "relink", destination_list_name)
 
         return true, string.format("Moved todo to list '%s'", destination_list_name)
     end

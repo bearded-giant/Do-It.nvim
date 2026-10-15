@@ -161,7 +161,7 @@ function generateId() {
 const OWED_LIST = "daily";
 
 // Twins live in two files, so a change made here has to be written there too.
-// tmux mirrors this in tmux/scripts/lib-twin.sh; the nvim toggles do not, so their drift is caught downstream.
+// tmux (tmux/scripts/lib-twin.sh) and nvim (lua/doit/modules/todos/state/twin.lua) mirror this.
 function syncTwin(todo, mutate) {
     if (!todo.twin || !todo.twin.list || !todo.twin.id) return "";
     const filepath = getListPath(todo.twin.list);
@@ -1566,7 +1566,7 @@ server.tool(
 
 server.tool(
     "rename_list",
-    "Rename a do-it todo list. Cannot rename the active list (switch away first).",
+    "Rename a do-it todo list. Cannot rename the active list (switch away first) or \"daily\".",
     {
         old_name: z.string().describe("Current list name"),
         new_name: listNameSchema.describe("New list name (no spaces — use hyphens, max 24 chars)"),
@@ -1578,6 +1578,9 @@ server.tool(
         if (!fs.existsSync(oldPath)) {
             throw new Error(`List "${old_name}" not found.`);
         }
+        if (old_name === OWED_LIST) {
+            throw new Error(`"${OWED_LIST}" is permanent and cannot be renamed.`);
+        }
         if (fs.existsSync(newPath)) {
             throw new Error(`List "${new_name}" already exists.`);
         }
@@ -1586,7 +1589,13 @@ server.tool(
         }
 
         fs.renameSync(oldPath, newPath);
-        for (const t of readJSON(newPath).todos || []) {
+        // a twin pair can sit inside this one list, and syncTwin would look for it under the old name
+        const renamed = readJSON(newPath);
+        if ((renamed.todos || []).some(t => t.twin && t.twin.list === old_name)) {
+            for (const t of renamed.todos) if (t.twin && t.twin.list === old_name) t.twin.list = new_name;
+            saveList(newPath, renamed);
+        }
+        for (const t of renamed.todos || []) {
             syncTwin(t, (_, twin) => {
                 twin.twin.list = new_name;
                 return "relinked";
@@ -1610,7 +1619,7 @@ server.tool(
 
 server.tool(
     "delete_list",
-    "Delete an entire do-it todo list. Cannot delete the active list.",
+    "Delete an entire do-it todo list. Cannot delete the active list or \"daily\".",
     {
         name: z.string().describe("List name to delete"),
     },
@@ -1618,6 +1627,9 @@ server.tool(
         const filepath = getListPath(name);
         if (!fs.existsSync(filepath)) {
             throw new Error(`List "${name}" not found.`);
+        }
+        if (name === OWED_LIST) {
+            throw new Error(`"${OWED_LIST}" is permanent and cannot be deleted.`);
         }
         if (name === getActiveListName()) {
             throw new Error(`Cannot delete the active list "${name}". Switch to another list first.`);

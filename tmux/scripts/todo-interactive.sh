@@ -1061,8 +1061,9 @@ while true; do
                             ._metadata.updated_at = (now | floor)
                         ' "$TARGET_PATH" > "${TARGET_PATH}.tmp" && mv "${TARGET_PATH}.tmp" "$TARGET_PATH"
 
+                        TWIN_MSG=$(twin_apply "$(twin_ref "$TARGET_PATH" "$TODO_ID")" relink "$TARGET_LIST")
                         TODO_TEXT=$(echo "$TODO_OBJ" | jq -r '.text | split("\n")[0][0:30]')
-                        echo "Moved to $TARGET_LIST: $TODO_TEXT"
+                        echo "Moved to $TARGET_LIST: $TODO_TEXT${TWIN_MSG:+ · $TWIN_MSG}"
                         sleep 0.5
                     fi
                 fi

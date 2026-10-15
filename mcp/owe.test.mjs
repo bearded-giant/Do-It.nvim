@@ -140,6 +140,19 @@ assert.equal(byText("proj", "ping sam").done, true);
 assert.match(await callTool("revert_todo", { id: byText("proj", "ping sam").id }), /no longer in "daily"/);
 assert.match(lone, /owed in daily #\d+: ping sam/);
 
+// daily holds every owed twin, so it can't go away or change name
+assert.match(await callTool("delete_list", { name: "daily" }), /permanent/);
+assert.match(await callTool("rename_list", { old_name: "daily", new_name: "inbox" }), /permanent/);
+assert.ok(fs.existsSync(path.join(listsDir, "daily.json")));
+
+// rename follows a pair that lives inside the renamed list
+const pair = await callTool("add_todo", { list: "proj", text: "pair up", type: "chore", owe: true });
+assert.match(pair, /owed in daily/);
+await callTool("move_todo", { id: byText("daily", "proj: pair up").id, list: "daily", to_list: "proj" });
+await callTool("rename_list", { old_name: "proj", new_name: "proj2" });
+assert.deepEqual(read("proj2").todos.filter(t => t.text.includes("pair up")).map(t => t.twin.list), ["proj2", "proj2"]);
+fs.renameSync(path.join(listsDir, "proj2.json"), path.join(listsDir, "proj.json"));
+
 // tmux links and the global pointer are the user's view state; an omitted list goes to daily
 fs.writeFileSync(path.join(dataDir, "session.json"), JSON.stringify({ active_list: "proj", sessions: { work: "proj" } }));
 assert.match(await callTool("add_todo", { text: "no list given" }), /Added to "daily"/);

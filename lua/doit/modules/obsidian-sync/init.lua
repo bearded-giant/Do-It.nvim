@@ -627,6 +627,9 @@ function M.setup_functions()
 								todo.done = is_done
 								if is_done then
 									todo.in_progress = false
+									todo.completed_at = os.time()
+								else
+									todo.completed_at = nil
 								end
 								data._metadata = data._metadata or {}
 								data._metadata.updated_at = os.time()
@@ -635,6 +638,7 @@ function M.setup_functions()
 								if wf then
 									wf:write(vim.fn.json_encode(data))
 									wf:close()
+									require("doit.modules.todos.state.twin").sync(todo, is_done and "complete" or "revert", todo.completed_at)
 									return true
 								end
 							end

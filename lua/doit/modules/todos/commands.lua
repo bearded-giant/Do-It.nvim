@@ -150,6 +150,7 @@ function M.setup(module)
                     if value == "nil" then
                         state.todos[index].priorities = nil
                         state.save_todos()
+                        require("doit.modules.todos.state.twin").sync(state.todos[index], "priority", nil)
                         vim.notify("Cleared priorities for todo " .. index, vim.log.levels.INFO)
                     else
                         local priority_list = vim.split(value, ",", { trimempty = true })
@@ -180,6 +181,7 @@ function M.setup(module)
                         if #valid_priorities > 0 then
                             state.todos[index].priorities = valid_priorities
                             state.save_todos()
+                            require("doit.modules.todos.state.twin").sync(state.todos[index], "priority", valid_priorities)
                             vim.notify("Updated priorities for todo " .. index, vim.log.levels.INFO)
                         end
                     end
@@ -245,12 +247,13 @@ function M.setup(module)
             local todo_index = tonumber(args[1])
             local target_list = args[2]
 
-            if not todo_index then
+            local todo = todo_index and module.state.todos[todo_index]
+            if not todo then
                 vim.notify("Invalid todo index", vim.log.levels.ERROR)
                 return
             end
 
-            local success, msg = module.state.move_todo_to_list(todo_index, target_list)
+            local success, msg = module.state.move_todo_to_list(todo.id, target_list)
             vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
 
             -- Refresh UI if open

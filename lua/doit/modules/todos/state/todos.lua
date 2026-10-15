@@ -1,3 +1,5 @@
+local twin = require("doit.modules.todos.state.twin")
+
 local M = {}
 
 function M.setup(state)
@@ -163,6 +165,7 @@ function M.setup(state)
     function M.toggle_todo(index)
         if state.todos[index] then
             local todo = state.todos[index]
+            local was_done = todo.done
             
             -- Cycle through states: pending -> in_progress -> done -> pending
             if not todo.in_progress and not todo.done then
@@ -183,6 +186,9 @@ function M.setup(state)
             end
 
             state.save_todos()
+            if todo.done ~= was_done then
+                twin.sync(todo, todo.done and "complete" or "revert", todo.completed_at)
+            end
         end
     end
     
@@ -199,6 +205,7 @@ function M.setup(state)
             state.todos[index].done = false
             state.todos[index].completed_at = nil
             state.save_todos()
+            twin.sync(state.todos[index], "revert")
         end
     end
     
@@ -217,6 +224,7 @@ function M.setup(state)
             end
             
             state.save_todos()
+            twin.sync(todo, "delete")
         end
     end
     
@@ -265,6 +273,7 @@ function M.setup(state)
 
             table.insert(state.todos, todo)
             state.save_todos()
+            twin.sync(todo, "restore")
 
             return true
         end

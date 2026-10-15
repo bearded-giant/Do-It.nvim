@@ -1,5 +1,6 @@
 local sorting = require("doit.modules.todos.state.sorting")
 local due_dates = require("doit.modules.todos.state.due_dates")
+local PERMANENT_LIST = require("doit.modules.todos.state.storage").PERMANENT_LIST
 
 -- badge sits left of the name so it survives truncation in a narrow panel
 local function overdue_badge(metadata)
@@ -624,6 +625,10 @@ function M.setup(parent_module)
         if selected_index > #displayed_lists then return end
 
         local list_name = displayed_lists[selected_index].name
+        if list_name == PERMANENT_LIST then
+            vim.notify(PERMANENT_LIST .. " is permanent; it can't be deleted", vim.log.levels.WARN)
+            return
+        end
         close_windows()
         
         vim.ui.input({
@@ -653,6 +658,10 @@ function M.setup(parent_module)
         if selected_index > #displayed_lists then return end
 
         local list_name = displayed_lists[selected_index].name
+        if list_name == PERMANENT_LIST then
+            vim.notify(PERMANENT_LIST .. " is permanent; it can't be renamed", vim.log.levels.WARN)
+            return
+        end
         close_windows()
         
         vim.ui.input({

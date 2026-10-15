@@ -948,6 +948,7 @@ function M.edit_priorities(win_id, on_render)
 						-- Update the priority
 						state.todos[todo_index].priorities = selected_priority_name
 						state.save_to_disk()
+						require("doit.modules.todos.state.twin").sync(todo_ref, "priority", selected_priority_name)
 
 						-- Render the updated list
 						maybe_render(on_render)
