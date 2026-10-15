@@ -428,4 +428,66 @@ describe("obsidian-sync module", function()
             assert.is_true(switched, "Should have switched to 'daily' list")
         end)
     end)
+
+    describe("send_current keymap", function()
+        local function send_current()
+            for _, map in ipairs(vim.api.nvim_buf_get_keymap(test_bufnr, "n")) do
+                if map.desc == "Send current todo to DoIt" then
+                    return map.callback()
+                end
+            end
+            error("send_current keymap not set on vault buffer")
+        end
+
+        it("adds the todo to the target list and restores the active list", function()
+            local loads = {}
+            local add_args
+            mock_todos_module.state.todo_lists.active = "default"
+            mock_todos_module.state.load_list = function(name)
+                table.insert(loads, name)
+                mock_todos_module.state.todo_lists.active = name
+                return true
+            end
+            local original_add = mock_todos_module.state.add_todo
+            mock_todos_module.state.add_todo = function(...)
+                add_args = { n = select("#", ...), ... }
+                add_args.active = mock_todos_module.state.todo_lists.active
+                return original_add(...)
+            end
+
+            obsidian_sync.setup({ vault_path = vim.fn.expand("~/Recharge-Notes"), default_list = "default" })
+            vim.api.nvim_set_current_buf(test_bufnr)
+            vim.api.nvim_buf_set_lines(test_bufnr, 0, -1, false, { "- [ ] Daily task" })
+            vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+            send_current()
+
+            -- passing the list name as add_todo's 2nd arg stored it as a priority and added to the active list
+            assert.equals(1, add_args.n)
+            assert.equals("Daily task", add_args[1])
+            assert.equals("daily", add_args.active)
+            assert.same({ "daily", "default" }, loads)
+            assert.equals("default", mock_todos_module.state.todo_lists.active)
+            assert.matches("<!%-%- doit:test_1 %-%->$", vim.api.nvim_buf_get_lines(test_bufnr, 0, 1, false)[1])
+        end)
+
+        it("still reloads when the target list is already active", function()
+            local loads = {}
+            mock_todos_module.state.todo_lists.active = "daily"
+            mock_todos_module.state.load_list = function(name)
+                table.insert(loads, name)
+                mock_todos_module.state.todo_lists.active = name
+                return true
+            end
+
+            obsidian_sync.setup({ vault_path = vim.fn.expand("~/Recharge-Notes"), default_list = "default" })
+            vim.api.nvim_set_current_buf(test_bufnr)
+            vim.api.nvim_buf_set_lines(test_bufnr, 0, -1, false, { "- [ ] Daily task" })
+            vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+            send_current()
+
+            assert.same({ "daily" }, loads)
+        end)
+    end)
 end)

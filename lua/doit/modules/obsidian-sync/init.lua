@@ -955,7 +955,13 @@ function M.setup_autocmds()
 						-- Determine which list to use based on file path
 						local target_list = M.determine_list(file, clean_text)
 
-						local todo = todos_module.state.add_todo(clean_text, target_list)
+						-- always reload: tmux and MCP write list files directly, so a stale in-memory list would clobber them on save
+						local original_list = todos_module.state.todo_lists.active
+						todos_module.state.load_list(target_list)
+						local todo = todos_module.state.add_todo(clean_text)
+						if original_list ~= target_list then
+							todos_module.state.load_list(original_list)
+						end
 
 						-- Add marker
 						line = line .. " <!-- doit:" .. todo.id .. " -->"
