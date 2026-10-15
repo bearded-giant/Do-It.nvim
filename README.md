@@ -411,6 +411,8 @@ Each tmux session can hold its own active list. The link map lives in `session.j
 
 An unlinked tmux session always lands on `daily`, never on whichever list was switched to last elsewhere. Outside tmux the session step is skipped and the global `.active_list` pointer takes the place of `daily` (falling back to `daily` when unset).
 
+The MCP server is the exception. Links track what you are looking at, which is rarely the list a model's work belongs to, so the server ignores them and the global pointer: a call without `list` goes to `DOIT_ACTIVE_LIST` when set, else `daily`. Model sessions pass `list` explicitly for project work.
+
 In the list switcher (`prefix + d + l`), `Enter` links the selected list to the current session (and refreshes the global pointer). In the list manager (`prefix + d + L`, or `L`/`q` from the interactive manager), `Enter` opens the list to view and edit without touching any link, and `l` does the linking instead. In both, `g` sets the global pointer only, and `u` unlinks the current session (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which sessions link each list, with dead sessions dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any session without touching any link.
 
 ### Status Bar Integration
@@ -474,7 +476,7 @@ Todo items:
 | `get_todo` | Fetch one item by id from whichever list holds it, no list name needed |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
-| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item) and `sequence` |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item), `sequence`, and `owe` (also write a linked twin into `daily`) |
 | `update_todo` | Edit text, description, status, priority, due date, order, `sequence`, or `parent`. Needs an id |
 | `sequence_todos` | Set a list's whole run order in one call from ranks or ids. Everything not named loses its sequence |
 | `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
@@ -489,6 +491,17 @@ Ids are global. Copy one from the tmux item view (`i`) or the nvim item view
 (`y`), paste it at the model, and `get_todo`, `start_todo`, `complete_todo`,
 `revert_todo`, `update_todo`, `add_note`, `delete_todo` and `move_todo` all
 find the list that holds it.
+
+Owed items. `add_todo` with `owe: true` is for actions the user owes on a
+project: run a check, merge an MR, answer a decision. It writes the item on the
+project list as `[type] N. owed in daily #M: ...` and a twin on `daily` as
+`[type] M. <project list>: ...`. Each carries a `twin` field and a first
+description line pointing at the other, so `daily` collects what you owe across
+every project and each project list still shows it. `complete_todo`,
+`revert_todo`, `delete_todo`, `move_todo`, `rename_list`, and `update_todo`'s
+done / priority / due keep both twins in step. Checking one off in the nvim or
+tmux UI only touches that one item, so the other stays open until a model
+session closes it.
 
 Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
 
@@ -528,7 +541,7 @@ Duplicate detection strips that whole wrapper before comparing, so an item you t
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOIT_DATA_DIR` | `~/.local/share/nvim/doit` | Data directory path |
-| `DOIT_ACTIVE_LIST` | (unset) | Override active list name. Wins over session links and per-project derivation |
+| `DOIT_ACTIVE_LIST` | (unset) | Override active list name. Wins over session links and per-project derivation. The MCP server reads only this, then `daily` |
 
 The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
 

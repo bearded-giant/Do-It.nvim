@@ -97,16 +97,10 @@ function updateSession(mutate) {
     writeJSON(SESSION_FILE, session);
 }
 
-// env override > per-tmux-session link > daily. The global .active_list
-// pointer is the outside-tmux default only.
+// tmux links and the global pointer track what the user is LOOKING at, which is
+// rarely the list a model's work belongs to, so they never steer this server.
 function getActiveListName() {
-    if (process.env.DOIT_ACTIVE_LIST) return process.env.DOIT_ACTIVE_LIST;
-    const session = readSession();
-    const sess = getTmuxSessionName();
-    const link = sess && session.sessions ? session.sessions[sess] : null;
-    if (link && fs.existsSync(getListPath(link))) return link;
-    if (sess) return "daily";
-    return session.active_list || "daily";
+    return process.env.DOIT_ACTIVE_LIST || "daily";
 }
 
 function getListPath(listName) {
@@ -161,6 +155,35 @@ function generateId() {
     const ts = Math.floor(Date.now() / 1000);
     const rand = Math.floor(Math.random() * 9999999);
     return `${ts}_${rand}`;
+}
+
+// The cross-project inbox for actions the user owes; owe twins land here.
+const OWED_LIST = "daily";
+
+// Twins live in two files, so a change made here has to be written there too.
+// The nvim and tmux toggles do not do this; their drift is caught downstream.
+function syncTwin(todo, mutate) {
+    if (!todo.twin || !todo.twin.list || !todo.twin.id) return "";
+    const filepath = getListPath(todo.twin.list);
+    if (!fs.existsSync(filepath)) return `\nTwin list "${todo.twin.list}" is gone.`;
+    const data = readJSON(filepath);
+    const twin = (data.todos || []).find(t => t.id === todo.twin.id);
+    if (!twin) return `\nTwin ${todo.twin.id} is no longer in "${todo.twin.list}".`;
+    const what = mutate(data, twin);
+    saveList(filepath, data);
+    return `\nTwin in "${todo.twin.list}" ${what}: ${twin.text}`;
+}
+
+function removeTodo(data, id) {
+    const idx = data.todos.findIndex(t => t.id === id);
+    // incomplete children outlive their parent (no completion cascade)
+    promoteChildren(data.todos, id);
+    const [removed] = data.todos.splice(idx, 1);
+    data._metadata = data._metadata || {};
+    data._metadata.deleted_todos = data._metadata.deleted_todos || [];
+    data._metadata.deleted_todos.unshift(removed);
+    data._metadata.deleted_todos = data._metadata.deleted_todos.slice(0, 10);
+    return removed;
 }
 
 // Tags live inline in the todo text, not in a schema field — same contract as
@@ -421,13 +444,12 @@ const server = new McpServer(
 
 IMPORTANT: Always use these MCP tools for todo operations. NEVER use bash, grep, find, cat, or python to read/write todo JSON files directly. The tools handle all data access.
 
-There is always an active list (usually "daily"). When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
+There is always an active list: "daily", unless the DOIT_ACTIVE_LIST env var names another. When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
 
-Session-linked lists: when this server runs inside tmux, the active list is PER TMUX SESSION. Resolution: DOIT_ACTIVE_LIST env > the current tmux session's link (the 'sessions' map in session.json) > "daily". An unlinked tmux session is always "daily", never the global pointer. Outside tmux: the global pointer > "daily".
-- switch_list inside tmux links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link.
-- create_list: the result text reports link state — if it auto-linked the new list to the current session, tell the user; if the session is already linked to another list, ASK the user before calling switch_list to relink. Never relink silently.
-- list_lists shows which tmux sessions link each list — use it to answer "which session works on what".
-- list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)" when that env var decided it. Tell the user: a stale export in the shell that launched this server pins every session to one list, and the tmux link is what they expect.
+Session-linked lists: the user's nvim and tmux views can link a tmux session to a list (the 'sessions' map in session.json). Those links and the global pointer are the user's view state and do NOT change this server's default list. For project work, always pass list= explicitly.
+- switch_list changes the user's views only: inside tmux it links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link. Call it only when the user asks to switch their view.
+- list_lists shows which tmux sessions link each list — use it to answer "which session shows what".
+- list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)" when that env var decided it. Tell the user: a stale export in the shell that launched this server pins every omitted list= to one list.
 
 Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
 
@@ -441,6 +463,8 @@ Item text convention — MANDATORY for every item you create:
 - claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
 
 Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its rank is preserved.
+
+Owed items: "${OWED_LIST}" is the user's cross-project inbox of actions THEY owe. When work needs the user (run/confirm/verify something, review or merge an MR, ping someone, change a console setting, decide an open question, resume paused work), call add_todo with owe=true and list=<the project list>. One call writes the project item ("[type] N. owed in ${OWED_LIST} #M: ...") and its "${OWED_LIST}" twin ("[type] M. <project list>: ..."); each carries a 'twin' field and a first description line naming the other. Write the description for the user: why, do (exact command + expected result), links (MR, handoff, vault note, artifact, doc), resume (how to pick the work back up). Owed items never carry 'claude:'. complete_todo, revert_todo, delete_todo, move_todo, and update_todo's done/priority/due apply to both twins; the result says what happened to the twin.
 
 Sequence (work order): priority is criticality, and the optional 'sequence' field is work order. Pending items with a sequence render in a "Sequence" section above the priority sections, in sequence order across priorities, and list_todos lists them first. When working a list (including /burn), take sequenced items in sequence order before falling back to priority. When items have to run in a specific order (deps, rollout steps), set it with sequence_todos(order: [ranks in run order]). Don't encode order through priority, and don't delete and recreate items to renumber them. To move one item, use update_todo's 'sequence'; 0 clears it.
 
@@ -461,7 +485,7 @@ Behavior:
 - "search for X" → search_todos
 - user pastes or names an id ("work 1757012345_4821", "fetch this todo: <id>") → get_todo — it finds the item in WHICHEVER list holds it and names that list
 - "show my lists" / "which lists" → list_lists
-- "switch to X list" → switch_list (in tmux: links this session + sets global; pass scope to narrow)
+- "switch to X list" → switch_list (the user's view only; in tmux: links this session + sets global; pass scope to narrow)
 - "set the global list without touching this session" → switch_list with scope="global" (unlinking a session is done in the tmux UI with the u key)
 - "todos for <project>" → list_todos with list=<project-name> (list names often match project names)
 - "create list X" → create_list
@@ -705,11 +729,22 @@ server.tool(
         parent: z.union([z.number(), z.string()]).optional().describe("Nest under this item: its rank number (the leading N.) or its id. Ranks stay flat and unique across the whole list."),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
         sequence: z.number().int().positive().optional().describe(SEQUENCE_HINT),
+        owe: z.boolean().optional().describe(`The USER owes this action (run/confirm/verify, review/merge an MR, ping, console/settings, decide, resume work). Writes this item AND a twin in "${OWED_LIST}", cross-linked by id, so the user tracks everything they owe across projects in one list. Completing, reverting, deleting or re-prioritizing either twin through these tools applies to both. Put why / do / links / resume sections in 'description'; both twins get it. Not for 'claude:' items.`),
     },
-    async ({ text, list, type, deps, description, priority, due, parent, start, sequence }) => {
+    async ({ text, list, type, deps, description, priority, due, parent, start, sequence, owe }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
-        const composed = composeTodoText(text, { type, deps, rank: nextRank(data.todos || []) });
+        const parsed = parseTodoText(text);
+        const twinned = Boolean(owe) && name !== OWED_LIST;
+        if (twinned && parsed.claude) {
+            throw new Error("owe items are the user's work: drop the leading 'claude:'.");
+        }
+        const owed = twinned ? loadList(OWED_LIST) : null;
+        const owedRank = owed ? nextRank(owed.data.todos || []) : null;
+        const rank = nextRank(data.todos || []);
+        const composed = twinned
+            ? composeTodoText(`owed in ${OWED_LIST} #${owedRank}: ${parsed.body.trim()}`, { type: type || parsed.type, deps, rank })
+            : composeTodoText(text, { type, deps, rank });
         const newTodo = {
             id,
             text: composed,
@@ -731,6 +766,30 @@ server.tool(
             newTodo.depth = (parentTodo.depth || 0) + 1;
         }
 
+        let twinLine = "";
+        if (twinned) {
+            const owedId = generateId();
+            const extra = description ? `\n\n${description}` : "";
+            const owedTodo = {
+                id: owedId,
+                text: composeTodoText(`${name}: ${parsed.body.trim()}`, { type: type || parsed.type, rank: owedRank }),
+                done: false,
+                in_progress: false,
+                order_index: getMaxOrder(owed.data.todos || []) + 1,
+                created_at: newTodo.created_at,
+                description: stampDescription(`from: ${name} #${rank} (id ${id})${extra}`),
+                twin: { list: name, id },
+            };
+            if (newTodo.priorities) owedTodo.priorities = newTodo.priorities;
+            if (newTodo.due_date) owedTodo.due_date = newTodo.due_date;
+            newTodo.description = stampDescription(`${OWED_LIST}: ${owedId}${extra}`);
+            newTodo.twin = { list: OWED_LIST, id: owedId };
+            owed.data.todos = owed.data.todos || [];
+            owed.data.todos.push(owedTodo);
+            saveList(owed.filepath, owed.data);
+            twinLine = `\nTwin in "${OWED_LIST}": ${owedTodo.text} [id:${owedId}]`;
+        }
+
         data.todos = data.todos || [];
         data.todos.push(newTodo);
         if (sequence) setSequence(data.todos, newTodo, sequence);
@@ -740,7 +799,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Added to "${name}": ${composed}${status} [id:${id}]`,
+                text: `Added to "${name}": ${composed}${status} [id:${id}]${twinLine}`,
             }],
         };
     }
@@ -821,11 +880,29 @@ server.tool(
         }
 
         saveList(filepath, data);
+        let twinNote = "";
+        if (done !== undefined || priority !== undefined || due !== undefined) {
+            twinNote = syncTwin(todo, (_, t) => {
+                if (done !== undefined) {
+                    t.done = done;
+                    if (done) t.in_progress = false;
+                }
+                if (priority !== undefined) {
+                    if (todo.priorities) t.priorities = todo.priorities;
+                    else delete t.priorities;
+                }
+                if (due !== undefined) {
+                    if (todo.due_date) t.due_date = todo.due_date;
+                    else delete t.due_date;
+                }
+                return "updated";
+            });
+        }
 
         return {
             content: [{
                 type: "text",
-                text: `Updated in "${name}": ${todo.text} [done:${todo.done}, in_progress:${todo.in_progress}${todo.sequence ? `, sequence:${todo.sequence}` : ""}]`,
+                text: `Updated in "${name}": ${todo.text} [done:${todo.done}, in_progress:${todo.in_progress}${todo.sequence ? `, sequence:${todo.sequence}` : ""}]${twinNote}`,
             }],
         };
     }
@@ -925,11 +1002,17 @@ server.tool(
         result.todo.in_progress = false;
         result.todo.completed_at = Math.floor(Date.now() / 1000);
         saveList(filepath, data);
+        const twinNote = syncTwin(result.todo, (_, t) => {
+            t.done = true;
+            t.in_progress = false;
+            t.completed_at = result.todo.completed_at;
+            return "completed";
+        });
 
         return {
             content: [{
                 type: "text",
-                text: `Completed in "${name}": ${result.todo.text}`,
+                text: `Completed in "${name}": ${result.todo.text}${twinNote}`,
             }],
         };
     }
@@ -961,11 +1044,17 @@ server.tool(
         result.todo.in_progress = false;
         delete result.todo.completed_at;
         saveList(filepath, data);
+        const twinNote = syncTwin(result.todo, (_, t) => {
+            t.done = false;
+            t.in_progress = false;
+            delete t.completed_at;
+            return "reverted";
+        });
 
         return {
             content: [{
                 type: "text",
-                text: `Reverted to pending in "${name}": ${result.todo.text}`,
+                text: `Reverted to pending in "${name}": ${result.todo.text}${twinNote}`,
             }],
         };
     }
@@ -1030,21 +1119,17 @@ server.tool(
             return presentChoices(result.matches, `Multiple items match on "${name}"`, "Ask the user which to delete, then call delete_todo with the chosen ID.");
         }
 
-        const idx = data.todos.findIndex(t => t.id === result.todo.id);
-        // incomplete children outlive their parent (no completion cascade)
-        promoteChildren(data.todos, data.todos[idx].id);
-        const [removed] = data.todos.splice(idx, 1);
-        data._metadata = data._metadata || {};
-        data._metadata.deleted_todos = data._metadata.deleted_todos || [];
-        data._metadata.deleted_todos.unshift(removed);
-        data._metadata.deleted_todos = data._metadata.deleted_todos.slice(0, 10);
-
+        const removed = removeTodo(data, result.todo.id);
         saveList(filepath, data);
+        const twinNote = syncTwin(removed, (twinData, t) => {
+            removeTodo(twinData, t.id);
+            return "deleted";
+        });
 
         return {
             content: [{
                 type: "text",
-                text: `Deleted from "${name}": ${removed.text}`,
+                text: `Deleted from "${name}": ${removed.text}${twinNote}`,
             }],
         };
     }
@@ -1358,11 +1443,15 @@ server.tool(
 
         saveList(source.filepath, source.data);
         saveList(targetPath, targetData);
+        const twinNote = syncTwin(moved, (_, t) => {
+            t.twin.list = to_list;
+            return "relinked";
+        });
 
         return {
             content: [{
                 type: "text",
-                text: `Moved from "${source.name}" to "${to_list}": ${moved.text}`,
+                text: `Moved from "${source.name}" to "${to_list}": ${moved.text}${twinNote}`,
             }],
         };
     }
@@ -1466,25 +1555,10 @@ server.tool(
         };
         writeJSON(filepath, data);
 
-        let sessionNote = "";
-        const sess = getTmuxSessionName();
-        if (sess) {
-            const existing = (readSession().sessions || {})[sess];
-            if (!existing) {
-                updateSession(session => {
-                    session.sessions = session.sessions || {};
-                    session.sessions[sess] = name;
-                });
-                sessionNote = `\ntmux session "${sess}" had no linked list, so "${name}" is now linked to it (it is this session's active list). Tell the user.`;
-            } else if (existing !== name) {
-                sessionNote = `\ntmux session "${sess}" is currently linked to "${existing}". Do NOT relink it yourself — ask the user whether this session should switch to "${name}" (then call switch_list).`;
-            }
-        }
-
         return {
             content: [{
                 type: "text",
-                text: `Created list "${name}" at ${filepath}${sessionNote}`,
+                text: `Created list "${name}" at ${filepath}`,
             }],
         };
     }
@@ -1512,6 +1586,12 @@ server.tool(
         }
 
         fs.renameSync(oldPath, newPath);
+        for (const t of readJSON(newPath).todos || []) {
+            syncTwin(t, (_, twin) => {
+                twin.twin.list = new_name;
+                return "relinked";
+            });
+        }
 
         updateSession(session => {
             for (const [sess, list] of Object.entries(session.sessions || {})) {

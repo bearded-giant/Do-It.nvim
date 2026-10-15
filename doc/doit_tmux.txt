@@ -266,8 +266,8 @@ Each tmux session can hold its own active list, so hopping between sessions
 no longer stomps a single global pointer. Links live in the `sessions` map of
 session.json, keyed by tmux session name, and survive tmux server restarts.
 
-Every surface (tmux scripts, the status bar, the MCP server, and Neovim when
-it runs inside tmux) resolves the active list through the same chain:
+Every UI surface (tmux scripts, the status bar, and Neovim when it runs
+inside tmux) resolves the active list through the same chain:
 
     1. DOIT_ACTIVE_LIST         explicit environment override
     2. sessions[<tmux session>] the session link
@@ -276,6 +276,10 @@ it runs inside tmux) resolves the active list through the same chain:
 
 An unlinked tmux session always lands on daily. Outside tmux, step 2 is
 skipped and the global .active_list pointer takes the place of daily.
+
+The MCP server does not follow links or the global pointer: they track what
+you are looking at, not the list a model's work belongs to. A call without a
+list goes to DOIT_ACTIVE_LIST when set, else daily.
 
 In the list switcher (prefix + d + l) and list manager (prefix + d + L):
 
@@ -300,7 +304,8 @@ that no longer exist in `tmux list-sessions` render dimmed. The daily list is
 pinned to the top with its pending count.
 
 Switching lists inside tmux — from the tmux UI, from Neovim, or through the
-MCP server — writes BOTH the session link and the global pointer. Non-tmux
+MCP server's switch_list — writes BOTH the session link and the global
+pointer. Non-tmux
 switches write the global pointer only.
 
 The daily popup (prefix + d + d, or Alt+Shift+D) opens the interactive
