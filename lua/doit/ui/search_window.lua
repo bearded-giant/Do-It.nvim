@@ -6,6 +6,7 @@ local todo_module = core.get_module("todos")
 local state = todo_module and todo_module.state or {}
 local config = require("doit.config")
 local todos_config = require("doit.modules.todos.config")
+local tags_util = require("doit.modules.todos.state.tags")
 
 local M = {}
 
@@ -78,8 +79,8 @@ local function handle_search_query(query, main_win_id)
 			vim.api.nvim_buf_add_highlight(search_buf_id, ns_id, hl_group, line_nr, 0, -1)
 
 			-- tag highlight
-			for tag in line:gmatch("#(%w+)") do
-				local start_idx = line:find("#" .. tag) - 1
+			for _, tag in ipairs(tags_util.parse(line)) do
+				local start_idx = line:find("#" .. tag, 1, true) - 1
 				vim.api.nvim_buf_add_highlight(search_buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
 			end
 		elseif line:match("Search Results") then

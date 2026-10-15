@@ -3,6 +3,7 @@ local vim = vim
 local config = require("doit.config")
 local highlights = require("doit.ui.highlights")
 local main_window = require("doit.ui.main_window")
+local tags_util = require("doit.modules.todos.state.tags")
 
 local M = {}
 
@@ -138,8 +139,8 @@ function M.render_list()
                 vim.api.nvim_buf_add_highlight(buf_id, ns_id, hl_group, line_nr, 0, -1)
                 
                 -- Tag highlight
-                for tag in lines[i]:gmatch("#(%w+)") do
-                    local start_idx = lines[i]:find("#" .. tag) - 1
+                for _, tag in ipairs(tags_util.parse(lines[i])) do
+                    local start_idx = lines[i]:find("#" .. tag, 1, true) - 1
                     vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
                 end
                 

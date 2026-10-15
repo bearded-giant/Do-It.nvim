@@ -506,8 +506,8 @@ function M.render_todos()
 			end
 
 			-- Tag highlight
-			for tag in line:gmatch("#(%w+)") do
-				local start_idx = line:find("#" .. tag) - 1
+			for _, tag in ipairs(tags_util.parse(line)) do
+				local start_idx = line:find("#" .. tag, 1, true) - 1
 				vim.api.nvim_buf_add_highlight(buf_id, ns_id, "Type", line_nr, start_idx, start_idx + #tag + 1)
 			end
 
