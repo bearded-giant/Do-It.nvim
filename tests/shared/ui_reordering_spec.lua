@@ -6,6 +6,8 @@ describe("todo reordering UI", function()
   local config = require("doit.config")
   local todo_actions = require("doit.ui.todo_actions")
   local main_window = require("doit.ui.main_window")
+  -- the stubs below replace whole vim tables; plenary needs the real ones back to finish the run
+  local orig = { api = vim.api, fn = vim.fn, notify = vim.notify, keymap = vim.keymap }
   
   -- Setup test environment
   before_each(function()
@@ -49,6 +51,7 @@ describe("todo reordering UI", function()
   
   after_each(function()
     state.save_to_disk:revert()
+    vim.api, vim.fn, vim.notify, vim.keymap = orig.api, orig.fn, orig.notify, orig.keymap
   end)
   
   it("should have reorder functionality", function()
