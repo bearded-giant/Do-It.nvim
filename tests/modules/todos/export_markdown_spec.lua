@@ -117,6 +117,107 @@ describe("todos export_markdown", function()
         assert.are.equal(expected, export_markdown.build(nested, "nest", "2026-07-30 10:00"))
     end)
 
+    -- same fixture and golden as tests/tmux/test_export.sh "splits Mine and Claude"
+    it("splits pending items into Mine and Claude blocks by root origin", function()
+        local mixed = {
+            { id = "m1", text = "my thing", done = false, order_index = 1 },
+            {
+                id = "mk",
+                text = "[chore] 28. claude child",
+                done = false,
+                order_index = 2,
+                parent_id = "m1",
+                source = "mcp",
+            },
+            {
+                id = "c1",
+                text = "[gate] 26. some claude item",
+                done = false,
+                order_index = 3,
+                priorities = "critical",
+            },
+            { id = "ck", text = "plain child", done = false, order_index = 4, parent_id = "c1" },
+            {
+                id = "cd",
+                text = "claude: done claude item",
+                done = true,
+                order_index = 5,
+                priorities = "urgent",
+                source = "mcp",
+            },
+            { id = "mu", text = "my urgent", done = false, order_index = 6, priorities = "urgent" },
+        }
+        local expected = table.concat({
+            "# mixed",
+            "",
+            "_exported 2026-07-30 10:00_",
+            "",
+            "## Mine",
+            "",
+            "### Urgent",
+            "",
+            "- [ ] my urgent",
+            "",
+            "### Default",
+            "",
+            "- [ ] my thing",
+            "",
+            "  - [ ] [chore] 28. claude child",
+            "",
+            "## Claude",
+            "",
+            "### Critical",
+            "",
+            "- [ ] [gate] 26. some claude item",
+            "",
+            "  - [ ] plain child",
+            "",
+        }, "\n")
+        assert.are.equal(expected, export_markdown.build(mixed, "mixed", "2026-07-30 10:00"))
+    end)
+
+    -- same fixture and golden as tests/tmux/test_export.sh "single-origin"
+    it("does not split a list whose pending items are all Claude's", function()
+        local solo = {
+            { id = "a", text = "[gate] 1. claude critical", done = false, order_index = 1, priorities = "critical" },
+            { id = "b", text = "claude: plain claude", done = false, order_index = 2, source = "mcp" },
+        }
+        local expected = table.concat({
+            "# solo",
+            "",
+            "_exported 2026-07-30 10:00_",
+            "",
+            "## Critical",
+            "",
+            "- [ ] [gate] 1. claude critical",
+            "",
+            "## Default",
+            "",
+            "- [ ] claude: plain claude",
+            "",
+        }, "\n")
+        assert.are.equal(expected, export_markdown.build(solo, "solo", "2026-07-30 10:00"))
+    end)
+
+    -- same fixture and golden as tests/tmux/test_export.sh "only mine item done"
+    it("does not split when the only Mine item is done", function()
+        local todos = {
+            { id = "m", text = "my done thing", done = true, order_index = 1 },
+            { id = "c", text = "[bug] 3. claude bug", done = false, order_index = 2, source = "mcp" },
+        }
+        local expected = table.concat({
+            "# solo",
+            "",
+            "_exported 2026-07-30 10:00_",
+            "",
+            "## Default",
+            "",
+            "- [ ] [bug] 3. claude bug",
+            "",
+        }, "\n")
+        assert.are.equal(expected, export_markdown.build(todos, "solo", "2026-07-30 10:00"))
+    end)
+
     it("writes the file and reports the pending count", function()
         local path = vim.fn.tempname() .. ".md"
         local ok, msg = export_markdown.write(path, FIXTURE, "work")

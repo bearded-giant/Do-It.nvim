@@ -549,12 +549,19 @@ each with its own in-progress items and priority sections, and N counting
 the block's open to-dos. Notes and completed to-dos stay shared below both.
 A list with open items on one side only shows no banners at all.
 
-A to-do counts as Claude's when it carries `source: "mcp"` (every MCP
-add_todo, owed twins included) or, for older items, a `twin` link or text
-that starts with `claude:`, a `[type]` tag, or an `N.` rank. Anything typed
-in nvim, tmux, or imported from a vault note lands in Mine. A subtree goes
-with its top-level item, and reordering (`r`) never crosses the boundary.
-The tmux UI (|doit-tmux-interactive|) splits the same way.
+Every to-do records who made it: the MCP server writes `source: "mcp"`
+(owed twins included), and nvim, tmux, and vault imports write
+`source: "user"`, so a to-do you type as `3. call the bank` stays in Mine.
+A to-do with no `source` counts as Claude's when it has a `twin` link or
+text that starts with `claude:`, a `[type]` tag, or an `N.` rank. A subtree
+goes with its top-level item, and reordering (`r`) never crosses the
+boundary. The tmux UI (|doit-tmux-interactive|) splits the same way, and
+its next-todo key, popup, and list previews put Mine first too.
+
+Markdown export (`E`) follows the same rule: with pending items on both
+sides, yours go under `## Mine` and Claude's under `## Claude`, with the
+priority headings one level down, and a child always goes in its top-level
+parent's block.
 
 IMPORT/EXPORT                                                 *doit-import*
 

@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 TODO_LIST_PATH="$(get_active_list_path)"
 
@@ -22,11 +23,11 @@ fi
 # Create a backup
 cp "$TODO_LIST_PATH" "${TODO_LIST_PATH}.bak"
 
-# Clear any existing in_progress flags and mark the next undone todo as in_progress
-NEXT_TODO=$(jq -r '
+# Clear any existing in_progress flags and start the first pending todo in view order
+NEXT_TODO=$(jq -r "$ORIGIN_JQ"'
     .todos |
-    sort_by(.order_index) |
-    map(select(.done == false)) |
+    map(select(.done == false and .in_progress != true)) |
+    sort_by(origin_rank, (if (.sequence | type) == "number" then [0, .sequence] else [1, 0] end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
     first |
     .id // empty
 ' "$TODO_LIST_PATH")

@@ -11,6 +11,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 unset DOIT_ACTIVE_LIST
 TODO_LIST_PATH="$(get_active_list_path)"
 
@@ -27,13 +28,8 @@ if [[ -n "$TODO_ID" && "$TODO_ID" != note_* ]]; then
         *)    OP='' ;;
     esac
     if [[ -n "$OP" ]]; then
-        jq --arg id "$TODO_ID" "
+        jq --arg id "$TODO_ID" "$ORIGIN_JQ
             def seqd: (.sequence | type) == \"number\" and (.done | not) and (.in_progress | not);
-            def origin:
-                if (.source | type) == \"string\" and .source != \"\" then (if .source == \"mcp\" then \"claude\" else \"mine\" end)
-                elif (.twin | type) == \"object\" then \"claude\"
-                elif ((.text // \"\") | sub(\"^[ \\\\t\\\\n\\\\x0b\\\\f\\\\r]+\"; \"\") | test(\"^(claude:|\\\\[[^\\\\]\\\\[]+\\\\]|[0-9]+[a-z]*\\\\.[ \\\\t\\\\n\\\\x0b\\\\f\\\\r])\")) then \"claude\"
-                else \"mine\" end;
             (.todos[] | select(.id == \$id)) as \$me |
             (\$me | seqd) as \$mseq |
             (if \$mseq then \"sequence\" else \"order_index\" end) as \$f |

@@ -157,6 +157,7 @@ if [[ -n "$SELECTED_PRIORITY" && "$SELECTED_PRIORITY" != "default" ]]; then
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
+          source: "user",
           created_at: (now | floor),
           priorities: $priority
        }] |
@@ -172,6 +173,7 @@ else
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
+          source: "user",
           created_at: (now | floor)
        }] |
        ._metadata.updated_at = (now | floor)' \

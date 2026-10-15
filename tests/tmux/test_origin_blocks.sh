@@ -159,4 +159,57 @@ assert_eq "0" "$(grep -cE '^── (Mine|Claude)' <<< "$FORMAT")"
 it "an all-claude list keeps the unsplit layout"
 assert_eq "$EXPECTED_SINGLE" "$(shape "$FORMAT")"
 
+describe "create, next, popup and preview follow Mine / Claude"
+
+# scripts under test call `tmux display-message`; keep that off the live server
+STUB="$TEST_TMPDIR/bin"
+mkdir -p "$STUB"
+printf '#!/bin/sh\nexit 0\n' > "$STUB/tmux"
+chmod +x "$STUB/tmux"
+in_test_env() { env -u TMUX DOIT_DATA_DIR="$DATA" PATH="$STUB:$PATH" "$@"; }
+
+mixed_list() {
+    cat > "$LIST" <<'JSON'
+{
+  "todos": [
+    {"id":"C1","text":"[gate] 1. claude critical","done":false,"in_progress":false,"order_index":1,"priorities":"critical"},
+    {"id":"M1","text":"mine default","done":false,"in_progress":false,"order_index":2},
+    {"id":"M2","text":"mine urgent","done":false,"in_progress":false,"order_index":3,"priorities":"urgent"},
+    {"id":"CI","text":"claude: running","done":false,"in_progress":true,"order_index":4}
+  ],
+  "_metadata": {"name":"orig"}
+}
+JSON
+}
+ORDER_RE='mine urgent|mine default|claude critical'
+EXPECTED_ORDER='mine urgent|mine default|claude critical'
+
+mixed_list
+echo "7. typed by hand" | in_test_env bash "$SCRIPTS/todo-quick-add.sh" --process >/dev/null 2>&1
+it "quick-add stamps source user"
+assert_eq "user" "$(jq -r '.todos[] | select(.text == "7. typed by hand") | .source' "$LIST")"
+FORMAT=$(run_format)
+it "a hand-typed rank stays in the Mine block"
+assert_eq "1" "$(awk '/^── Mine/{m=1} /^── Claude/{m=0} m && /7\. typed by hand/' <<< "$FORMAT" | grep -c .)"
+
+mixed_list
+in_test_env bash "$SCRIPTS/todo-next.sh" >/dev/null 2>&1
+it "todo-next starts the first Mine item in view order"
+assert_eq "M2" "$(jq -r '[.todos[] | select(.in_progress == true) | .id] | join(",")' "$LIST")"
+
+mixed_list
+POPUP=$(in_test_env bash "$SCRIPTS/todo-popup.sh" < /dev/null 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
+it "popup lists Mine pending items before Claude ones"
+assert_eq "$EXPECTED_ORDER" "$(grep -oE "$ORDER_RE" <<< "$POPUP" | paste -sd'|' -)"
+
+source "$SCRIPTS/lib-origin.sh"
+mixed_list
+for script in todo-list-manager.sh todo-list-switch.sh; do
+    sed -n '/^preview_list() {/,/^}/p' "$SCRIPTS/$script" > "$TEST_TMPDIR/fn.sh"
+    PREVIEW=$(LISTS_DIR="$DATA/lists" FZF_PREVIEW_COLUMNS=120 \
+        bash -c "source '$TEST_TMPDIR/fn.sh'; export -f preview_list; bash -c 'preview_list orig'" 2>&1)
+    it "$script preview lists Mine items first"
+    assert_eq "$EXPECTED_ORDER" "$(grep -oE "$ORDER_RE" <<< "$PREVIEW" | paste -sd'|' -)"
+done
+
 report

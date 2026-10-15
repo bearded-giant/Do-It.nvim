@@ -7,6 +7,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 if ! command -v jq &> /dev/null; then
     echo "Error: jq is required but not installed" >&2
@@ -35,7 +36,7 @@ fi
 OUT_PATH="${OUT_PATH/#\~/$HOME}"
 
 build_markdown() {
-    jq -r --arg list "$LIST_NAME" --arg now "$(date '+%Y-%m-%d %H:%M')" '
+    jq -r --arg list "$LIST_NAME" --arg now "$(date '+%Y-%m-%d %H:%M')" "$ORIGIN_JQ"'
         def strip_footer: (. // "") | sub("\n*----------\nlast [a-z]+:(.|\n)*$"; "");
         def trim: sub("^\\s+"; "") | sub("\\s+$"; "");
         def prio_rank:
@@ -64,25 +65,32 @@ build_markdown() {
         def nest:
             . as $all
             | (map(select(.id != null) | {key: .id, value: true}) | from_entries) as $ids
-            | def kids($pid; $d; $rank):
+            | def kids($pid; $d; $rank; $block):
                 [$all[] | select(.parent_id == $pid and .id != $pid)] | sort_by(by_key)
-                | map(. as $k | [$k + {depth: $d, rank: $rank}] + kids($k.id; $d + 1; $rank)) | add // [];
+                | map(. as $k | [$k + {depth: $d, rank: $rank, block: $block}] + kids($k.id; $d + 1; $rank; $block))
+                | add // [];
             ([.[] | select(.parent_id == null or $ids[.parent_id] == null or .parent_id == .id)]
                 | sort_by(by_key)
-                | map(. as $r | [$r + {depth: 0, rank: ($r | prio_rank)}] + kids($r.id; 1; ($r | prio_rank)))
+                | map(. as $r | ($r | prio_rank) as $rank | ($r | origin) as $block
+                    | [$r + {depth: 0, rank: $rank, block: $block}] + kids($r.id; 1; $rank; $block))
                 | add // []) as $rows
             | ($rows | map(.id)) as $seen
-            | $rows + [$all[] | select([.id] | inside($seen) | not) | . + {depth: 0, rank: prio_rank}];
+            | $rows + [$all[] | select([.id] | inside($seen) | not) | . + {depth: 0, rank: prio_rank, block: origin}];
 
         ["Critical", "Urgent", "Important", "Default"] as $labels |
-        ([.todos[] | select(.done != true)]
-            | nest
-            | group_by(.rank)
-            | map("## " + $labels[.[0].rank] + "\n\n" + (map(.depth as $d | item | pad($d)) | join("\n\n")))
-        ) as $sections |
+        def sections($h):
+            group_by(.rank)
+            | map($h + " " + $labels[.[0].rank] + "\n\n" + (map(.depth as $d | item | pad($d)) | join("\n\n")))
+            | join("\n\n");
+        ([.todos[] | select(.done != true)] | nest) as $rows |
+        ($rows | map(select(.block == "mine"))) as $mine |
+        ($rows | map(select(.block == "claude"))) as $claude |
         # jq -r appends the final newline, so no trailing "\n" here
         "# " + $list + "\n\n_exported " + $now + "_\n\n"
-        + (if ($sections | length) == 0 then "_no pending items_" else ($sections | join("\n\n")) end)
+        + if ($rows | length) == 0 then "_no pending items_"
+          elif ($mine | length) > 0 and ($claude | length) > 0 then
+            "## Mine\n\n" + ($mine | sections("###")) + "\n\n## Claude\n\n" + ($claude | sections("###"))
+          else $rows | sections("##") end
     ' "$LIST_PATH"
 }
 

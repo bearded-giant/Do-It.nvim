@@ -45,6 +45,7 @@ function M.setup(state)
             created_at = os.time(),
             order_index = #state.todos + 1,
             description = require("doit.core.utils.footer").stamp(""),
+            source = "user",
         }
 
         if parent then

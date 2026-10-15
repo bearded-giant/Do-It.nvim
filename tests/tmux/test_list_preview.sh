@@ -21,6 +21,8 @@ EOF
 run_preview() {
     local script="$1" cols="$2"
     sed -n '/^preview_list() {/,/^}/p' "$SCRIPTS/$script" > "$TEST_TMPDIR/fn.sh"
+    # the script exports ORIGIN_JQ (lib-origin.sh) before fzf starts, so the preview inherits it
+    ORIGIN_JQ="$(source "$SCRIPTS/lib-origin.sh"; echo "$ORIGIN_JQ")" \
     LISTS_DIR="$TEST_TMPDIR" SHOW_COMPLETED=true FZF_PREVIEW_COLUMNS="$cols" \
         bash -c "source '$TEST_TMPDIR/fn.sh'; export -f preview_list; bash -c 'preview_list wide'" 2>&1
 }

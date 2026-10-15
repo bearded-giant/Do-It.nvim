@@ -27,6 +27,23 @@ describe("origin blocks", function()
         end
     end)
 
+    -- runs before the render block, which swaps doit.core for a mock
+    describe("nvim add path", function()
+        it("stamps source user so a hand-typed rank stays Mine", function()
+            package.loaded["doit.state"] = nil
+            local doit = require("doit")
+            doit.setup({ modules = { todos = { enabled = true } } })
+            local doit_state = require("doit.state")
+            doit_state.todos = {}
+            doit_state.save_to_disk = function() end
+            doit_state.save_todos = function() end
+
+            local todo = doit_state.add_todo("3. typed by hand", {})
+            assert.are.equal("user", todo.source)
+            assert.are.equal("mine", sorting.origin(todo))
+        end)
+    end)
+
     describe("render", function()
         local mock_state
 

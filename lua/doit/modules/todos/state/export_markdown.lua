@@ -2,6 +2,7 @@
 -- Output must stay byte-identical to the tmux exporter (tmux/scripts/todo-export.sh).
 
 local footer = require("doit.core.utils.footer")
+local sorting = require("doit.modules.todos.state.sorting")
 
 local M = {}
 
@@ -78,7 +79,7 @@ end
 -- Tree order over the pending set, mirroring sorting.structure_aware but with
 -- the exporter's comparator: a child rides with its parent into the parent's
 -- priority section, and a child whose parent is done or missing exports as a
--- root. Rows carry the root's rank so sections are bucketed by subtree.
+-- root. Rows carry the root's rank and origin so sections and blocks are bucketed by subtree.
 local function nest(pending)
     local by_id, children, roots = {}, {}, {}
     for _, entry in ipairs(pending) do
@@ -103,26 +104,43 @@ local function nest(pending)
     end
 
     local rows, emitted = {}, {}
-    local function emit(entry, depth, rank)
+    local function emit(entry, depth, rank, block)
         if emitted[entry] then
             return
         end
         emitted[entry] = true
-        rows[#rows + 1] = { todo = entry.todo, depth = depth, rank = rank }
+        rows[#rows + 1] = { todo = entry.todo, depth = depth, rank = rank, block = block }
         for _, child in ipairs(children[entry.todo.id] or {}) do
-            emit(child, depth + 1, rank)
+            emit(child, depth + 1, rank, block)
         end
     end
     for _, root in ipairs(roots) do
-        emit(root, 0, priority_rank(root.todo))
+        emit(root, 0, priority_rank(root.todo), sorting.origin(root.todo))
     end
     -- a parent cycle is unreachable from any root; keep it in the export
     for _, entry in ipairs(pending) do
         if not emitted[entry] then
-            rows[#rows + 1] = { todo = entry.todo, depth = 0, rank = priority_rank(entry.todo) }
+            rows[#rows + 1] =
+                { todo = entry.todo, depth = 0, rank = priority_rank(entry.todo), block = sorting.origin(entry.todo) }
         end
     end
     return rows
+end
+
+local function sections(rows, heading)
+    local buckets = {}
+    for _, row in ipairs(rows) do
+        buckets[row.rank] = buckets[row.rank] or {}
+        table.insert(buckets[row.rank], pad(item_block(row.todo), row.depth))
+    end
+
+    local out = {}
+    for rank = 1, #LABELS do
+        if buckets[rank] then
+            out[#out + 1] = heading .. " " .. LABELS[rank] .. "\n\n" .. table.concat(buckets[rank], "\n\n")
+        end
+    end
+    return table.concat(out, "\n\n")
 end
 
 function M.build(todos, list_name, timestamp)
@@ -133,25 +151,25 @@ function M.build(todos, list_name, timestamp)
         end
     end
 
-    local buckets = {}
-    for _, row in ipairs(nest(pending)) do
-        buckets[row.rank] = buckets[row.rank] or {}
-        table.insert(buckets[row.rank], pad(item_block(row.todo), row.depth))
+    local rows = nest(pending)
+    local blocks = { mine = {}, claude = {} }
+    for _, row in ipairs(rows) do
+        table.insert(blocks[row.block], row)
     end
 
-    local body = {}
-    for rank = 1, #LABELS do
-        if buckets[rank] then
-            body[#body + 1] = "## " .. LABELS[rank] .. "\n\n" .. table.concat(buckets[rank], "\n\n")
-        end
+    local body
+    if #blocks.mine > 0 and #blocks.claude > 0 then
+        body = "## Mine\n\n" .. sections(blocks.mine, "###") .. "\n\n## Claude\n\n" .. sections(blocks.claude, "###")
+    else
+        body = sections(rows, "##")
     end
 
     local stamp = timestamp or os.date("%Y-%m-%d %H:%M")
     local header = "# " .. (list_name or "todos") .. "\n\n_exported " .. stamp .. "_\n\n"
-    if #body == 0 then
+    if #rows == 0 then
         return header .. "_no pending items_\n"
     end
-    return header .. table.concat(body, "\n\n") .. "\n"
+    return header .. body .. "\n"
 end
 
 function M.write(file_path, todos, list_name)

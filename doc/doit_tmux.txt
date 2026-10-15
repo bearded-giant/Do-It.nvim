@@ -131,7 +131,9 @@ Mine and Claude~
     holds its own in-progress rows and priority groups. A subtree follows its
     top-level todo. Notes and completed todos stay below both blocks. With
     open todos on one side only, no banners show. `[` / `]` stop on the
-    banners, and K/J never swap across them. See |doit-origin-blocks|.
+    banners, and K/J never swap across them. The next-todo key, the popup,
+    the list previews, and markdown export put Mine first as well. See
+    |doit-origin-blocks|.
 
 Status Changes~
     s                  Start (mark in-progress)

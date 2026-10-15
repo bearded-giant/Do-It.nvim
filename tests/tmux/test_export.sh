@@ -104,4 +104,52 @@ EOF
 GOLDEN=$'# nest\n\n_exported STAMP_\n\n## Urgent\n\n- [ ] orphaned child\n\n- [ ] urgent root\n\n## Default\n\n- [ ] parent\n\n  - [ ] first child\n    more\n\n    child note\n\n    - [ ] grandchild\n\n  - [ ] second child'
 assert_eq "$GOLDEN" "$(sed 's/^_exported .*_$/_exported STAMP_/' "$TEST_TMPDIR/nest.md")"
 
+# same fixture and golden as export_markdown_spec.lua "splits pending items into Mine and Claude"
+it "splits Mine and Claude blocks by root origin (golden shared with the nvim exporter)"
+MIXED="$TEST_TMPDIR/mixed.json"
+cat > "$MIXED" <<'EOF'
+{
+  "todos": [
+    {"id":"m1","text":"my thing","done":false,"order_index":1},
+    {"id":"mk","text":"[chore] 28. claude child","done":false,"order_index":2,"parent_id":"m1","source":"mcp"},
+    {"id":"c1","text":"[gate] 26. some claude item","done":false,"order_index":3,"priorities":"critical"},
+    {"id":"ck","text":"plain child","done":false,"order_index":4,"parent_id":"c1"},
+    {"id":"cd","text":"claude: done claude item","done":true,"order_index":5,"priorities":"urgent","source":"mcp"},
+    {"id":"mu","text":"my urgent","done":false,"order_index":6,"priorities":"urgent"}
+  ]
+}
+EOF
+"$EXPORT_SH" "$TEST_TMPDIR/mixed.md" "$MIXED" > /dev/null
+GOLDEN=$'# mixed\n\n_exported STAMP_\n\n## Mine\n\n### Urgent\n\n- [ ] my urgent\n\n### Default\n\n- [ ] my thing\n\n  - [ ] [chore] 28. claude child\n\n## Claude\n\n### Critical\n\n- [ ] [gate] 26. some claude item\n\n  - [ ] plain child\n'
+assert_eq "${GOLDEN}x" "$(sed 's/^_exported .*_$/_exported STAMP_/' "$TEST_TMPDIR/mixed.md"; printf x)"
+
+# same fixture and golden as export_markdown_spec.lua "all Claude's"
+it "does not split a single-origin list (golden shared with the nvim exporter)"
+SOLO="$TEST_TMPDIR/solo.json"
+cat > "$SOLO" <<'EOF'
+{
+  "todos": [
+    {"id":"a","text":"[gate] 1. claude critical","done":false,"order_index":1,"priorities":"critical"},
+    {"id":"b","text":"claude: plain claude","done":false,"order_index":2,"source":"mcp"}
+  ]
+}
+EOF
+"$EXPORT_SH" "$TEST_TMPDIR/solo.md" "$SOLO" > /dev/null
+GOLDEN=$'# solo\n\n_exported STAMP_\n\n## Critical\n\n- [ ] [gate] 1. claude critical\n\n## Default\n\n- [ ] claude: plain claude'
+assert_eq "$GOLDEN" "$(sed 's/^_exported .*_$/_exported STAMP_/' "$TEST_TMPDIR/solo.md")"
+
+# same fixture and golden as export_markdown_spec.lua "only Mine item is done"
+it "does not split when the only mine item is done (golden shared with the nvim exporter)"
+cat > "$SOLO" <<'EOF'
+{
+  "todos": [
+    {"id":"m","text":"my done thing","done":true,"order_index":1},
+    {"id":"c","text":"[bug] 3. claude bug","done":false,"order_index":2,"source":"mcp"}
+  ]
+}
+EOF
+"$EXPORT_SH" "$TEST_TMPDIR/solo.md" "$SOLO" > /dev/null
+GOLDEN=$'# solo\n\n_exported STAMP_\n\n## Default\n\n- [ ] [bug] 3. claude bug'
+assert_eq "$GOLDEN" "$(sed 's/^_exported .*_$/_exported STAMP_/' "$TEST_TMPDIR/solo.md")"
+
 report

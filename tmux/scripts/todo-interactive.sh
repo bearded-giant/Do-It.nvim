@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 source "$SCRIPT_DIR/lib-footer.sh"
 source "$SCRIPT_DIR/lib-twin.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
@@ -128,16 +129,10 @@ export DUE_JQ
 # Every row carries depth plus its ROOT's bucket (root_ip / root_done /
 # root_prio / root_origin) so sections and the Mine / Claude blocks split by
 # subtree, never mid-subtree.
-NEST_JQ='
+NEST_JQ="$ORIGIN_JQ"'
 def prio_rank: if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end;
 def seqd: (.sequence | type) == "number" and (.done | not) and (.in_progress | not);
 def seq_key: if seqd then [0, .sequence] else [1, 0] end;
-def origin:
-    if (.source | type) == "string" and .source != "" then (if .source == "mcp" then "claude" else "mine" end)
-    elif (.twin | type) == "object" then "claude"
-    elif ((.text // "") | sub("^[ \\t\\n\\x0b\\f\\r]+"; "") | test("^(claude:|\\[[^\\]\\[]+\\]|[0-9]+[a-z]*\\.[ \\t\\n\\x0b\\f\\r])")) then "claude"
-    else "mine" end;
-def origin_rank: if (.done | not) and origin == "claude" then 1 else 0 end;
 def tag_ok($tagf): $tagf == "" or ([.text | scan("#([\\w/-]+)")] | flatten | index($tagf) != null);
 def rows(rootkey):
     . as $all
@@ -1292,6 +1287,7 @@ while true; do
                       done: false,
                       in_progress: false,
                       order_index: ($order | tonumber),
+                      source: "user",
                       created_at: (now | floor),
                       description: $desc,
                       priorities: $priority
@@ -1309,6 +1305,7 @@ while true; do
                       done: false,
                       in_progress: false,
                       order_index: ($order | tonumber),
+                      source: "user",
                       created_at: (now | floor),
                       description: $desc
                    }] |
@@ -1361,6 +1358,7 @@ while true; do
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
+                          source: "user",
                           created_at: (now | floor),
                           description: $desc,
                           priorities: $priority
@@ -1378,6 +1376,7 @@ while true; do
                           done: false,
                           in_progress: false,
                           order_index: ($order | tonumber),
+                          source: "user",
                           created_at: (now | floor),
                           description: $desc
                        }] |

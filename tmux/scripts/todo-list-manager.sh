@@ -6,6 +6,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 source "$SCRIPT_DIR/lib-twin.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 if ! command -v jq &> /dev/null; then
     echo "Error: jq is required"
@@ -66,10 +67,10 @@ preview_list() {
         echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
         [[ "$overdue" -gt 0 ]] 2>/dev/null && printf '%s%s overdue%s\n' "$COLOR_RED" "$overdue" "$COLOR_RESET"
         echo ""
-        # show in-progress first, then pending
-        jq -r --argjson w "$text_w" '
+        # view order: Mine before Claude, in-progress first inside each
+        jq -r --argjson w "$text_w" "$ORIGIN_JQ"'
             [.todos[] | select(.done == false)] |
-            sort_by((if .in_progress then 0 else 1 end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
+            sort_by(origin_rank, (if .in_progress then 0 else 1 end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
             .[0:5] | .[] |
             (if .in_progress then "▶ " else "• " end) + (.text | split("\n")[0][0:$w])
         ' "$list_file" 2>/dev/null | while read -r line; do

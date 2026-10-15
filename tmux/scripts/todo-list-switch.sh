@@ -6,6 +6,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 DOIT_DATA_DIR="${DOIT_DATA_DIR:-$HOME/.local/share/nvim/doit}"
 LISTS_DIR="$DOIT_DATA_DIR/lists"
@@ -48,7 +49,7 @@ preview_list() {
         [[ "$overdue" -gt 0 ]] 2>/dev/null && printf '%s%s overdue%s\n' "$COLOR_RED" "$overdue" "$COLOR_RESET"
         echo ""
         echo "Recent items:"
-        jq -r --argjson w "$text_w" '.todos | sort_by(.order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:$w])"' "$list_file" 2>/dev/null
+        jq -r --argjson w "$text_w" "$ORIGIN_JQ"'[.todos[] | select(.done == false)] | sort_by(origin_rank, (if .in_progress then 0 else 1 end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) | .[0:5] | .[] | "  - \(.text | split("\n")[0][0:$w])"' "$list_file" 2>/dev/null
     fi
 }
 export -f preview_list

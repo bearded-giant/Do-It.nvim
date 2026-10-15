@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-origin.sh"
 
 TODO_LIST_PATH="$(get_active_list_path)"
 ACTIVE_LIST_NAME="$(get_active_list_name)"
@@ -69,7 +70,7 @@ fi
 PENDING_COUNT=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$TODO_LIST_PATH")
 if [[ $PENDING_COUNT -gt 0 ]]; then
     echo -e "${BOLD}◯ Pending:${RESET}"
-    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == false and .in_progress != true) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | head -10 | while IFS='|' read -r obs line; do
+    jq -r "$ORIGIN_JQ"'.todos | map(select(.done == false and .in_progress != true)) | sort_by(origin_rank, (if (.sequence | type) == "number" then [0, .sequence] else [1, 0] end), (if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) | .[] | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | head -10 | while IFS='|' read -r obs line; do
         obs_icon=""
         [[ "$obs" == "true" ]] && obs_icon=" ${PURPLE}${RESET}"
         echo -e "  • ${line}${obs_icon}"

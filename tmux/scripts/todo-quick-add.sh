@@ -56,6 +56,7 @@ if [[ "$1" == "--process" ]]; then
           done: false,
           in_progress: false,
           order_index: ($order | tonumber),
+          source: "user",
           created_at: (now | floor)
        }] |
        ._metadata.updated_at = (now | floor)' \
