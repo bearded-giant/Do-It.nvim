@@ -771,15 +771,6 @@ function M.format_todo_line(todo)
 	return table.concat(components, " ")
 end
 
--- Calculate the offset for todo indices based on filter headers in the rendered list
-function M.calculate_line_offset()
-	local offset = 1 -- Always have at least one blank line at the top
-	if state.active_filter then
-		offset = offset + 2 -- Add 2 more lines for tag filter header
-	end
-	return offset
-end
-
 -- Resolve the todo under the cursor via the render rows (group-separator safe).
 function M.get_todo_at_cursor()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
