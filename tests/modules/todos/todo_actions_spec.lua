@@ -258,6 +258,24 @@ describe("todo_actions", function()
             assert.is_true(mock_state.todos[1].in_progress)
             assert.is_false(mock_state.todos[1].done)
         end)
+
+        it("follows the toggled todo past section headers", function()
+            mock_state.todos = {
+                { id = "a", text = "Alpha", done = false, in_progress = false, priorities = "critical" },
+                { id = "b", text = "Bravo", done = false, in_progress = false },
+            }
+            -- blank, Critical, Alpha, blank, Default, Bravo
+            vim.api.nvim_win_get_cursor = function() return { 6, 0 } end
+            local cursor_set
+            vim.api.nvim_win_set_cursor = function(_, pos) cursor_set = pos end
+
+            todo_actions.toggle_todo(mock_win_id, function() end)
+
+            assert.is_true(mock_state.todos[2].in_progress)
+            -- after toggle: blank, Critical, Alpha, blank, Bravo (in progress)
+            local rows = require("doit.ui.main_window").build_render_rows()
+            assert.are.equal("b", rows[cursor_set[1]].todo.id)
+        end)
     end)
 
     describe("get_real_todo_index", function()

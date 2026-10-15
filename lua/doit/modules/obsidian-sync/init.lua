@@ -716,30 +716,9 @@ function M.setup_functions()
 			return nil
 		end
 
-		local cursor = vim.api.nvim_win_get_cursor(win_id)
-		local line_num = cursor[1]
-
-		local core = require("doit.core")
-		local todos_module = core.get_module("todos")
-		if not todos_module then
-			return nil
-		end
-
-		local state = todos_module.state
-
-		-- Calculate header offset
-		local line_offset = 1 -- blank line at top
-		if state.active_filter then
-			line_offset = line_offset + 2 -- blank line + filter text
-		end
-
-		-- Calculate which todo we're on
-		local todo_line = line_num - line_offset
-		if todo_line > 0 and todo_line <= #state.todos then
-			return todo_line
-		end
-
-		return nil
+		local line_num = vim.api.nvim_win_get_cursor(win_id)[1]
+		local row = require("doit.ui.main_window").build_render_rows()[line_num]
+		return row and row.todo_index
 	end
 end
 

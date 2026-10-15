@@ -482,69 +482,13 @@ function M.toggle_todo(win_id, on_render)
 				vim.api.nvim_win_set_cursor(win_id, { first_line, 0 })
 			end
 		else
-			-- find new position of the todo after sorting
-			local new_position
-			for i, todo in ipairs(state.todos) do
-				if todo == todo_ref then
-					new_position = i
-					break
-				end
-			end
-
-			if new_position then
-				local new_line_num
-				local line_offset = 1
-				if state.active_filter then
-					line_offset = line_offset + 2
-				end
-
-				local show_completed = true
-				local show_descriptions = true
-				if config.options and config.options.modules and config.options.modules.todos then
-					if config.options.modules.todos.show_completed == false then
-						show_completed = false
-					end
-					if config.options.modules.todos.show_descriptions == false then
-						show_descriptions = false
-					end
-				end
-
-				local current_line = line_offset + 1
-				for i, todo in ipairs(state.todos) do
-					if todo.done and not show_completed then
-						goto continue_cursor
-					end
-
-					local show_by_tag = tags_util.has_tag(todo.text, state.active_filter)
-
-					if show_by_tag then
-						if i == new_position then
-							new_line_num = current_line
-							break
-						end
-						local text_lines = vim.split(todo.text, "\n", { plain = true })
-						local num_lines = #text_lines
-						if show_descriptions and todo.description and todo.description ~= "" then
-							local desc_lines = vim.split(todo.description, "\n", { plain = true })
-							num_lines = num_lines + #desc_lines
-						end
-						current_line = current_line + num_lines
-					end
-					::continue_cursor::
-				end
-
-				-- Validate cursor position
-				if new_line_num then
-					local total_lines = vim.api.nvim_buf_line_count(buf_id)
-					if new_line_num > total_lines then
-						new_line_num = total_lines
-					elseif new_line_num < 1 then
-						new_line_num = 1
-					end
-
+			local rows = require("doit.ui.main_window").build_render_rows()
+			for i, row in ipairs(rows) do
+				if row.todo == todo_ref and row.is_first then
 					if vim.api.nvim_win_is_valid(win_id) then
-						vim.api.nvim_win_set_cursor(win_id, { new_line_num, 0 })
+						vim.api.nvim_win_set_cursor(win_id, { i, 0 })
 					end
+					break
 				end
 			end
 		end
