@@ -230,6 +230,12 @@ assert_eq '[false,null]' "$(field "$DAILY" D1 '[.done, .completed_at]')"
 assert_contains "$(cat "$TEST_TMPDIR/loop.out")" 'twin in "daily": revert'
 
 reset_fixture
+run_loop 'x\nmerge it [P1]' 'X\nmerge it [P1]' 'u\nmerge it [P1]'
+it "u after X brings back the done stamp, and the twin gets the same one"
+assert_eq '[true,"number",true]' "$(jq -c --slurpfile d "$DAILY" \
+    '.todos[] | select(.id == "P1") | [.done, (.completed_at | type), (.completed_at == ($d[0].todos[] | select(.id == "D1") | .completed_at))]' "$PROJ")"
+
+reset_fixture
 echo '{"todos":[],"_metadata":{}}' > "$LISTS_DIR/other.json"
 run_loop 'm\nmerge it [P1]' 'other'
 it "m moves the item and relinks its twin"

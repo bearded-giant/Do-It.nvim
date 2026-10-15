@@ -91,6 +91,7 @@ UNDO_TYPE=""
 UNDO_ID=""
 UNDO_PREV_DONE=""
 UNDO_PREV_IN_PROGRESS=""
+UNDO_PREV_COMPLETED_AT=""
 UNDO_LABEL=""
 UNDO_TWIN=""
 
@@ -101,6 +102,7 @@ snapshot_for_undo() {
     UNDO_ID="$todo_id"
     UNDO_PREV_DONE=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .done' "$TODO_LIST_PATH")
     UNDO_PREV_IN_PROGRESS=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .in_progress // false' "$TODO_LIST_PATH")
+    UNDO_PREV_COMPLETED_AT=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .completed_at // ""' "$TODO_LIST_PATH")
     UNDO_LABEL=$(jq -r --arg id "$todo_id" '.todos[] | select(.id == $id) | .text' "$TODO_LIST_PATH")
 }
 
@@ -955,11 +957,12 @@ while true; do
                 UNDO_TYPE=""
                 sleep 0.5
             else
-                jq --arg id "$UNDO_ID" --argjson done "$UNDO_PREV_DONE" --argjson ip "$UNDO_PREV_IN_PROGRESS" '
+                jq --arg id "$UNDO_ID" --argjson done "$UNDO_PREV_DONE" --argjson ip "$UNDO_PREV_IN_PROGRESS" \
+                    --arg ca "$UNDO_PREV_COMPLETED_AT" '
                     .todos |= map(
                         if .id == $id then
                             .done = $done | .in_progress = $ip |
-                            if $done then . else del(.completed_at) end
+                            if $done then .completed_at = (($ca | tonumber?) // .completed_at) else del(.completed_at) end
                         else . end
                     ) |
                     ._metadata.updated_at = (now | floor)
