@@ -55,18 +55,18 @@ This usually appears if any test in the file failed. If all tests pass, you won'
 
 ## Running Specific Tests
 
-You can run specific tests by modifying the command in `docker/run-tests.sh`:
+`docker/run-tests.sh` takes two optional flags, so there's no need to edit the script:
 
 ```bash
-# Run all tests
-docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests', {pattern = '.*_spec.lua', recursive = true})" -c "qa!"
+# every spec file whose path contains the string
+docker/run-tests.sh --pattern origin_blocks
 
-# Run only state tests
-docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state', {pattern = '.*_spec.lua'})" -c "qa!"
-
-# Run a specific test file
-docker run --rm -v "$(pwd)/..:/plugin" doit-plugin-test nvim --headless -c "lua require('plenary.test_harness').test_directory('tests/state/todos_spec.lua')" -c "qa!"
+# every spec file under a directory, or a single spec file
+docker/run-tests.sh --dir tests/modules/todos
+docker/run-tests.sh --dir tests/modules/todos/sorting_spec.lua
 ```
+
+plenary's `test_directory` has no pattern option of its own, so the script turns `--pattern` into a list of spec files before it starts the container.
 
 ## Test Structure
 
