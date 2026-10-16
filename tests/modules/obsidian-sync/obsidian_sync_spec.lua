@@ -2,8 +2,16 @@ describe("obsidian-sync module", function()
     local obsidian_sync
     local mock_todos_module
     local test_bufnr
+    local orig_home
+    local fake_home
 
     before_each(function()
+        -- the module's vault paths expand ~, and a real HOME points them at the user's live daily notes
+        orig_home = vim.env.HOME
+        fake_home = vim.fn.tempname()
+        vim.fn.mkdir(fake_home, "p")
+        vim.env.HOME = fake_home
+
         -- Clear module cache
         package.loaded["doit.modules.obsidian-sync"] = nil
         package.loaded["doit.core"] = nil
@@ -74,6 +82,8 @@ describe("obsidian-sync module", function()
         if test_bufnr and vim.api.nvim_buf_is_valid(test_bufnr) then
             vim.api.nvim_buf_delete(test_bufnr, {force = true})
         end
+        vim.env.HOME = orig_home
+        vim.fn.delete(fake_home, "rf")
     end)
 
     describe("module loading", function()

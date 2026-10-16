@@ -1,8 +1,16 @@
 describe("obsidian-sync integration", function()
     local obsidian_sync
     local temp_file
+    local orig_home
+    local fake_home
 
     before_each(function()
+        -- the module's vault paths expand ~, and a real HOME points them at the user's live daily notes
+        orig_home = vim.env.HOME
+        fake_home = vim.fn.tempname()
+        vim.fn.mkdir(fake_home, "p")
+        vim.env.HOME = fake_home
+
         -- Clear module cache
         package.loaded["doit.modules.obsidian-sync"] = nil
 
@@ -49,6 +57,8 @@ describe("obsidian-sync integration", function()
         if temp_file and vim.fn.filereadable(temp_file) == 1 then
             vim.fn.delete(temp_file)
         end
+        vim.env.HOME = orig_home
+        vim.fn.delete(fake_home, "rf")
     end)
 
     describe("commands", function()

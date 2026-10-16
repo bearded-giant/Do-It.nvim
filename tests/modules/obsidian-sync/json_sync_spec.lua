@@ -4,6 +4,7 @@ describe("obsidian-sync json operations", function()
     local mock_todos_module
     local test_dir
     local test_bufnr
+    local orig_home
 
     before_each(function()
         -- Clear module cache
@@ -13,6 +14,9 @@ describe("obsidian-sync json operations", function()
         -- Create temp directory for mock JSON files
         test_dir = "/tmp/doit_obsidian_test_" .. os.time() .. "_" .. math.random(1000)
         vim.fn.mkdir(test_dir .. "/lists", "p")
+        -- the module's vault paths expand ~, and a real HOME points them at the user's live daily notes
+        orig_home = vim.env.HOME
+        vim.env.HOME = test_dir
 
         -- Create mock todos module
         mock_todos_module = {
@@ -73,6 +77,7 @@ describe("obsidian-sync json operations", function()
         if test_bufnr and vim.api.nvim_buf_is_valid(test_bufnr) then
             vim.api.nvim_buf_delete(test_bufnr, { force = true })
         end
+        vim.env.HOME = orig_home
         os.execute("rm -rf " .. test_dir)
     end)
 
