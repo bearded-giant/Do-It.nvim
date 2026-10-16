@@ -121,9 +121,9 @@ show_todo() {
     local color="#{@doit-todo-fg}"
     local icon="#{@doit-todo-icon}"
     local text_bg="#{@doit-todo-text-bg}"
-    # pass the session name: #() runs without a client context, so the exec
-    # script cannot ask tmux which session it renders for
-    local script_path="${SCRIPTS_DIR}/todo-exec.sh '#{session_name}'"
+    # pass the window: #() runs without a client context, so the exec
+    # script cannot ask tmux which window it renders for
+    local script_path="${SCRIPTS_DIR}/todo-exec.sh #{window_id}"
 
     # custom renderer — mirrors theme's status_fill=icon geometry but with
     # dynamic bg refs so the chip can fully collapse into $thm_bg when empty.
@@ -139,8 +139,8 @@ show_todo() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     if [[ -n "$1" ]]; then
-        # invoked from the status line with #{session_name} as $1
-        export DOIT_SESSION_NAME="$1"
+        # invoked from the status line with #{window_id} as $1
+        export DOIT_WINDOW="$1"
         TODO_LIST_PATH="$(get_active_list_path)"
         ACTIVE_LIST_NAME="$(get_active_list_name)"
     fi

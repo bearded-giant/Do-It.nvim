@@ -63,22 +63,56 @@ function writeJSON(filepath, data) {
     fs.renameSync(filepath + ".tmp", filepath);
 }
 
-// Current tmux session name, or null outside tmux. Resolved per call, not per
-// process — the user moves panes between sessions and the server lives long.
-function getTmuxSessionName() {
+// tmux format output separator; window names can hold tabs and spaces
+const TMUX_SEP = "\x1f";
+
+function tmux(args) {
+    return execFileSync("tmux", args, { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).replace(/\n$/, "");
+}
+
+// The tmux window this server runs in, or null outside tmux: its id and its
+// key "<session>:<window name>", which a link persists under in session.json.
+// Resolved per call, not per process — the user moves panes between windows
+// and the server lives long.
+function getTmuxWindow() {
     if (!process.env.TMUX) return null;
     try {
         // popups have no TMUX_PANE; $TMUX ends in the session id, which beats the most-recent-session guess
         const sid = process.env.TMUX.split(",").pop();
         const target = process.env.TMUX_PANE ? ["-t", process.env.TMUX_PANE]
             : /^\d+$/.test(sid) ? ["-t", `$${sid}`] : [];
-        const out = execFileSync("tmux", ["display-message", "-p", ...target, "#S"], {
-            encoding: "utf-8",
-            stdio: ["ignore", "pipe", "ignore"],
-        });
-        return out.trim() || null;
+        const [id, ...rest] = tmux(["display-message", "-p", ...target, `#{window_id}${TMUX_SEP}#S:#W`]).split(TMUX_SEP);
+        const key = rest.join(TMUX_SEP);
+        return id && key ? { id, key } : null;
     } catch {
         return null;
+    }
+}
+
+// The live link is the window's @doit-window-list option, which follows the
+// window through renames and moves; the key stamp lets tmux/scripts/todo-relink.sh
+// move the persisted copy after a rename.
+function setWindowLink(win, list) {
+    tmux(["set-option", "-wq", "-t", win.id, "@doit-window-list", list]);
+    tmux(["set-option", "-wq", "-t", win.id, "@doit-window-key", win.key]);
+}
+
+// Live windows linked to list `from` now link `to`; a null `to` unlinks them.
+function retagLiveWindows(from, to) {
+    if (!process.env.TMUX) return;
+    try {
+        for (const line of tmux(["list-windows", "-a", "-F", `#{window_id}${TMUX_SEP}#{@doit-window-list}`]).split("\n")) {
+            const [id, list] = line.split(TMUX_SEP);
+            if (!id || list !== from) continue;
+            if (to) {
+                tmux(["set-option", "-wq", "-t", id, "@doit-window-list", to]);
+            } else {
+                tmux(["set-option", "-wqu", "-t", id, "@doit-window-list"]);
+                tmux(["set-option", "-wqu", "-t", id, "@doit-window-key"]);
+            }
+        }
+    } catch {
+        // tmux gone: the persisted links in session.json were still updated
     }
 }
 
@@ -447,9 +481,9 @@ IMPORTANT: Always use these MCP tools for todo operations. NEVER use bash, grep,
 
 There is always an active list: "daily", unless the DOIT_ACTIVE_LIST env var names another. When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
 
-Session-linked lists: the user's nvim and tmux views can link a tmux session to a list (the 'sessions' map in session.json). Those links and the global pointer are the user's view state and do NOT change this server's default list. For project work, always pass list= explicitly.
-- switch_list changes the user's views only: inside tmux it links the current tmux session AND updates the global pointer by default; scope="global" sets only the global pointer, scope="session" only the link. Call it only when the user asks to switch their view.
-- list_lists shows which tmux sessions link each list — use it to answer "which session shows what".
+Window-linked lists: the user's nvim and tmux views can link a tmux window to a list (the 'sessions' map in session.json, keyed "<session>:<window name>"). Those links and the global pointer are the user's view state and do NOT change this server's default list. For project work, always pass list= explicitly.
+- switch_list changes the user's views only: inside tmux it links the current tmux window AND updates the global pointer by default; scope="global" sets only the global pointer, scope="window" only the link. Call it only when the user asks to switch their view.
+- list_lists shows which tmux windows link each list — use it to answer "which window shows what".
 - list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)" when that env var decided it. Tell the user: a stale export in the shell that launched this server pins every omitted list= to one list.
 
 Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
@@ -486,8 +520,8 @@ Behavior:
 - "search for X" → search_todos
 - user pastes or names an id ("work 1757012345_4821", "fetch this todo: <id>") → get_todo — it finds the item in WHICHEVER list holds it and names that list
 - "show my lists" / "which lists" → list_lists
-- "switch to X list" → switch_list (the user's view only; in tmux: links this session + sets global; pass scope to narrow)
-- "set the global list without touching this session" → switch_list with scope="global" (unlinking a session is done in the tmux UI with the u key)
+- "switch to X list" → switch_list (the user's view only; in tmux: links this window + sets global; pass scope to narrow)
+- "set the global list without touching this window" → switch_list with scope="global" (unlinking a window is done in the tmux UI with the u key)
 - "todos for <project>" → list_todos with list=<project-name> (list names often match project names)
 - "create list X" → create_list
 - "rename list X to Y" → rename_list
@@ -1464,18 +1498,18 @@ server.tool(
 
 server.tool(
     "list_lists",
-    "Show all available do-it todo lists (from ~/.local/share/nvim/doit/lists/) and which one is active.",
+    "Show all available do-it todo lists (from ~/.local/share/nvim/doit/lists/), which one is active, and which tmux windows link each.",
     {},
     async () => {
         const files = fs.readdirSync(LISTS_DIR).filter(f => f.endsWith(".json"));
         const active = getActiveListName();
         const activeVia = process.env.DOIT_ACTIVE_LIST
-            ? " (via DOIT_ACTIVE_LIST env override, not the session link)"
+            ? " (via DOIT_ACTIVE_LIST env override, not the window link)"
             : "";
 
         const linksByList = {};
-        for (const [sess, list] of Object.entries(readSession().sessions || {})) {
-            (linksByList[list] = linksByList[list] || []).push(sess);
+        for (const [win, list] of Object.entries(readSession().sessions || {})) {
+            (linksByList[list] = linksByList[list] || []).push(win);
         }
 
         const lines = files.map(f => {
@@ -1499,34 +1533,36 @@ server.tool(
 
 server.tool(
     "switch_list",
-    "Switch the active do-it list. Inside tmux the default links the current tmux session to the list AND updates the global pointer; scope narrows the write.",
+    "Switch the active do-it list. Inside tmux the default links the current tmux window to the list AND updates the global pointer; scope narrows the write.",
     {
         list: z.string().describe("List name to switch to"),
-        scope: z.enum(["session", "global"]).optional().describe("'session': only link the current tmux session (needs tmux). 'global': only set the global pointer, touch no session link. Omit for the default (both inside tmux, global outside)."),
+        scope: z.enum(["window", "session", "global"]).optional().describe("'window': only link the current tmux window (needs tmux); 'session' is its older name. 'global': only set the global pointer, touch no window link. Omit for the default (both inside tmux, global outside)."),
     },
     async ({ list, scope }) => {
+        if (scope === "session") scope = "window";
         const filepath = getListPath(list);
         if (!fs.existsSync(filepath)) {
             throw new Error(`List "${list}" not found. Use list_lists to see available lists.`);
         }
 
-        const sess = getTmuxSessionName();
-        if (scope === "session" && !sess) {
-            throw new Error("Not inside tmux — there is no session to link. Use scope 'global' or omit scope.");
+        const win = getTmuxWindow();
+        if (scope === "window" && !win) {
+            throw new Error("Not inside tmux — there is no window to link. Use scope 'global' or omit scope.");
         }
 
-        const linkIt = scope !== "global" && sess;
-        const setGlobal = scope !== "session";
+        const linkIt = scope !== "global" && win;
+        const setGlobal = scope !== "window";
         updateSession(session => {
             if (linkIt) {
                 session.sessions = session.sessions || {};
-                session.sessions[sess] = list;
+                session.sessions[win.key] = list;
             }
             if (setGlobal) session.active_list = list;
         });
+        if (linkIt) setWindowLink(win, list);
 
         const effects = [];
-        if (linkIt) effects.push(`linked tmux session "${sess}"`);
+        if (linkIt) effects.push(`linked tmux window "${win.key}"`);
         if (setGlobal) effects.push("set the global pointer");
         return {
             content: [{
@@ -1610,6 +1646,7 @@ server.tool(
                 if (list === old_name) session.sessions[sess] = new_name;
             }
         });
+        retagLiveWindows(old_name, new_name);
 
         return {
             content: [{
@@ -1647,6 +1684,7 @@ server.tool(
                 if (list === name) delete session.sessions[sess];
             }
         });
+        retagLiveWindows(name, null);
 
         return {
             content: [{

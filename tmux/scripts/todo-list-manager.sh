@@ -33,8 +33,8 @@ finish() {
     [[ "$action" == "view" ]] && exec "$SCRIPT_DIR/todo-interactive.sh" --list "$name"
     exit 0
 }
-SESS=$(get_tmux_session_name 2>/dev/null) || SESS=""
-LIVE_SESSIONS=$(tmux list-sessions -F '#S' 2>/dev/null)
+WIN=$(get_tmux_window_key 2>/dev/null) || WIN=""
+LIVE_WINDOWS=$(tmux list-windows -a -F '#S:#W' 2>/dev/null)
 
 # colors
 COLOR_GREEN=$'\e[1;32m'
@@ -105,18 +105,19 @@ overdue_badge_for_list() {
     return 0
 }
 
-# " [sess1 sess2]" for lists some session links; dead sessions render dim
+# " [sess:win1, sess:win2]" for lists some window links; dead windows render dim.
+# comma-joined because window names carry spaces
 badge_for_list() {
     local badge="" s
     while IFS= read -r s; do
         [[ -z "$s" ]] && continue
-        if grep -qxF -- "$s" <<< "$LIVE_SESSIONS"; then
-            badge+=" ${COLOR_YELLOW}${s}${COLOR_RESET}"
+        if grep -qxF -- "$s" <<< "$LIVE_WINDOWS"; then
+            badge+=", ${COLOR_YELLOW}${s}${COLOR_RESET}"
         else
-            badge+=" ${COLOR_DIM_YELLOW}${s}${COLOR_RESET}"
+            badge+=", ${COLOR_DIM_YELLOW}${s}${COLOR_RESET}"
         fi
-    done < <(sessions_for_list "$1")
-    [[ -n "$badge" ]] && printf ' [%s]' "${badge# }"
+    done < <(windows_for_list "$1")
+    [[ -n "$badge" ]] && printf ' [%s]' "${badge#, }"
 }
 
 # daily pinned to the top with its pending count; active list marked with *
@@ -208,7 +209,7 @@ rename_list() {
     fi
 
     mv "$LISTS_DIR/${old_name}.json" "$LISTS_DIR/${SAFE_NAME}.json"
-    relink_sessions_for_list "$old_name" "$SAFE_NAME"
+    relink_windows_for_list "$old_name" "$SAFE_NAME"
     # a twin pair can sit inside this one list, so refs to the old name read as the new one
     local ref
     while IFS= read -r ref; do
@@ -216,7 +217,7 @@ rename_list() {
     done < <(jq -r --arg old "$old_name" --arg new "$SAFE_NAME" '.todos[] | .twin // empty | select(.list and .id)
         | "\(if .list == $old then $new else .list end)\t\(.id)"' "$LISTS_DIR/${SAFE_NAME}.json")
 
-    # update session if this was active list
+    # update the link if this was the active list
     if [[ "$old_name" == "$CURRENT_LIST" ]]; then
         set_active_list "$SAFE_NAME"
     fi
@@ -260,17 +261,17 @@ while true; do
     clear
     CURRENT_LIST=$(get_active_list_name)
 
-    # format list with active indicator + session-link badges
+    # format list with active indicator + window-link badges
     LIST_DISPLAY=$(build_rows)
 
-    SESSION_HINT=""
-    [[ -n "$SESS" ]] && SESSION_HINT=" - Session: $SESS"
+    WINDOW_HINT=""
+    [[ -n "$WIN" ]] && WINDOW_HINT=" - Window: $WIN"
     SELECTION=$(echo "$LIST_DISPLAY" | fzf --ansi \
         --header="
- List Manager - Active: $CURRENT_LIST$SESSION_HINT
+ List Manager - Active: $CURRENT_LIST$WINDOW_HINT
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup    y: Copy name
- ENTER: Open    l: Link to session    g: Set global    u: Unlink session    /: Search
+ ENTER: Open    l: Link to window    g: Set global    u: Unlink window    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
@@ -347,9 +348,9 @@ while true; do
             fi
             ;;
         "u")
-            if [[ -n "$SESS" ]]; then
-                unlink_session "$SESS"
-                echo "${COLOR_GREEN}Unlinked session '$SESS' (falls back to daily)${COLOR_RESET}"
+            if [[ -n "$WIN" ]]; then
+                unlink_current_window
+                echo "${COLOR_GREEN}Unlinked window '$WIN' (falls back to daily)${COLOR_RESET}"
                 sleep 0.5
             fi
             ;;

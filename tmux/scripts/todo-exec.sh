@@ -1,20 +1,23 @@
 #!/bin/bash
 
-# Get the current in-progress todo from the active list. When nothing is
-# in_progress the chip names the resolved list so a wrong link is visible.
+# Get the current in-progress todo from the window's list, labelled
+# "<session>:<window>"; outside tmux the list name is the label.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 
-# status line passes #{session_name} as $1 — #() has no client context
-[[ -n "$1" ]] && export DOIT_SESSION_NAME="$1"
+# status line passes #{window_id} as $1 — #() has no client context; by hand,
+# '<session>:<window>' names a window too
+[[ -n "$1" ]] && export DOIT_WINDOW="$1"
 
 ACTIVE_LIST_NAME="$(get_active_list_name)"
 TODO_LIST_PATH="$LISTS_DIR/${ACTIVE_LIST_NAME}.json"
 CHAR_LIMIT=$(tmux show -gqv @doit-todo-chars 2>/dev/null)
 CHAR_LIMIT=${CHAR_LIMIT:-25}
 LIST_CHAR_LIMIT=$(tmux show -gqv @doit-list-chars 2>/dev/null)
-LIST_LABEL="$ACTIVE_LIST_NAME"
+# outside tmux there is no window, so the list name stands in as the label
+WINDOW_KEY=$(get_tmux_window_key 2>/dev/null) || WINDOW_KEY=""
+LIST_LABEL="${WINDOW_KEY:-$ACTIVE_LIST_NAME}"
 [[ -n "$LIST_CHAR_LIMIT" && ${#LIST_LABEL} -gt $LIST_CHAR_LIMIT ]] && LIST_LABEL="${LIST_LABEL:0:$LIST_CHAR_LIMIT}..."
 ICON_TASK=$'\xef\x82\xae'
 

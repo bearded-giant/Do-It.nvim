@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/lib-origin.sh"
 DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
 # --list <name>: pin this view to one list (the daily popup) without touching
-# any session link. Exported so fzf binds that re-run this script (--format
+# any window link. Exported so fzf binds that re-run this script (--format
 # reloads, todo-move.sh) stay on the pinned list.
 FORMAT_MODE=""
 while [[ $# -gt 0 ]]; do

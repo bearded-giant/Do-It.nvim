@@ -11,25 +11,65 @@ local function get_session_file()
     return session_dir .. "/session.json"
 end
 
--- Current tmux session name, or nil outside tmux
-local function tmux_session_name()
-    if not vim.env.TMUX or vim.fn.executable("tmux") == 0 then
-        return nil
-    end
-    local cmd = "tmux display-message -p '#S'"
-    if vim.env.TMUX_PANE then
-        -- pane-targeted: correct even after the window moved between sessions
-        cmd = "tmux display-message -p -t " .. vim.fn.shellescape(vim.env.TMUX_PANE) .. " '#S'"
-    end
-    local out = vim.fn.system(cmd)
+-- field separator for tmux format output; window names can hold tabs and spaces
+local SEP = "\31"
+
+-- Run tmux with an argv list; stdout without its trailing newline, nil on failure
+local function tmux(args)
+    local out = vim.fn.system(vim.list_extend({ "tmux" }, args))
     if vim.v.shell_error ~= 0 or not out then
         return nil
     end
-    out = out:gsub("%s+$", "")
-    if out == "" then
+    return (out:gsub("\n$", ""))
+end
+
+-- This nvim's tmux window, or nil outside tmux: id, live (its @doit-window-list
+-- link, which follows the window through renames and moves), and key
+-- ("<session>:<window name>", what the link persists under in session.json)
+local function tmux_window()
+    if not vim.env.TMUX or vim.fn.executable("tmux") == 0 then
         return nil
     end
-    return out
+    local args = { "display-message", "-p" }
+    if vim.env.TMUX_PANE then
+        -- pane-targeted: correct even after the window moved between sessions
+        vim.list_extend(args, { "-t", vim.env.TMUX_PANE })
+    end
+    table.insert(args, "#{window_id}" .. SEP .. "#{@doit-window-list}" .. SEP .. "#S:#W")
+    local id, live, key = (tmux(args) or ""):match("^([^\31]*)\31([^\31]*)\31(.+)$")
+    if not id then
+        return nil
+    end
+    return { id = id, live = live ~= "" and live or nil, key = key }
+end
+
+-- the key stamp lets tmux/scripts/todo-relink.sh move the persisted copy on a rename
+local function set_window_link(win, list_name)
+    tmux({ "set-option", "-wq", "-t", win.id, "@doit-window-list", list_name })
+    tmux({ "set-option", "-wq", "-t", win.id, "@doit-window-key", win.key })
+end
+
+-- id/value pairs of every live window's tmux option `name`
+local function live_windows(name)
+    local out = tmux({ "list-windows", "-a", "-F", "#{window_id}" .. SEP .. "#{" .. name .. "}" }) or ""
+    local rows = {}
+    for line in out:gmatch("[^\n]+") do
+        local id, value = line:match("^([^\31]*)\31(.*)$")
+        if id then
+            table.insert(rows, { id = id, value = value })
+        end
+    end
+    return rows
+end
+
+-- true when a live window other than win already holds the link persisted for win.key
+local function key_claimed_elsewhere(win)
+    for _, row in ipairs(live_windows("@doit-window-key")) do
+        if row.id ~= win.id and row.value == win.key then
+            return true
+        end
+    end
+    return false
 end
 
 local function read_session()
@@ -49,11 +89,23 @@ local function read_session()
     return {}
 end
 
+local function write_session(data)
+    -- an empty lua table json_encodes as [] which breaks the jq readers
+    if type(data.sessions) == "table" and next(data.sessions) == nil then
+        data.sessions = nil
+    end
+    local file = io.open(get_session_file(), "w")
+    if file then
+        file:write(vim.fn.json_encode(data))
+        file:close()
+    end
+end
+
 -- Save current list selection. The file is shared with the tmux and MCP
--- surfaces and carries a per-tmux-session 'sessions' link map, so this must
--- read-merge-write — a wholesale rewrite would clobber the other sessions'
--- links. Inside tmux the switch writes BOTH the session link and the global
--- pointer; outside tmux the global pointer only.
+-- surfaces and carries a per-tmux-window 'sessions' link map, so this must
+-- read-merge-write — a wholesale rewrite would clobber the other windows'
+-- links. Inside tmux the switch writes BOTH the window link (live option and
+-- persisted copy) and the global pointer; outside tmux the global pointer only.
 function M.save_session(list_name)
     if not list_name then
         return
@@ -63,37 +115,60 @@ function M.save_session(list_name)
     data.active_list = list_name
     data.timestamp = os.time()
 
-    local sess = tmux_session_name()
-    if sess then
+    local win = tmux_window()
+    if win then
         if type(data.sessions) ~= "table" then
             data.sessions = {}
         end
-        data.sessions[sess] = list_name
-    end
-    -- an empty lua table json_encodes as [] which breaks the jq readers
-    if type(data.sessions) == "table" and next(data.sessions) == nil then
-        data.sessions = nil
+        data.sessions[win.key] = list_name
+        set_window_link(win, list_name)
     end
 
-    local file = io.open(get_session_file(), "w")
-    if file then
-        local json = vim.fn.json_encode(data)
-        file:write(json)
-        file:close()
+    write_session(data)
+end
+
+-- Every window linked to old_name, live and persisted, now links new_name.
+function M.relink_list(old_name, new_name)
+    local data = read_session()
+    if type(data.sessions) == "table" then
+        local changed = false
+        for key, list in pairs(data.sessions) do
+            if list == old_name then
+                data.sessions[key] = new_name
+                changed = true
+            end
+        end
+        if changed then
+            write_session(data)
+        end
+    end
+    if vim.env.TMUX and vim.fn.executable("tmux") == 1 then
+        for _, row in ipairs(live_windows("@doit-window-list")) do
+            if row.value == old_name then
+                tmux({ "set-option", "-wq", "-t", row.id, "@doit-window-list", new_name })
+            end
+        end
     end
 end
 
 -- Load last selected list. Returns (list_name, from_link). Inside tmux only
--- the session link counts: an unlinked session gets nil (the caller's default
+-- the window link counts: an unlinked window gets nil (the caller's default
 -- list), never the global pointer, which is the outside-tmux default. from_link
 -- tells the caller the choice was an explicit link (outranks project derivation).
 function M.load_session()
     local data = read_session()
 
-    local sess = tmux_session_name()
-    if sess then
-        if type(data.sessions) == "table" and data.sessions[sess] then
-            return data.sessions[sess], true
+    local win = tmux_window()
+    if win then
+        if win.live then
+            return win.live, true
+        end
+        -- a tmux restart drops window options: the link persisted under this
+        -- window's name comes back, unless a same-named live window holds it
+        local link = type(data.sessions) == "table" and data.sessions[win.key] or nil
+        if link and not key_claimed_elsewhere(win) then
+            set_window_link(win, link)
+            return link, true
         end
         return nil, false
     end

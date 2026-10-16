@@ -1,9 +1,13 @@
 -- storage.load_list runs for startup restore, previews and cross-list moves;
--- only switch_list may write the tmux session link. A restore that persisted
+-- only switch_list may write the tmux window link. A restore that persisted
 -- the global fallback is how unrelated tmux sessions ended up linked to one list.
 
 describe("list switch persistence", function()
-	local tmpdir, orig_stdpath, orig_path, state
+	local tmpdir, orig_stdpath, state, sock
+
+	local function T(...)
+		return vim.trim(vim.fn.system(vim.list_extend({ "tmux", "-S", sock }, { ... })))
+	end
 
 	local function session_file()
 		return tmpdir .. "/doit/session.json"
@@ -30,34 +34,29 @@ describe("list switch persistence", function()
 		f:close()
 	end
 
-	-- fake tmux on PATH answering every display-message with a fixed session name
-	local function enter_fake_tmux(name)
-		local bindir = tmpdir .. "/bin"
-		vim.fn.mkdir(bindir, "p")
-		local f = io.open(bindir .. "/tmux", "w")
-		f:write("#!/bin/sh\necho " .. name .. "\n")
-		f:close()
-		os.execute("chmod +x " .. bindir .. "/tmux")
-		vim.env.PATH = bindir .. ":" .. orig_path
-		vim.env.TMUX = "/tmp/fake-tmux-sock,1,0"
+	-- a real tmux server on a private socket; this nvim sits in window s:alpha
+	local function enter_tmux()
+		sock = "/tmp/doit-spec-" .. vim.fn.getpid() .. "-" .. math.random(1000000) .. ".sock"
+		T("-f", "/dev/null", "new-session", "-d", "-s", "s", "-n", "alpha", "-x", "80", "-y", "24")
+		T("new-window", "-d", "-t", "s:", "-n", "beta")
+		vim.env.TMUX = sock .. "," .. T("display", "-p", "#{pid}") .. ",0"
+		vim.env.TMUX_PANE = T("display", "-p", "-t", "s:alpha", "#{pane_id}")
 	end
 
 	before_each(function()
 		tmpdir = vim.fn.tempname()
 		vim.fn.mkdir(tmpdir, "p")
 		orig_stdpath = vim.fn.stdpath
-		orig_path = vim.env.PATH
 		vim.fn.stdpath = function(what)
 			if what == "data" then
 				return tmpdir
 			end
 			return orig_stdpath(what)
 		end
-		vim.env.TMUX_PANE = nil
-		enter_fake_tmux("alpha")
+		enter_tmux()
 
 		-- alpha is unlinked; the global pointer names an existing list
-		write_session({ active_list = "work", sessions = { beta = "play" } })
+		write_session({ active_list = "work", sessions = { ["s:beta"] = "play" } })
 		write_list("work")
 		write_list("play")
 
@@ -71,19 +70,22 @@ describe("list switch persistence", function()
 	end)
 
 	after_each(function()
+		vim.fn.system({ "tmux", "-S", sock, "kill-server" })
+		os.remove(sock)
 		vim.fn.stdpath = orig_stdpath
-		vim.env.PATH = orig_path
 		vim.env.TMUX = nil
+		vim.env.TMUX_PANE = nil
 		vim.fn.delete(tmpdir, "rf")
 	end)
 
-	it("startup restore of an unlinked session lands on daily and writes no link", function()
+	it("startup restore of an unlinked window lands on daily and writes no link", function()
 		state.load_from_disk()
 
 		assert.are.equal("daily", state.todo_lists.active)
 		local data = read_session()
-		assert.is_nil(data.sessions.alpha)
-		assert.are.equal("play", data.sessions.beta)
+		assert.is_nil(data.sessions["s:alpha"])
+		assert.are.equal("play", data.sessions["s:beta"])
+		assert.are.equal("", T("display", "-p", "-t", "s:alpha", "#{@doit-window-list}"))
 		assert.are.equal("work", data.active_list)
 	end)
 
@@ -91,17 +93,18 @@ describe("list switch persistence", function()
 		state.load_list("play")
 
 		local data = read_session()
-		assert.is_nil(data.sessions.alpha)
+		assert.is_nil(data.sessions["s:alpha"])
 		assert.are.equal("work", data.active_list)
 	end)
 
-	it("switch_list links this session and moves the global pointer", function()
+	it("switch_list links this window and moves the global pointer", function()
 		local ok = state.switch_list("play")
 
 		assert.is_true(ok)
 		local data = read_session()
-		assert.are.equal("play", data.sessions.alpha)
-		assert.are.equal("play", data.sessions.beta)
+		assert.are.equal("play", data.sessions["s:alpha"])
+		assert.are.equal("play", data.sessions["s:beta"])
 		assert.are.equal("play", data.active_list)
+		assert.are.equal("play", T("display", "-p", "-t", "s:alpha", "#{@doit-window-list}"))
 	end)
 end)

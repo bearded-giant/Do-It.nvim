@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # list switcher for doit tmux integration
-# ENTER links the list to the current tmux session (and refreshes the global
-# pointer); g sets the global pointer only; u unlinks the current session.
+# ENTER links the list to the current tmux window (and refreshes the global
+# pointer); g sets the global pointer only; u unlinks the current window.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
@@ -29,8 +29,8 @@ COLOR_DIM_YELLOW=$'\e[2;33m'
 COLOR_RESET=$'\e[0m'
 
 CURRENT_LIST=$(get_active_list_name)
-SESS=$(get_tmux_session_name 2>/dev/null) || SESS=""
-LIVE_SESSIONS=$(tmux list-sessions -F '#S' 2>/dev/null)
+WIN=$(get_tmux_window_key 2>/dev/null) || WIN=""
+LIVE_WINDOWS=$(tmux list-windows -a -F '#S:#W' 2>/dev/null)
 
 preview_list() {
     # rows carry markers/badges — first word after any "* " marker is the name
@@ -66,18 +66,19 @@ overdue_badge_for_list() {
     return 0
 }
 
-# " [sess1 sess2]" for lists some session links; dead sessions render dim
+# " [sess:win1, sess:win2]" for lists some window links; dead windows render dim.
+# comma-joined because window names carry spaces
 badge_for_list() {
     local badge="" s
     while IFS= read -r s; do
         [[ -z "$s" ]] && continue
-        if grep -qxF -- "$s" <<< "$LIVE_SESSIONS"; then
-            badge+=" ${COLOR_YELLOW}${s}${COLOR_RESET}"
+        if grep -qxF -- "$s" <<< "$LIVE_WINDOWS"; then
+            badge+=", ${COLOR_YELLOW}${s}${COLOR_RESET}"
         else
-            badge+=" ${COLOR_DIM_YELLOW}${s}${COLOR_RESET}"
+            badge+=", ${COLOR_DIM_YELLOW}${s}${COLOR_RESET}"
         fi
-    done < <(sessions_for_list "$1")
-    [[ -n "$badge" ]] && printf ' [%s]' "${badge# }"
+    done < <(windows_for_list "$1")
+    [[ -n "$badge" ]] && printf ' [%s]' "${badge#, }"
 }
 
 # daily pinned to the top with its pending count, the rest as-is
@@ -95,9 +96,9 @@ build_rows() {
     done < <(get_available_lists)
 }
 
-if [[ -n "$SESS" ]]; then
-    HEADER="Lists — session: $SESS → $CURRENT_LIST
-ENTER: link to session   ctrl-g: set global only   ctrl-u: unlink session"
+if [[ -n "$WIN" ]]; then
+    HEADER="Lists — window: $WIN → $CURRENT_LIST
+ENTER: link to window   ctrl-g: set global only   ctrl-u: unlink window"
 else
     HEADER="Switch Todo List (current: $CURRENT_LIST)
 ENTER: switch   ctrl-g: set global"
@@ -118,9 +119,9 @@ SELECTED=$(echo "$RESULT" | tail -1 | awk '{print $1}')
 
 case "$KEY" in
     "ctrl-u")
-        if [[ -n "$SESS" ]]; then
-            unlink_session "$SESS"
-            echo "Unlinked session '$SESS' (falls back to daily)"
+        if [[ -n "$WIN" ]]; then
+            unlink_current_window
+            echo "Unlinked window '$WIN' (falls back to daily)"
         fi
         ;;
     "ctrl-g")

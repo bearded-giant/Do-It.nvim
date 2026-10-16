@@ -10,7 +10,7 @@ CONTENTS                                                *doit-tmux-contents*
   5. Interactive Manager ......................... |doit-tmux-interactive|
   6. Status Bar ........................................ |doit-tmux-status|
   7. Shared Storage ................................... |doit-tmux-storage|
-  8. Session-Linked Lists ....................... |doit-tmux-session-links|
+  8. Window-Linked Lists ......................... |doit-tmux-window-links|
   9. Configuration .............................. |doit-tmux-configuration|
 
 ==============================================================================
@@ -24,7 +24,7 @@ Key features:
 - Full CRUD operations (create, read, update, delete)
 - Interactive fzf-based manager
 - Multiple list support with switching
-- Per-tmux-session active lists (see |doit-tmux-session-links|)
+- Per-tmux-window active lists (see |doit-tmux-window-links|)
 - Undo support for accidental deletes
 - Status bar integration
 - Shared storage with Neovim (session.json)
@@ -78,10 +78,10 @@ Quick Actions~
     prefix + d + N     Start next pending todo
 
 List Management~
-    prefix + d + l     Switch between lists (links the current session)
+    prefix + d + l     Switch between lists (links the current window)
     prefix + d + L     List manager (create/rename/delete lists)
     prefix + d + d     Daily list popup (interactive manager pinned to the
-                       daily list, without touching this session's link)
+                       daily list, without touching this window's link)
 
 Alt+Shift Shortcuts (no prefix)~
     Alt+Shift+T        Quick popup viewer
@@ -216,22 +216,25 @@ STATUS BAR                                              *doit-tmux-status*
 Add the current todo to your tmux status bar.
 
 In your tmux.conf: >tmux
-    set -g status-right '#($DOIT_TMUX_DIR/status/todo.sh "#{session_name}")'
+    set -g status-right '#($DOIT_TMUX_DIR/status/todo.sh #{window_id})'
 <
 
-Passing `#{session_name}` makes the status resolve the session's linked list
-(|doit-tmux-session-links|); status commands run without a client context, so
-the script cannot discover the session on its own. Omit the argument for the
-old global behavior.
+Passing `#{window_id}` makes the status resolve the window's linked list
+(|doit-tmux-window-links|); status commands run without a client context, so
+the script cannot discover the window on its own. By hand, any tmux target
+works as the argument, such as `'work:api'`. Omit the argument for the old
+global behavior.
 
 Or with custom formatting: >tmux
     set -g status-right '#{?#{!=:#($DOIT_TMUX_DIR/status/todo.sh),},#[fg=yellow] #($DOIT_TMUX_DIR/status/todo.sh),}'
 <
 
-The status shows `<list>: <todo>`: the active list name, whole unless
-`@doit-list-chars` caps it, then the in-progress todo text
-without its `claude:` marker, cut at `@doit-todo-chars` characters (default
-25). With nothing in progress it shows `<list>: no active`.
+The chip (`scripts/todo-exec.sh`) shows `<session>:<window>: <todo>`: the
+window key, whole unless `@doit-list-chars` caps it, then the in-progress todo
+text without its `claude:` marker, cut at `@doit-todo-chars` characters
+(default 25). With nothing in progress it shows
+`<session>:<window>: no active`. Run outside tmux with no window, the list
+name takes the label's place.
 
 ==============================================================================
 SHARED STORAGE                                          *doit-tmux-storage*
@@ -244,9 +247,10 @@ Todo Lists:~
 
 Session State:~
     Location: ~/.local/share/nvim/doit/session.json
-    Tracks the global active list (`.active_list`) and the per-tmux-session
-    links (`.sessions`, a `{"<tmux session>": "<list>"}` map — see
-    |doit-tmux-session-links|).
+    Tracks the global active list (`.active_list`) and the saved copy of
+    each tmux window's link (`.sessions`, a
+    `{"<tmux session>:<window name>": "<list>"}` map — see
+    |doit-tmux-window-links|).
 
 When you switch lists in tmux, Neovim sees the change on next refresh.
 When you switch lists in Neovim, tmux picks it up immediately.
@@ -273,21 +277,36 @@ JSON Schema:~
 <
 
 ==============================================================================
-SESSION-LINKED LISTS                              *doit-tmux-session-links*
+WINDOW-LINKED LISTS                                *doit-tmux-window-links*
 
-Each tmux session can hold its own active list, so hopping between sessions
-no longer stomps a single global pointer. Links live in the `sessions` map of
-session.json, keyed by tmux session name, and survive tmux server restarts.
+Each tmux window can hold its own active list, so worktrees opened as windows
+of one session each keep their own todos, and hopping between windows never
+stomps a single global pointer.
+
+The link lives on the window as the `@doit-window-list` tmux option, so it
+follows the window through renames, moves to another session, and session
+renames, and same-named windows keep separate lists. A copy sits in the
+`sessions` map of session.json, keyed `<session>:<window name>` (tmux bans
+`:` in session names, so the first `:` splits the key). After a tmux restart a
+window takes back the link saved under its name, unless a live window with
+the same name already holds it. doit.tmux sets `window-renamed`,
+`session-renamed` and `window-linked` hooks (index 90) that run
+`scripts/todo-relink.sh` to keep the copy on each window's current name.
+
+Links from older versions bound whole sessions (a key with no `:`). On plugin
+load, each running window of that session without a link of its own takes the
+session's list and the session key is removed; a session that is not running
+yet keeps its key for a later load.
 
 Every UI surface (tmux scripts, the status bar, and Neovim when it runs
 inside tmux) resolves the active list through the same chain:
 
     1. DOIT_ACTIVE_LIST         explicit environment override
-    2. sessions[<tmux session>] the session link
+    2. @doit-window-list        the window link
     3. project-list derivation  opt-in, |doit-tmux-configuration|
     4. daily
 
-An unlinked tmux session always lands on daily. Outside tmux, step 2 is
+An unlinked tmux window always lands on daily. Outside tmux, step 2 is
 skipped and the global .active_list pointer takes the place of daily.
 
 The MCP server does not follow links or the global pointer: they track what
@@ -297,13 +316,13 @@ list goes to DOIT_ACTIVE_LIST when set, else daily.
 In the list switcher (prefix + d + l) and list manager (prefix + d + L):
 
     ENTER              Switcher: link the selected list to the current
-                       session (also refreshes the global pointer).
+                       window (also refreshes the global pointer).
                        Manager: open the list to view and edit it, touching
                        no link or pointer
     l                  Manager only: link the selected list to the current
-                       session, like ENTER in the switcher
+                       window, like ENTER in the switcher
     g / ctrl-g         Set the global pointer only, touch no link
-    u / ctrl-u         Unlink the current session (falls back to daily)
+    u / ctrl-u         Unlink the current window (falls back to daily)
 
 Both views badge a list with "!N overdue" when it holds open items past their
 due date, and the preview pane repeats the count, so an overdue item is
@@ -312,17 +331,17 @@ attributable to a list without opening each one.
 The manager uses the bare keys (g, u); the switcher uses ctrl-g and ctrl-u so
 plain letters keep filtering the list as you type.
 
-Rows show which sessions link each list, e.g. `work  [api infra]`. Sessions
-that no longer exist in `tmux list-sessions` render dimmed. The daily list is
+Rows show which windows link each list, e.g. `work  [api:main, api:fix-auth]`.
+Windows that no longer exist in `tmux list-windows -a` render dimmed. The daily list is
 pinned to the top with its pending count.
 
 Switching lists inside tmux — from the tmux UI, from Neovim, or through the
-MCP server's switch_list — writes BOTH the session link and the global
+MCP server's switch_list — writes BOTH the window link and the global
 pointer. Non-tmux
 switches write the global pointer only.
 
 The daily popup (prefix + d + d, or Alt+Shift+D) opens the interactive
-manager pinned to the daily list from any session without changing any link
+manager pinned to the daily list from any window without changing any link
 or pointer.
 
 ==============================================================================
@@ -386,7 +405,7 @@ The plugin sets these environment variables automatically:
 - DOIT_SCRIPTS_DIR: Path to scripts directory
 
 Manual overrides (never set by the plugin):
-- DOIT_ACTIVE_LIST: Forces the active list, winning over session links and
+- DOIT_ACTIVE_LIST: Forces the active list, winning over window links and
   per-project lists. Older versions seeded this globally on every switch;
   that seeding is gone (it would pin every session to one list), and the
   plugin now unsets any stale global copy when it loads.

@@ -7,8 +7,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
 
-# status line passes #{session_name} as $1 — #() has no client context
-[[ -n "$1" ]] && export DOIT_SESSION_NAME="$1"
+# status line passes #{window_id} as $1 — #() has no client context
+[[ -n "$1" ]] && export DOIT_WINDOW="$1"
 
 TODO_LIST_PATH="$(get_active_list_path)"
 CHAR_LIMIT="${DOIT_CHAR_LIMIT:-25}"

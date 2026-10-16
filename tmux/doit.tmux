@@ -12,8 +12,17 @@ tmux set-environment -g DOIT_SCRIPTS_DIR "$SCRIPTS_DIR"
 
 # Older versions seeded a global DOIT_ACTIVE_LIST env var here and on every
 # list switch. That global pins EVERY session to one list, which defeats
-# per-session links — unset any residue left in a long-running server.
+# per-window links — unset any residue left in a long-running server.
 tmux set-environment -gu DOIT_ACTIVE_LIST 2>/dev/null
+
+# A window's link is its @doit-list option, which follows the window through
+# renames and moves; these keep the session.json copy that a tmux restart
+# restores from on the window's current name. Fixed index 90 so a reload
+# replaces rather than stacks, and user hooks on low indexes stay intact.
+for hook in window-renamed session-renamed window-linked; do
+    tmux set-hook -g "${hook}[90]" "run-shell '$SCRIPTS_DIR/todo-relink.sh'"
+done
+tmux run-shell -b "'$SCRIPTS_DIR/todo-relink.sh' --migrate"
 
 # Default keybinding prefix (can be overridden with @doit-key)
 default_key="d"
@@ -52,7 +61,7 @@ tmux bind-key -T doit-menu l display-popup -E -w "$interactive_w" -h "$interacti
 tmux bind-key -T doit-menu L display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-list-manager.sh"
 
 # Daily list popup: interactive manager pinned to the daily list, without
-# touching this session's link (prefix + d + d)
+# touching this window's link (prefix + d + d)
 tmux bind-key -T doit-menu d display-popup -E -w "$interactive_w" -h "$interactive_h" "$SCRIPTS_DIR/todo-interactive.sh --list daily"
 
 # Editor mode for create/edit (default: off, uses inline input)
@@ -79,7 +88,7 @@ tmux bind-key -T doit-menu d display-popup -E -w "$interactive_w" -h "$interacti
 
 # Per-project lists (default: off). When on, a pane inside a git repo resolves
 # to a list named after the repo directory, created on first use. Panes outside
-# a repo fall back to the session's active list. DOIT_ACTIVE_LIST still wins.
+# a repo fall back to the window's active list. DOIT_ACTIVE_LIST still wins.
 # The nvim side is modules.todos.project_lists.
 # set -g @doit-project-lists "on"
 

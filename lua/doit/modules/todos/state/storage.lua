@@ -455,6 +455,7 @@ function storage.setup(M)
             local session = require("doit.modules.todos.state.session")
             session.save_session(new_name)
         end
+        require("doit.modules.todos.state.session").relink_list(old_name, new_name)
 
         require("doit.modules.todos.state.twin").relink_list(new_name)
         
@@ -491,7 +492,7 @@ function storage.setup(M)
             end
         end
         
-        -- Try to restore last session's list. Inside tmux the session's linked
+        -- Try to restore last session's list. Inside tmux the window's linked
         -- list wins (from_link), and an explicit link also outranks project
         -- derivation below.
         local session = require("doit.modules.todos.state.session")
