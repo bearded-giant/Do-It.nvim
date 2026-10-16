@@ -29,7 +29,16 @@ twin_apply() {
         revert)   filter='(.todos[] | select(.id == $id)) |= (.done = false | .in_progress = false | del(.completed_at))' ;;
         priority) filter='(.todos[] | select(.id == $id)) |= (if $arg == "" then del(.priorities) else .priorities = $arg end)' ;;
         due)      filter='(.todos[] | select(.id == $id)) |= (if $arg == "" then del(.due_date) else .due_date = $arg end)' ;;
-        relink)   filter='(.todos[] | select(.id == $id)).twin.list = $arg' ;;
+        # mirrors mcp/todo-text.js relabelTwin: the owed copy names its project list after the marker/type/rank prefix
+        relink)   filter='(.todos[] | select(.id == $id)) |= ((.twin.list // "") as $old
+                      | if $old != "" and $old != $arg then
+                          ((.text // "") | capture("^(?<p>(claude:\\s*)?(\\[[^\\]]+\\]\\s*)?(\\d+[a-z]*\\.\\s+)?)").p) as $p
+                          | ((.text // "")[($p | length):]) as $rest
+                          | (if ($rest | startswith($old + ": ")) then .text = $p + $arg + ": " + $rest[($old | length) + 2:] else . end)
+                          | (("from: " + $old + " #") as $f
+                              | if ((.description // "") | startswith($f)) then .description = "from: " + $arg + " #" + .description[($f | length):] else . end)
+                        else . end
+                      | .twin.list = $arg)' ;;
         # no promoteChildren like the MCP: tmux's own delete doesn't promote and owed twins are top-level
         delete)   filter='(.todos[] | select(.id == $id)) as $d | .todos |= map(select(.id != $id))
                       | ._metadata.deleted_todos = ([$d] + (._metadata.deleted_todos // []))[0:10]' ;;

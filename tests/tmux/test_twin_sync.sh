@@ -82,10 +82,16 @@ assert_eq '{"list":"proj","id":"P1"}' "$(field "$DAILY" D1 '.twin')"
 it "restore drops it from deleted_todos and keeps the rest"
 assert_eq '["OLD"]' "$(jq -c '[._metadata.deleted_todos[].id]' "$DAILY")"
 
+jq '(.todos[] | select(.id == "D1")).description = "from: proj #1 (id P1)\n\nwhy"' "$DAILY" > "$DAILY.tmp" && mv "$DAILY.tmp" "$DAILY"
 twin_apply "daily	D1" relink other >/dev/null
 it "relink points the twin at the new list"
 assert_eq '{"list":"other","id":"P1"}' "$(field "$DAILY" D1 '.twin')"
+it "relink renames the twin's list label and from: line"
+assert_eq '"other: merge it"' "$(field "$DAILY" D1 '.text')"
+assert_eq '"from: other #1 (id P1)\n\nwhy"' "$(field "$DAILY" D1 '.description')"
 twin_apply "daily	D1" relink proj >/dev/null
+it "relink back restores the label"
+assert_eq '"proj: merge it"' "$(field "$DAILY" D1 '.text')"
 
 it "restore of an id not in deleted_todos is a no-op with a message"
 assert_eq 'twin D1 no longer in "daily"' "$(twin_apply "daily	D1" restore)"

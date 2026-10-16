@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseTodoText, nextRank, composeTodoText, normalizeTodoText } from "./todo-text.js";
+import { parseTodoText, nextRank, composeTodoText, normalizeTodoText, relabelTwin } from "./todo-text.js";
 
 // parse
 assert.deepEqual(parseTodoText("[gate] 30. pre-store check"), {
@@ -93,5 +93,18 @@ assert.equal(
 );
 // but genuinely different bodies do not
 assert.notEqual(normalizeTodoText("buy milk"), normalizeTodoText("buy bread"));
+
+// relabelTwin renames the list label after the marker/type/rank prefix, and the from: line
+const relabel = (text, description, oldList, newList) => {
+    const t = { text, description };
+    relabelTwin(t, oldList, newList);
+    return [t.text, t.description];
+};
+assert.deepEqual(relabel("[gate] 4. proj: ship it", "from: proj #4 (id x)\n\nwhy", "proj", "proj2"),
+    ["[gate] 4. proj2: ship it", "from: proj2 #4 (id x)\n\nwhy"]);
+assert.deepEqual(relabel("claude: [chore] 2. proj: x", undefined, "proj", "p"), ["claude: [chore] 2. p: x", undefined]);
+assert.deepEqual(relabel("[gate] 4. projects: x", "from: projects #4", "proj", "p"), ["[gate] 4. projects: x", "from: projects #4"]);
+assert.deepEqual(relabel("[gate] 4. other text proj: x", "note from: proj #4", "proj", "p"), ["[gate] 4. other text proj: x", "note from: proj #4"]);
+assert.deepEqual(relabel("[gate] 4. proj: x", "from: proj #4", "proj", "proj"), ["[gate] 4. proj: x", "from: proj #4"]);
 
 console.log("todo-text: all checks passed");

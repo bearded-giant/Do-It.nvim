@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { composeTodoText, nextRank, normalizeTodoText, parseTodoText } from "./todo-text.js";
+import { composeTodoText, nextRank, normalizeTodoText, parseTodoText, relabelTwin } from "./todo-text.js";
 import { isSequenced, setSequence } from "./sequence.js";
 
 // Root VERSION is the single source of truth, read at runtime exactly as the
@@ -808,7 +808,8 @@ server.tool(
             const extra = description ? `\n\n${description}` : "";
             const owedTodo = {
                 id: owedId,
-                text: composeTodoText(`${name}: ${parsed.body.trim()}`, { type: type || parsed.type, rank: owedRank }),
+                // the rank leads so a list named "claude" is a label, not the burn marker
+                text: composeTodoText(`${owedRank}. ${name}: ${parsed.body.trim()}`, { type: type || parsed.type }),
                 done: false,
                 in_progress: false,
                 order_index: getMaxOrder(owed.data.todos || []) + 1,
@@ -1481,6 +1482,7 @@ server.tool(
         saveList(source.filepath, source.data);
         saveList(targetPath, targetData);
         const twinNote = syncTwin(moved, (_, t) => {
+            relabelTwin(t, t.twin.list, to_list);
             t.twin.list = to_list;
             return "relinked";
         });
@@ -1631,11 +1633,17 @@ server.tool(
         // a twin pair can sit inside this one list, and syncTwin would look for it under the old name
         const renamed = readJSON(newPath);
         if ((renamed.todos || []).some(t => t.twin && t.twin.list === old_name)) {
-            for (const t of renamed.todos) if (t.twin && t.twin.list === old_name) t.twin.list = new_name;
+            for (const t of renamed.todos) {
+                if (t.twin && t.twin.list === old_name) {
+                    relabelTwin(t, old_name, new_name);
+                    t.twin.list = new_name;
+                }
+            }
             saveList(newPath, renamed);
         }
         for (const t of renamed.todos || []) {
             syncTwin(t, (_, twin) => {
+                relabelTwin(twin, twin.twin.list, new_name);
                 twin.twin.list = new_name;
                 return "relinked";
             });

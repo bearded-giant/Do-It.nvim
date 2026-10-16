@@ -122,15 +122,21 @@ await callTool("update_todo", { id: p.id, done: true });
 assert.equal(byText("daily", "proj: confirm").done, true);
 await callTool("update_todo", { id: p.id, done: false });
 
-// move keeps the link, rename follows the file
+// move keeps the link, rename follows the file, and both rename the twin's list label
 assert.match(await callTool("move_todo", { id: p.id, to_list: "other" }), /relinked/);
-assert.deepEqual(byText("daily", "proj: confirm").twin, { list: "other", id: p.id });
+d = byText("daily", "confirm callback");
+assert.deepEqual(d.twin, { list: "other", id: p.id });
+assert.equal(d.text, "[gate] 2. other: confirm callback on stage");
+assert.ok(d.description.startsWith(`from: other #2 (id ${p.id})\n\ndo:`));
 await callTool("rename_list", { old_name: "other", new_name: "renamed" });
-assert.deepEqual(byText("daily", "proj: confirm").twin, { list: "renamed", id: p.id });
+d = byText("daily", "confirm callback");
+assert.deepEqual(d.twin, { list: "renamed", id: p.id });
+assert.equal(d.text, "[gate] 2. renamed: confirm callback on stage");
+assert.ok(d.description.startsWith(`from: renamed #2 (id ${p.id})`));
 
 // delete takes the twin with it, undo-able on both sides
 assert.match(await callTool("delete_todo", { id: p.id }), /Twin in "daily" deleted/);
-assert.equal(byText("daily", "proj: confirm"), undefined);
+assert.equal(byText("daily", "renamed: confirm"), undefined);
 assert.equal(read("daily")._metadata.deleted_todos[0].id, d.id);
 
 // a twin that is already gone is reported, not thrown
@@ -159,6 +165,14 @@ await callTool("move_todo", { id: byText("daily", "proj: pair up").id, list: "da
 await callTool("rename_list", { old_name: "proj", new_name: "proj2" });
 assert.deepEqual(read("proj2").todos.filter(t => t.text.includes("pair up")).map(t => t.twin.list), ["proj2", "proj2"]);
 fs.renameSync(path.join(listsDir, "proj2.json"), path.join(listsDir, "proj.json"));
+
+// a list named claude labels its twins "claude: ...", which must not parse as the burn marker
+await callTool("create_list", { name: "claude" });
+await callTool("add_todo", { list: "claude", text: "deploy it", type: "gate", owe: true });
+const claudeTwin = byText("daily", "deploy it");
+assert.match(claudeTwin.text, /^\[gate\] \d+\. claude: deploy it$/);
+await callTool("rename_list", { old_name: "claude", new_name: "claude-code" });
+assert.match(byText("daily", "deploy it").text, /^\[gate\] \d+\. claude-code: deploy it$/);
 
 // tmux links and the global pointer are the user's view state; an omitted list goes to daily
 fs.writeFileSync(path.join(dataDir, "session.json"), JSON.stringify({ active_list: "proj", sessions: { work: "proj" } }));

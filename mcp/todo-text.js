@@ -37,6 +37,21 @@ export function parseTodoText(text) {
     };
 }
 
+const LABEL_PREFIX = /^(?:claude:\s*)?(?:\[[^\]]+\]\s*)?(?:\d+[a-z]*\.\s+)?/i;
+
+// an owed twin names its project list ("[gate] 4. proj: body", "from: proj #4"), so a relink renames that label
+export function relabelTwin(todo, oldList, newList) {
+    if (!oldList || oldList === newList) return;
+    const text = todo.text || "";
+    const prefix = LABEL_PREFIX.exec(text)[0];
+    const rest = text.slice(prefix.length);
+    if (rest.startsWith(`${oldList}: `)) todo.text = `${prefix}${newList}: ${rest.slice(oldList.length + 2)}`;
+    const from = `from: ${oldList} #`;
+    if ((todo.description || "").startsWith(from)) {
+        todo.description = `from: ${newList} #${todo.description.slice(from.length)}`;
+    }
+}
+
 export function nextRank(todos) {
     const ranks = (todos || []).map(t => parseTodoText(t.text).rank).filter(n => n !== null);
     return ranks.length ? Math.max(...ranks) + 1 : 1;

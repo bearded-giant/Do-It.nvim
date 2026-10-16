@@ -43,6 +43,30 @@ local function write_list(path, data)
     return true
 end
 
+-- mirrors mcp/todo-text.js relabelTwin: the owed copy names its project list after the marker/type/rank prefix
+local function relabel(twin, old_list, new_list)
+    if not old_list or old_list == new_list then
+        return
+    end
+    local text = twin.text or ""
+    local pos = 1
+    for _, pat in ipairs({ "^claude:%s*", "^%[[^%]]+%]%s*", "^%d+%l*%.%s+" }) do
+        local _, e = text:find(pat, pos)
+        if e then
+            pos = e + 1
+        end
+    end
+    local label = old_list .. ": "
+    if text:sub(pos, pos + #label - 1) == label then
+        twin.text = text:sub(1, pos - 1) .. new_list .. ": " .. text:sub(pos + #label)
+    end
+    local from = "from: " .. old_list .. " #"
+    local desc = twin.description
+    if type(desc) == "string" and desc:sub(1, #from) == from then
+        twin.description = "from: " .. new_list .. " #" .. desc:sub(#from + 1)
+    end
+end
+
 local function mutate(twin, op, value, source_id)
     if op == "complete" then
         twin.done = true
@@ -57,6 +81,7 @@ local function mutate(twin, op, value, source_id)
     elseif op == "due" then
         twin.due_date = value
     elseif op == "relink" then
+        relabel(twin, type(twin.twin) == "table" and twin.twin.list or nil, value)
         twin.twin = { list = value, id = source_id }
     end
 end
