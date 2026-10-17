@@ -59,10 +59,10 @@ preview_list() {
     local text_w=$(( ${FZF_PREVIEW_COLUMNS:-0} - 2 ))
     (( text_w < 20 )) && text_w=200
     if [[ -f "$list_file" ]]; then
-        local total=$(jq '.todos | length' "$list_file" 2>/dev/null || echo 0)
+        local total=$(jq --arg list "$name" --arg today "$(date +%F)" "$RECENT_DONE_JQ"'[.todos[] | select(.done != true or (.completed_at | recent_done($list; $today)))] | length' "$list_file" 2>/dev/null || echo 0)
         local pending=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$list_file" 2>/dev/null || echo 0)
         local in_progress=$(jq '[.todos[] | select(.in_progress == true)] | length' "$list_file" 2>/dev/null || echo 0)
-        local done_count=$(jq '[.todos[] | select(.done == true)] | length' "$list_file" 2>/dev/null || echo 0)
+        local done_count=$(jq --arg list "$name" --arg today "$(date +%F)" "$RECENT_DONE_JQ"'[.todos[] | select(.done == true and (.completed_at | recent_done($list; $today)))] | length' "$list_file" 2>/dev/null || echo 0)
         local overdue=$(jq -r --arg today "$(date +%F)" '[.todos[]? | select((.done | not) and ((.due_date // "") != "") and .due_date < $today)] | length' "$list_file" 2>/dev/null || echo 0)
         echo "Total: $total  Pending: $pending  In Progress: $in_progress  Done: $done_count"
         [[ "$overdue" -gt 0 ]] 2>/dev/null && printf '%s%s overdue%s\n' "$COLOR_RED" "$overdue" "$COLOR_RESET"

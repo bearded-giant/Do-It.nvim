@@ -13,6 +13,17 @@ end
 
 local M = {}
 
+-- daily, the owed inbox, shows only items completed today; older ones stay on disk
+function M.visible_todos(list_name, todos)
+    if list_name ~= PERMANENT_LIST then
+        return todos
+    end
+    local today = os.date("%Y-%m-%d")
+    return vim.tbl_filter(function(t)
+        return not t.done or os.date("%Y-%m-%d", t.completed_at or 0) >= today
+    end, todos)
+end
+
 function M.setup(parent_module)
     local vim = vim
     local api = vim.api
@@ -133,7 +144,7 @@ function M.setup(parent_module)
         local saved_todos = vim.deepcopy(todo_module.state.todos)
         
         todo_module.state.load_list(list_name)
-        local todos = todo_module.state.todos or {}
+        local todos = M.visible_todos(list_name, todo_module.state.todos or {})
         local metadata = todo_module.state.todo_lists.metadata[list_name] or {}
         
         -- Restore original list

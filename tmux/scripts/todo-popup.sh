@@ -42,8 +42,8 @@ echo -e "${BLUE}${BOLD}╰──────────────────
 echo ""
 
 # Display statistics
-TOTAL=$(jq '.todos | length' "$TODO_LIST_PATH")
-DONE=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH")
+TOTAL=$(jq --arg list "$ACTIVE_LIST_NAME" --arg today "$(date +%Y-%m-%d)" "$RECENT_DONE_JQ"'[.todos[] | select(.done != true or (.completed_at | recent_done($list; $today)))] | length' "$TODO_LIST_PATH")
+DONE=$(jq --arg list "$ACTIVE_LIST_NAME" --arg today "$(date +%Y-%m-%d)" "$RECENT_DONE_JQ"'[.todos[] | select(.done == true and (.completed_at | recent_done($list; $today)))] | length' "$TODO_LIST_PATH")
 IN_PROGRESS=$(jq '[.todos[] | select(.in_progress == true)] | length' "$TODO_LIST_PATH")
 PENDING=$(jq '[.todos[] | select(.done == false and .in_progress != true)] | length' "$TODO_LIST_PATH")
 

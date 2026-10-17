@@ -639,7 +639,7 @@ open_note_editor() {
 while true; do
     clear
     # Show todos and prompt for selection
-    done_count=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
+    done_count=$(jq --arg list "$ACTIVE_LIST_NAME" --arg today "$(date +%Y-%m-%d)" "$RECENT_DONE_JQ"'[.todos[] | select(.done == true and (.completed_at | recent_done($list; $today)))] | length' "$TODO_LIST_PATH" 2>/dev/null || echo 0)
     LIST=$(format_todos)
     # park the cursor on a just-created/edited todo when one is queued;
     # default past the leading blank row to the first real line

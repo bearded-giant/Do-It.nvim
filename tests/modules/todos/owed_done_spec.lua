@@ -63,4 +63,17 @@ describe("owed list done section", function()
         assert.truthy(out:find("done yesterday", 1, true))
         assert.truthy(out:find("done no stamp", 1, true))
     end)
+
+    it("list manager preview drops daily's older done items from stats and rows", function()
+        local lm = require("doit.modules.todos.ui.list_manager_window")
+        local ids = function(list)
+            local out = {}
+            for _, t in ipairs(lm.visible_todos(list, mock_state.todos)) do
+                out[#out + 1] = t.id
+            end
+            return table.concat(out, ",")
+        end
+        assert.equals("p,t", ids("daily"))
+        assert.equals("p,t,y,n", ids("proj"))
+    end)
 end)
