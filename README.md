@@ -494,8 +494,11 @@ Ids are global. Copy one from the tmux item view (`i`) or the nvim item view
 `revert_todo`, `update_todo`, `add_note`, `delete_todo` and `move_todo` all
 find the list that holds it.
 
-Owed items. `add_todo` with `owe: true` is for actions the user owes on a
-project: run a check, merge an MR, answer a decision. It writes the item on the
+Owed items. `add_todo` with `owe: true` is for actions only the user can do
+on a project and that something waits on right now: a console or vault
+setting, a credential, a message to someone. Routine flow (merging or
+reviewing an MR, tagging a release, resuming a session) stays out, so `daily`
+reads as signal. It writes the item on the
 project list as `[type] N. owed in daily #M: ...` and a twin on `daily` as
 `[type] M. <project list>: ...`. Each carries a `twin` field and a first
 description line pointing at the other, so `daily` collects what you owe across
