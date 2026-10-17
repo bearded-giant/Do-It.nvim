@@ -78,8 +78,8 @@ preview_list() {
         done
         # show completed items if enabled
         if [[ "$SHOW_COMPLETED" == "true" && "$done_count" -gt 0 ]]; then
-            jq -r --argjson w "$text_w" '
-                [.todos[] | select(.done == true)] |
+            jq -r --argjson w "$text_w" --arg list "$name" --arg today "$(date +%F)" "$RECENT_DONE_JQ"'
+                [.todos[] | select(.done == true and (.completed_at | recent_done($list; $today)))] |
                 sort_by((if .priorities == "critical" then 0 elif .priorities == "urgent" then 1 elif .priorities == "important" then 2 else 3 end), .order_index) |
                 .[0:3] | .[] |
                 "✓ " + (.text | split("\n")[0][0:$w])

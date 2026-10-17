@@ -72,10 +72,9 @@ if command -v fzf &>/dev/null; then
 
     export DOIT_DATA_DIR="$TEST_TMPDIR/data"
     mkdir -p "$DOIT_DATA_DIR/lists"
-    make_list "$DOIT_DATA_DIR/lists/daily.json"
-    echo '{"active_list":"daily"}' > "$DOIT_DATA_DIR/session.json"
+    make_list "$DOIT_DATA_DIR/lists/proj.json"
 
-    OUT=$(bash "$SCRIPTS/todo-interactive.sh" --format 2>/dev/null)
+    OUT=$(bash "$SCRIPTS/todo-interactive.sh" --list proj --format 2>/dev/null)
     STRIPPED=$(echo "$OUT" | sed 's/\x1b\[[0-9;]*m//g')
 
     it "renders a pending priority header"

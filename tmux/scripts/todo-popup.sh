@@ -86,7 +86,7 @@ fi
 COMPLETED_COUNT=$(jq '[.todos[] | select(.done == true)] | length' "$TODO_LIST_PATH")
 if [[ $COMPLETED_COUNT -gt 0 && "$SHOW_COMPLETED" == "true" ]]; then
     echo -e "${DIM}✓ Completed:${RESET}"
-    jq -r '.todos | sort_by(.order_index) | .[] | select(.done == true) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | while IFS='|' read -r obs line; do
+    jq -r --arg list "$ACTIVE_LIST_NAME" --arg today "$(date +%Y-%m-%d)" "$RECENT_DONE_JQ"'.todos | sort_by(.order_index) | .[] | select(.done == true and (.completed_at | recent_done($list; $today))) | "\(if .obsidian_ref then "true" else "false" end)|\(.text)"' "$TODO_LIST_PATH" | while IFS='|' read -r obs line; do
         obs_icon=""
         [[ "$obs" == "true" ]] && obs_icon=" ${PURPLE}${RESET}"
         echo -e "${DIM}  • ${line}${obs_icon}${RESET}"

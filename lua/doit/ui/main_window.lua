@@ -366,6 +366,13 @@ function M.build_render_rows()
 		end
 	end
 
+	-- daily, the owed inbox, shows only items completed today; older ones stay on disk
+	local owed = state.todo_lists and state.todo_lists.active == "daily"
+	local today = os.date("%Y-%m-%d")
+	local function hidden(t)
+		return t.done and (not show_completed or (owed and os.date("%Y-%m-%d", t.completed_at or 0) < today))
+	end
+
 	local heads, counts = {}, { mine = 0, claude = 0 }
 	local root = nil
 	for i, todo in ipairs(state.todos) do
@@ -376,10 +383,10 @@ function M.build_render_rows()
 		-- under its parent instead of dragging the done divider into the list.
 		-- a root hidden by show_completed leaves each child to its own status.
 		local head = root or todo
-		if head.done and not show_completed then
+		if hidden(head) then
 			head = todo
 		end
-		if not (head.done and not show_completed) and tags_util.has_tag(todo.text, state.active_filter) then
+		if not hidden(head) and tags_util.has_tag(todo.text, state.active_filter) then
 			heads[i] = head
 			if not head.done and not todo.done then
 				local block = sorting.origin(head)

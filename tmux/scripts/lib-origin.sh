@@ -11,3 +11,10 @@ def origin:
 def origin_rank: if (.done | not) and origin == "claude" then 1 else 0 end;
 '
 export ORIGIN_JQ
+
+# daily, the owed inbox, shows only items completed today; older ones stay on
+# disk, hidden. Input is .completed_at (epoch seconds); missing counts as old.
+RECENT_DONE_JQ='
+def recent_done($list; $today): $list != "daily" or (((. // 0) | strflocaltime("%Y-%m-%d")) >= $today);
+'
+export RECENT_DONE_JQ

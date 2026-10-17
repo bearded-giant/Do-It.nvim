@@ -507,7 +507,9 @@ every project and each project list still shows it. `complete_todo`,
 done / priority / due keep both twins in step. The tmux and nvim UIs do the
 same for done, priority, due, delete (undo brings the twin back too), move, and
 list rename. Since `daily` holds every twin, none of the three will delete or
-rename it.
+rename it. The tmux and nvim views of `daily` show only items checked off
+today; older done items stay in the file (and in `list_todos`), just hidden.
+Other lists show every done item.
 
 Notes. Two different things share the word: `add_note` writes the description on a todo item, while the `*_note` tools manage standalone list-scoped notes.
 

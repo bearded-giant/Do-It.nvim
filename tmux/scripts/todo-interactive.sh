@@ -368,8 +368,8 @@ format_todos() {
             obs_icon=""
             [[ "$obs" == "true" ]] && obs_icon="${COLOR_PURPLE} ${COLOR_RESET}"
             printf "%s%s%s  %-${tw}s%s%s %s[%s]%s\n" "$ind" "$COLOR_DIM" "$status" "$text" "$suffix" "$obs_icon" "$COLOR_DIM" "$id" "$COLOR_RESET"
-        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ$NEST_JQ"'.todos |
-            map(select(tag_ok($tagf))) | rows(-(.completed_at // 0)) |
+        done < <(jq -r --argjson tw "$text_w" --arg tagf "$TAG_FILTER" --arg today "$(date +%Y-%m-%d)" --arg list "$ACTIVE_LIST_NAME" "$DUE_JQ$NEST_JQ$RECENT_DONE_JQ"'.todos |
+            map(select(tag_ok($tagf) and ((.done | not) or (.completed_at | recent_done($list; $today))))) | rows(-(.completed_at // 0)) |
             .[] | select(.root_done) |'"$row_fields" "$TODO_LIST_PATH")
     fi
 }
