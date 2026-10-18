@@ -231,7 +231,8 @@ Or with custom formatting: >tmux
 
 The chip (`scripts/todo-exec.sh`) shows `<session>:<window>: <todo>`: the
 window key, whole unless `@doit-list-chars` caps it, then the in-progress todo
-text without its `claude:` marker, cut at `@doit-todo-chars` characters
+text without its `claude:` marker, with an owed item's `owed in daily #N:`
+label shortened to `owed:`, cut at `@doit-todo-chars` characters
 (default 25). With nothing in progress it shows
 `<session>:<window>: no active`. Run outside tmux with no window, the list
 name takes the label's place.

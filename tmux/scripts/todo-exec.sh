@@ -63,6 +63,9 @@ tmux set -gq @doit-todo-icon "$ICON_TASK"
 todo_text="${todo_text#"${todo_text%%[![:space:]]*}"}"
 todo_text="${todo_text%"${todo_text##*[![:space:]]}"}"
 todo_text="${todo_text#claude: }"
+# the twin label serves the list views; in a narrow chip it pushes the task out
+owed_re='^(.*)owed in [^ ]+ #[0-9]+: (.*)$'
+[[ $todo_text =~ $owed_re ]] && todo_text="${BASH_REMATCH[1]}owed: ${BASH_REMATCH[2]}"
 
 if [[ ${#todo_text} -gt $CHAR_LIMIT ]]; then
     todo_text="${todo_text:0:$CHAR_LIMIT}..."

@@ -2,7 +2,8 @@
 
 # status-bar chip text: "<session>:<window>: <todo>" with the label whole
 # unless @doit-list-chars caps it, todo cut at @doit-todo-chars (default 25)
-# without its claude: marker, "<session>:<window>: no active" when idle.
+# without its claude: marker and with "owed in <list> #N:" shortened to
+# "owed:", "<session>:<window>: no active" when idle.
 # Outside tmux the list name is the label. A real tmux server on a private
 # socket plays the user's; the outside-tmux case gets a no-op tmux on PATH.
 
@@ -18,7 +19,7 @@ SOCK="$TEST_TMPDIR/tmux.sock"
 trap 'tmux -S "$SOCK" kill-server 2>/dev/null; rm -rf "$TEST_TMPDIR"' EXIT
 T() { tmux -S "$SOCK" "$@"; }
 T -f /dev/null new-session -d -s s -n short -x 80 -y 24
-for w in a-very-long-window-name marked 'tmux config' nobody; do T new-window -d -t s: -n "$w"; done
+for w in a-very-long-window-name marked 'tmux config' nobody owing; do T new-window -d -t s: -n "$w"; done
 TM="$SOCK,$(T display -p '#{pid}'),0"
 
 NOOP_BIN="$TEST_TMPDIR/bin"
@@ -51,8 +52,9 @@ mklist daily ""
 mklist hello-test "ship the thing" true
 mklist recharge-auth-complete-auth-service "long list item" true
 mklist marked "claude: [decision] 12. pick the status bar layout (dep on #3)" true
+mklist owing "[gate] 27. owed in daily #129: prod registry cutover" true
 cat > "$DATA/session.json" << 'JSON'
-{"active_list": "daily", "sessions": {"s:short": "hello-test", "s:a-very-long-window-name": "recharge-auth-complete-auth-service", "s:marked": "marked"}}
+{"active_list": "daily", "sessions": {"s:short": "hello-test", "s:a-very-long-window-name": "recharge-auth-complete-auth-service", "s:marked": "marked", "s:owing": "owing"}}
 JSON
 
 describe "status chip text"
@@ -74,6 +76,9 @@ assert_eq "s:marked: [decision] 12. pick the s..." "$(chip s:marked)"
 
 it "@doit-todo-chars widens the todo text"
 assert_eq "s:marked: [decision] 12. pick the status bar layout (dep on #3)" "$(with_opt @doit-todo-chars 80 chip s:marked)"
+
+it "owed twin label collapses so the task stays in view"
+assert_eq "s:owing: [gate] 27. owed: prod registry cutover" "$(with_opt @doit-todo-chars 80 chip s:owing)"
 
 it "window name with spaces labels the chip whole"
 assert_eq "s:tmux config: no active" "$(chip 's:tmux config')"
