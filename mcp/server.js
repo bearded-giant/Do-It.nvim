@@ -501,11 +501,13 @@ Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its
 
 Owed items: "${OWED_LIST}" is the user's cross-project inbox of actions THEY owe, kept to signal. Call add_todo with owe=true and list=<the project list> only when all four hold: (1) only the user can do it: credentials, a console (vault, DNS, IdP, GCP, beta admin), outward comms, or a human call the code can't settle; (2) actionable now: not waiting on another reviewer, a release, a cutover window, or another item; (3) something waits on it: blocked work, or a security/prod risk; (4) not routine flow. Never owe: resuming a session (the handoff carries it), merging or reviewing an MR, tagging or deploying after a merge, watching for a future event, "say ship it", approving a diff proposed in chat, anything the model can run. Conditional asks stay on the project list with deps and no owe; owe them once the dep clears. One console session is one owed item with a checklist. Design decisions (type decision, mirroring a doc's open question) are feature work, not inbox actions: add them to the project list without owe, so they never twin into "${OWED_LIST}". One call writes the project item ("[type] N. owed in ${OWED_LIST} #M: ...") and its "${OWED_LIST}" twin ("[type] M. <project list>: ..."); each carries a 'twin' field and a first description line naming the other. Write the description for the user: why, do (exact command + expected result), links (MR, handoff, vault note, artifact, doc), resume (how to pick the work back up). Owed items never carry 'claude:'. complete_todo, revert_todo, delete_todo, move_todo, and update_todo's done/priority/due apply to both twins; the result says what happened to the twin.
 
+Active item: the in_progress item is what the user's tmux chip and nvim statusline show, one per list. When working a list, start_todo an item before you work it, as its own call, whether or not it lands; when you stop or wait on the user, leave the next item in_progress (the one you are on, else the one waiting on the user, else the top pending one). start_todo never touches a twin, so the user's own "${OWED_LIST}" active item stays theirs.
+
 Sequence (work order): priority is criticality, and the optional 'sequence' field is work order. Pending items with a sequence render in a "Sequence" section above the priority sections, in sequence order across priorities, and list_todos lists them first. When working a list (including /burn), take sequenced items in sequence order before falling back to priority. When items have to run in a specific order (deps, rollout steps), set it with sequence_todos(order: [ranks in run order]). Don't encode order through priority, and don't delete and recreate items to renumber them. To move one item, use update_todo's 'sequence'; 0 clears it.
 
 Behavior:
 - "show todos" / "list todos" / "what's on my list" → list_todos (uses active list automatically)
-- "what's next" / "next todo" → list_todos with filter="pending" (first item is next; sequenced items come first)
+- "what's next" / "next todo" → the in_progress item first (list_todos filter="in_progress": the active item a prior turn or session left), then list_todos with filter="pending" (first item is next; sequenced items come first)
 - "do these in order: #3, #8, #10" / "sequence these" → sequence_todos with the ranks in order
 - "critical items" / "show urgent" / "what's important" → list_todos with priority filter
 - "add todo: ..." / "remind me to ..." → add_todo
@@ -977,7 +979,7 @@ server.tool(
 
 server.tool(
     "start_todo",
-    "Start a todo item (set in_progress=true). Supports fuzzy text query. Only one item can be in_progress at a time — starting a new one stops the current one.",
+    "Start a todo item (set in_progress=true): the list's active item, shown in the user's tmux chip and nvim statusline. Supports fuzzy text query. Only one item can be in_progress at a time — starting a new one stops the current one. Call it before working an item, and leave the next item started when you stop.",
     {
         id: z.string().optional().describe("Todo ID."),
         query: z.string().optional().describe("Fuzzy text match (all words must appear)."),
