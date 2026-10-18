@@ -494,6 +494,7 @@ Item text convention — MANDATORY for every item you create:
 
 - [type] — short lowercase work-type tag (decision, gate, loader, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
 - N. — the item's fixed handle, unique across the list and assigned at creation (add_todo does it, so don't write it into 'text'). Deps and #N references point at it. It is never renumbered, so it is NOT the work order.
+- body — a short label, 40 chars or fewer: verb + object, or for a decision its topic as a short question. It is what the user's tmux chip and board sidebar show. Paths, commands, file lists, sub-steps, options, rationale, and status go in 'description', never in the body.
 - (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
 - claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
 
@@ -756,7 +757,7 @@ server.tool(
     "add_todo",
     "Add a new todo item to a do-it list (writes to ~/.local/share/nvim/doit/lists/). Do not write JSON files directly. Stored text is composed as \"claude: [type] N. text (dep on #M)\" — pass type and deps as params, the rank N is assigned automatically.",
     {
-        text: z.string().describe("Todo text. Omit the [type] prefix and the leading rank number — those are composed from the params below. Keep a leading 'claude:' if the item is for the model to burn down."),
+        text: z.string().describe("Todo text: a short label, 40 chars or fewer (verb + object; a decision's topic as a short question). Paths, commands, sub-steps, options, and why go in 'description'. Omit the [type] prefix and the leading rank number — those are composed from the params below. Keep a leading 'claude:' if the item is for the model to burn down."),
         list: z.string().optional().describe("List name (default: active list)"),
         type: z.string().optional().describe("Work type." + TYPE_HINT),
         deps: z.array(z.union([z.number(), z.string()])).optional().describe("Blocking rank numbers." + DEPS_HINT),
@@ -853,7 +854,7 @@ server.tool(
     {
         id: z.string().describe("Todo ID"),
         list: z.string().optional().describe("List name (default: active list)"),
-        text: z.string().optional().describe("New text. The item's existing [type] prefix and rank number carry over — pass the body only."),
+        text: z.string().optional().describe("New text: a short label, 40 chars or fewer; details go in 'description'. The item's existing [type] prefix and rank number carry over — pass the body only."),
         type: z.string().optional().describe("Change the work type." + TYPE_HINT),
         deps: z.array(z.union([z.number(), z.string()])).optional().describe("Replace the blocking rank numbers." + DEPS_HINT),
         claude: z.boolean().optional().describe("Toggle the leading 'claude:' burn-down marker. Pass false to drop it when an item stops being model work — rewriting 'text' alone will not remove it."),
