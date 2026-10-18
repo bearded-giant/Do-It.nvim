@@ -169,7 +169,7 @@ T set -pq -t "$PAIR_A" @doit-pane-list pane-a
 
 describe "todo board input"
 
-# one fake client; switch-client is recorded instead of run, the rest hits the private server
+# one fake client; switch-client and display-popup are recorded instead of run, the rest hits the private server
 FAKE_BIN="$TEST_TMPDIR/fakebin"
 SWITCHED="$TEST_TMPDIR/switched"
 SCREEN="$TEST_TMPDIR/screen"
@@ -178,7 +178,7 @@ cat > "$FAKE_BIN/tmux" << EOF
 #!/bin/bash
 case "\$1" in
     list-clients) [[ "\$3" == *client_activity* ]] && printf '5\x1f/dev/ttyfake\n' || echo /dev/ttyfake ;;
-    switch-client) echo "\$*" >> "$SWITCHED" ;;
+    switch-client | display-popup) echo "\$*" >> "$SWITCHED" ;;
     *) exec "$(command -v tmux)" -S "$SOCK" "\$@" ;;
 esac
 EOF
@@ -298,5 +298,47 @@ assert_eq "0" "$(last_frame | grep -c '^ 1-5/')"
 it "shift+wheel, how a trackpad sends sideways, scrolls sideways"
 drive 60 30 '\e[<69;5;3M' > /dev/null
 assert_contains "$(grep -c '^olo  solo-list  ▸ \[bug\] 4. fix$' "$SCREEN")" "1"
+
+it "EMPTY opens into a row per list on click"
+drive "\e[<0;3;$(row_of '^EMPTY ')M" > /dev/null
+assert_eq "1" "$(last_frame | grep -cE '^  empty +0$')"
+
+it "click on an item opens the doit manager on its list with the item under the cursor"
+assert_contains "$(drive "\e[<0;8;$(row_of '     ▸ left item')M")" "todo-interactive.sh --list left-list --item t0"
+
+it "right-click on a list opens the doit manager on it"
+out=$(drive "\e[<2;3;$(row_of '  win-list ')M")
+assert_contains "$out" "display-popup -c /dev/ttyfake -E -w 80% -h 80% "
+assert_contains "$out" "todo-interactive.sh --list win-list"
+assert_eq "0" "$(printf '%s\n' "$out" | grep -c -- '--item')"
+
+it "e opens the doit manager on the selected list, L the list manager"
+assert_contains "$(drive "\e[<0;3;$(row_of '  win-list ')M" e)" "todo-interactive.sh --list win-list"
+assert_contains "$(drive "\e[<0;3;$(row_of '  win-list ')M" L)" "todo-list-manager.sh --select win-list"
+
+describe "deep links into the doit popups"
+
+# fake fzf: record args and the rows it was fed, pick nothing (the managers quit on an empty pick)
+FZF_BIN="$TEST_TMPDIR/fzfbin"
+mkdir -p "$FZF_BIN"
+cat > "$FZF_BIN/fzf" << EOF
+#!/bin/bash
+printf '%s\n' "\$@" > "$TEST_TMPDIR/fzf.args"
+cat > "$TEST_TMPDIR/fzf.rows"
+EOF
+chmod +x "$FZF_BIN/fzf"
+start_row() { sed -n 's/^start:pos(\([0-9]*\))$/\1/p' "$TEST_TMPDIR/fzf.args" | head -1; }
+
+it "--item starts the todo manager on that todo"
+env -u TMUX -u TMUX_PANE PATH="$FZF_BIN:$PATH" "$SCRIPTS/todo-interactive.sh" --list multi --item t2 < /dev/null > /dev/null 2>&1
+n=$(start_row)
+assert_not_empty "$n"
+assert_contains "$(sed -n "${n}p" "$TEST_TMPDIR/fzf.rows")" "[t2]"
+
+it "--select starts the list manager on that list"
+env -u TMUX -u TMUX_PANE PATH="$FZF_BIN:$PATH" "$SCRIPTS/todo-list-manager.sh" --select multi < /dev/null > /dev/null 2>&1
+n=$(start_row)
+assert_not_empty "$n"
+assert_eq "multi" "$(sed -n "${n}p" "$TEST_TMPDIR/fzf.rows" | sed 's/\x1b\[[0-9;]*m//g; s/^[* ]*//' | awk '{print $1}')"
 
 report

@@ -252,7 +252,7 @@ from your Claude Code hooks.
 
 Below: every list in ACTIVE (in-progress item shown), OPEN (open items,
 nothing in progress; lists sharing a first dash segment fold into one row)
-and EMPTY (one line of names). `daily` leads its group, the rest go by name.
+and EMPTY (one line of names that opens like a fold). `daily` leads its group, the rest go by name.
 A list a Claude pane is working on is left out, since its row is up top
 (`daily` always stays). Counts sit in one aligned column; linked windows show
 only on the selected row.
@@ -264,11 +264,18 @@ the matching items, and folds open flat while filtering.
     up/down j/k             move the selection
     enter, click            Claude row: switch the tmux client to that pane
                             list: show every open item; fold: open it
+                            item: todo manager on its list, cursor on it
+    e, right-click          todo manager for the selected list
+    L                       list manager on the selected list
     a                       open or close every list and fold
     /                       filter (enter keeps it, esc clears it)
     left/right h/l          scroll sideways (also the sideways wheel)
     wheel ctrl-d/u g/G      scroll down and up
     q                       quit
+
+The managers open as popups on the tmux client beside the board. They take
+a start point on their own: `todo-interactive.sh --list <name> --item <id>`
+and `todo-list-manager.sh --select <name>`.
 
 `--once` prints the whole board. It marks its pane with the `doit_board`
 user var so a WezTerm key can find and close it; the README has a toggle

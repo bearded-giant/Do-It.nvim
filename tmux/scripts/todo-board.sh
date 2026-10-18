@@ -5,9 +5,10 @@
 # OPEN / EMPTY. Rows are never cut; the screen is a viewport you scroll.
 # --once prints the whole board.
 #
-# up/down j/k select   enter/click: jump to pane, open list or group   a: open all
-# / filter (enter keeps it, esc clears)   left/right h/l scroll sideways
-# wheel, ctrl-d/u, g/G scroll   q quit
+# up/down j/k select   enter/click: jump to pane, open list or group, item -> doit
+# manager on it   e/right-click: doit manager for the list   L: list manager
+# a: open all   / filter (enter keeps it, esc clears)   left/right h/l scroll
+# sideways   wheel, ctrl-d/u, g/G scroll   q quit
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
@@ -20,7 +21,7 @@ S="$DOIT_SEP"
 FMT="#{session_name}$S#{window_name}$S#{pane_id}$S#{@claude_state}$S#{@doit-pane-list}$S#{@doit-window-list}$S#{&&:#{session_attached},#{window_active}}$S#{pane_dead}$S#{session_attached}$S#{@claude_state_at}$S#{@claude_err}$S#{@claude_attention}$S#{@claude_attention_ack}$S#{@claude_ctx}"
 
 # jq owns layout because it counts characters; bash 3.2 slices multibyte text mid-glyph.
-# A line is {k, segs: [[sgr, text]...], trail}; k ("P:<pane>" / "L:<list>" / "F:<prefix>")
+# A line is {k, segs: [[sgr, text]...], trail}; k ("P:<pane>" / "L:<list>" / "I:<list>:<id>" / "F:<prefix>")
 # is what a click on it acts on, trail shows only while the line is selected.
 # Stick to jq 1.7 syntax: wezterm's login shell finds macOS /usr/bin/jq first.
 read -r -d '' RENDER << 'JQ'
@@ -72,16 +73,16 @@ def lcp:
 | ($filter | ascii_downcase) as $f
 | def active($n): ($lists[$n].todos // []) | map(select(.in_progress == true and (.done | not))) | .[0];
   def expanded($k): ($expanded | any(.[]; . == "*")) != ($expanded | any(.[]; . == $k));
-  def item($k; $ind):
-    {k: $k, segs: [[sgr(prio; (if .in_progress == true then "1" else "" end)),
+  def item($n; $ind):
+    {k: ("I:" + $n + ":" + (.id | tostring)), segs: [[sgr(prio; (if .in_progress == true then "1" else "" end)),
       $ind + "   " + (if .in_progress == true then "▸ " else "· " end) + (.text | clean)]]};
   # a block with item lines under it gets a blank row after, for air between blocks
   def listrow($ind):
     . as $r
     | ("L:" + $r.n) as $k
-    | [if $r.hits != null then ($r.hits[] | item($k; $ind))
-       elif expanded($k) then ($r.open[] | item($k; $ind))
-       elif $r.a then ($r.a | item($k; $ind))
+    | [if $r.hits != null then ($r.hits[] | item($r.n; $ind))
+       elif expanded($k) then ($r.open[] | item($r.n; $ind))
+       elif $r.a then ($r.a | item($r.n; $ind))
        else empty end] as $items
     | {k: $k,
        pre: [["", $ind], [(if $r.a then "1" else "" end), $r.n]],
@@ -146,7 +147,9 @@ def lcp:
           + [($opn | map(select(.n == "daily")))[] | listrow("  ")]
           + [$opn | map(select(.n != "daily")) | folded] end)
      + (if $emp == [] then []
-        else [{k: "", segs: [["36", "EMPTY"], ["2", " \($emp | length)  " + ($emp | map(.n) | join("  "))]]}] end)
+        elif $f != "" or expanded("F:#empty") then
+          [{k: "F:#empty", segs: [["36", "EMPTY"], ["2", " \($emp | length)"]]}] + [$emp[] | listrow("  ")]
+        else [{k: "F:#empty", segs: [["36", "EMPTY"], ["2", " \($emp | length)  " + ($emp | map(.n) | join("  "))]]}] end)
      | if .[-1] == {k: "", segs: []} then .[:-1] else . end) as $lrows
   # counts right-aligned in one column so names scan as a list
   | ($lrows | map(select(.pre) | .pre | width) | max // 0) as $w
@@ -261,27 +264,78 @@ clear_filter() {
     ROW_OFF=0
 }
 
-# Switch the tmux client in the pane to our right (the wezterm split) to pane $1,
-# then hand focus back to it. Without wezterm, the last active client moves.
-jump() {
-    local tty="" right=""
+# The tmux client in the pane to our right (the wezterm split) as TTY, its wezterm
+# pane as RIGHT; without wezterm, the last active client.
+client() {
+    TTY="" RIGHT=""
     if [[ -n "$WEZTERM_PANE" ]] && command -v wezterm &>/dev/null; then
-        right=$(wezterm cli get-pane-direction Right 2>/dev/null)
-        [[ -n "$right" ]] && tty=$(wezterm cli list --format json 2>/dev/null |
-            jq -r --argjson id "$right" '.[] | select(.pane_id == $id) | .tty_name // empty')
+        RIGHT=$(wezterm cli get-pane-direction Right 2>/dev/null)
+        [[ -n "$RIGHT" ]] && TTY=$(wezterm cli list --format json 2>/dev/null |
+            jq -r --argjson id "$RIGHT" '.[] | select(.pane_id == $id) | .tty_name // empty')
     fi
-    tmux list-clients -F '#{client_tty}' 2>/dev/null | grep -qxF -- "$tty" ||
-        tty=$(tmux list-clients -F "#{client_activity}$S#{client_tty}" 2>/dev/null |
+    tmux list-clients -F '#{client_tty}' 2>/dev/null | grep -qxF -- "$TTY" ||
+        TTY=$(tmux list-clients -F "#{client_activity}$S#{client_tty}" 2>/dev/null |
             sort -rn | head -1 | cut -d "$S" -f2)
-    [[ -n "$tty" ]] || return 1
-    tmux switch-client -c "$tty" -t "$1" 2>/dev/null
-    [[ -n "$right" ]] && wezterm cli activate-pane --pane-id "$right" 2>/dev/null
+    [[ -n "$TTY" ]]
+}
+
+focus_tmux() {
+    [[ -n "$RIGHT" ]] && wezterm cli activate-pane --pane-id "$RIGHT" 2>/dev/null
     return 0
+}
+
+jump() {
+    client || return 1
+    tmux switch-client -c "$TTY" -t "$1" 2>/dev/null
+    focus_tmux
+}
+
+# a doit popup on the tmux client; display-popup blocks until it closes, so it runs
+# in the background while the board keeps redrawing
+popup() {
+    local w h
+    client || return 1
+    w=$(tmux show -gqv @doit-interactive-popup-w 2>/dev/null)
+    h=$(tmux show -gqv @doit-interactive-popup-h 2>/dev/null)
+    tmux display-popup -c "$TTY" -E -w "${w:-80%}" -h "${h:-80%}" "$1" > /dev/null 2>&1 &
+    focus_tmux
+}
+
+# I:<list>:<id> or L:<list> -> the todo manager pinned to that list, cursor on the item
+manage() {
+    local list id="" cmd
+    case "$1" in
+        L:*) list=${1#L:} ;;
+        I:*)
+            list=${1#I:}
+            id=${list#*:}
+            list=${list%%:*}
+            ;;
+        *) return ;;
+    esac
+    cmd=$(printf '%q --list %q' "$SCRIPT_DIR/todo-interactive.sh" "$list")
+    [[ -n "$id" ]] && cmd+=$(printf ' --item %q' "$id")
+    popup "$cmd"
+}
+
+manage_lists() {
+    local list="" cmd
+    case "$1" in
+        L:*) list=${1#L:} ;;
+        I:*)
+            list=${1#I:}
+            list=${list%%:*}
+            ;;
+    esac
+    cmd=$(printf '%q' "$SCRIPT_DIR/todo-list-manager.sh")
+    [[ -n "$list" ]] && cmd+=$(printf ' --select %q' "$list")
+    popup "$cmd"
 }
 
 act() {
     case "$1" in
         P:*) jump "${1#P:}" ;;
+        I:*) manage "$1" ;;
         L:* | F:*) toggle "$1" ;;
     esac
 }
@@ -313,6 +367,10 @@ read_escape() {
                 00 | 01)
                     target=${LINE_TARGET[$((y - 1))]}
                     [[ -n "$target" ]] && SEL=$target && act "$target"
+                    ;;
+                20 | 21)
+                    target=${LINE_TARGET[$((y - 1))]}
+                    [[ -n "$target" ]] && SEL=$target && manage "$target"
                     ;;
                 640) ROW_OFF=$((ROW_OFF > 3 ? ROW_OFF - 3 : 0)) ;;
                 650) ROW_OFF=$((ROW_OFF + 3)) ;;
@@ -351,6 +409,8 @@ handle() {
         $'\x04') ROW_OFF=$((ROW_OFF + ROWS / 2)) ;;
         $'\x15') ROW_OFF=$((ROW_OFF - ROWS / 2)) ;;
         a) EXPANDED=$(jq -cn --argjson e "$EXPANDED" 'if any($e[]; . == "*") then [] else ["*"] end') ;;
+        e) manage "$SEL" ;;
+        L) manage_lists "$SEL" ;;
         "") act "$SEL" ;;
         $'\e') read_escape ;;
     esac

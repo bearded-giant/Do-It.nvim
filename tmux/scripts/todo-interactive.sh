@@ -12,12 +12,18 @@ DOIT_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/../../VERSION" 2>/dev/null)"
 
 # --list <name>: pin this view to one list (the daily popup) without touching
 # any window link. Exported so fzf binds that re-run this script (--format
-# reloads, todo-move.sh) stay on the pinned list.
+# reloads, todo-move.sh) stay on the pinned list. --item <id>: open with the
+# cursor on that todo (the board's deep link).
 FORMAT_MODE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --list)
             [[ -n "$2" ]] && export DOIT_PINNED_LIST="$2"
+            shift
+            [[ $# -gt 0 ]] && shift
+            ;;
+        --item)
+            [[ -n "$2" ]] && CURSOR_TARGET="$2"
             shift
             [[ $# -gt 0 ]] && shift
             ;;

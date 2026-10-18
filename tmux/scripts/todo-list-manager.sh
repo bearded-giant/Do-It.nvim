@@ -20,6 +20,10 @@ fi
 
 CURRENT_LIST=$(get_active_list_name)
 
+# --select <name>: open with the cursor on that list (the board's deep link)
+SELECT_LIST=""
+[[ "$1" == "--select" ]] && SELECT_LIST="$2"
+
 # Enter opens a list without touching any link. Launched from the todo manager,
 # the choice goes back through $DOIT_LM_RESULT ("view|link <name>") so the caller
 # re-renders in place instead of nesting a second manager; standalone, it
@@ -266,7 +270,15 @@ while true; do
 
     WINDOW_HINT=""
     [[ -n "$WIN" ]] && WINDOW_HINT=" - Window: $WIN"
+    # rows are matched the way SELECTED_LIST is parsed below
+    START_BIND=()
+    if [[ -n "$SELECT_LIST" ]]; then
+        ln=$(printf '%s\n' "$LIST_DISPLAY" | sed 's/\x1b\[[0-9;]*m//g; s/^[* ]*//' | awk '{print $1}' | grep -nxF -- "$SELECT_LIST" | head -1 | cut -d: -f1)
+        [[ -n "$ln" ]] && START_BIND=(--bind "start:pos($ln)")
+        SELECT_LIST=""
+    fi
     SELECTION=$(echo "$LIST_DISPLAY" | fzf --ansi \
+        "${START_BIND[@]}" \
         --header="
  List Manager - Active: $CURRENT_LIST$WINDOW_HINT
 ─────────────────────────────────────────
