@@ -6,6 +6,13 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OVERALL_EXIT=0
 
+# tmux runs the scripts through #!/bin/bash, which macOS pins at 3.2; a newer bash
+# first on PATH would hide 3.2-only bugs (read -t timing out with status 1)
+BASH_BIN_DIR=$(mktemp -d /tmp/doit-bash.XXXXXX)
+trap 'rm -rf "$BASH_BIN_DIR"' EXIT
+ln -s /bin/bash "$BASH_BIN_DIR/bash"
+export PATH="$BASH_BIN_DIR:$PATH"
+
 if [[ -n "$1" ]]; then
     tests=("$SCRIPT_DIR/$1")
 else
