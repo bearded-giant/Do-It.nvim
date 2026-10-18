@@ -253,8 +253,9 @@ from your Claude Code hooks.
 Below: every list in ACTIVE (in-progress item shown), OPEN (open items,
 nothing in progress; lists sharing a first dash segment fold into one row)
 and EMPTY (one line of names). `daily` leads its group, the rest go by name.
-Rows carry the glyphs of Claude panes on the list and an aligned open count;
-linked windows show only on the selected row.
+A list a Claude pane is working on is left out, since its row is up top
+(`daily` always stays). Counts sit in one aligned column; linked windows show
+only on the selected row.
 
 Rows are never cut; the screen is a scrolled viewport with a position footer.
 `/` filters list names and item text as you type; item-text hits show only

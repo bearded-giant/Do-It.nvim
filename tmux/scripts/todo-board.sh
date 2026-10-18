@@ -84,8 +84,7 @@ def lcp:
        elif $r.a then ($r.a | item($k; $ind))
        else empty end] as $items
     | {k: $k,
-       pre: ([["", $ind]] + (($onlist[$r.n] // []) | map(glyph + [["", " "]]) | add // [])
-             + [[(if $r.a then "1" else "" end), $r.n]]),
+       pre: [["", $ind], [(if $r.a then "1" else "" end), $r.n]],
        count: ($r.open | length),
        trail: (if ($links[$r.n] // []) == [] then [] else [["2", "  ← " + ($links[$r.n] | join(", "))]] end)},
       $items[],
@@ -124,7 +123,8 @@ def lcp:
               segs: (if $r | needs then $segs | map([sgr("48;5;52;97"; .[0]), .[1]]) else $segs end)})]
       end)) as $crows
 
-  | [(["daily"] + ($lists | keys | map(select(. != "daily"))))[] as $n
+  # a list a claude pane works already has its row up top; daily stays, unstamped panes fall back to it
+  | [(["daily"] + ($lists | keys | map(select(. != "daily" and $onlist[.] == null))))[] as $n
      | (($lists[$n].todos // []) | map(select(.done | not)) | order) as $open
      | (if $f == "" or ($n | ascii_downcase | contains($f)) then null
         else [$open[] | select(.text | ascii_downcase | contains($f))] end) as $hits

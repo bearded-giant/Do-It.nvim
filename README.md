@@ -437,7 +437,7 @@ Passing `#{window_id}` lets the status segment resolve the window's linked list;
 
 The chip shows one window at a time. If you run a few Claude Code sessions side by side, `tmux/scripts/todo-board.sh` shows them all at once, plus every list. The top section has one row per pane with `@claude_state` set, grouped by session: its status glyph, window, list, and that list's in-progress item. The glyphs follow the usual claude strip rules (busy, ask, ready, error, age, low context). A pane's list is its `@doit-pane-list` option, then its window's link, then `daily`, so two Claude panes sharing a window each keep their own list. Your Claude Code hooks set both pane options; a SessionStart hook can run `tmux set -p -t "$TMUX_PANE" @doit-pane-list <list>`.
 
-Below that comes every list in three groups, `daily` first in whichever group it lands in and the rest by name. ACTIVE holds lists with an in-progress item, shown underneath. OPEN holds lists with open items but nothing in progress, and lists sharing a first dash segment (`auth-*`, `merchant-mcp-*`) fold into one row until you open it. EMPTY is a single line naming the lists with nothing open. Each row carries the glyphs of any Claude panes working that list and an open count in one aligned column; the windows linked to a list show only while its row is selected.
+Below that comes every list in three groups, `daily` first in whichever group it lands in and the rest by name. ACTIVE holds lists with an in-progress item, shown underneath. OPEN holds lists with open items but nothing in progress, and lists sharing a first dash segment (`auth-*`, `merchant-mcp-*`) fold into one row until you open it. EMPTY is a single line naming the lists with nothing open. A list a Claude pane is working on is left out, since its row is already up top (`daily` always stays). Open counts sit in one aligned column, and the windows linked to a list show only while its row is selected.
 
 Rows are never cut short. The screen is a window onto the whole board, so long rows scroll sideways and a long board scrolls down, with a footer showing where you are. `/` filters as you type, matching list names and item text. A list that matches only on item text shows just those items, and folds open flat while a filter is on.
 
@@ -471,7 +471,6 @@ The board runs outside tmux, so you can park it in a terminal split next to the 
       size = 0.2,
       args = { "/bin/bash", "-lc", wezterm.home_dir .. "/.tmux/plugins/do-it.nvim/tmux/scripts/todo-board.sh" },
     })
-    pane:activate()
   end),
 },
 ```

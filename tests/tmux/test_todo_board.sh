@@ -58,6 +58,8 @@ assert_contains "$out" "ACTIVE 1"
 mklist solo-list "claude: [bug] 4. fix the redirect" true critical
 mklist left-list "left item" true ""
 mklist right-list "idle item" false ""
+mklist pane-a "pane a item" true ""
+mklist pane-b "pane b idle" false ""
 mklist win-list "window item" true ""
 mklist multi "first thing" false "" "second thing" true urgent "third thing" false ""
 mklist empty
@@ -75,9 +77,9 @@ T set -pq -t "$SOLO" @claude_ctx 25
 T set -pq -t "$SOLO" @doit-pane-list solo-list
 T set -pq -t "$PAIR_A" @claude_state ask
 T set -pq -t "$PAIR_A" @claude_state_at "$(($(date +%s) - 420))"
-T set -pq -t "$PAIR_A" @doit-pane-list left-list
+T set -pq -t "$PAIR_A" @doit-pane-list pane-a
 T set -pq -t "$PAIR_B" @claude_state ready
-T set -pq -t "$PAIR_B" @doit-pane-list right-list
+T set -pq -t "$PAIR_B" @doit-pane-list pane-b
 T set -wq -t s:pair @doit-window-list win-list
 T set -pq -t "$BARE" @claude_state busy
 T set -pq -t "$BARE" @claude_err "api error"
@@ -91,8 +93,8 @@ it "busy pane: yellow dot, low context, its list and whole active item on one li
 assert_contains "$claude" "●◔25 solo  solo-list  ▸ [bug] 4. fix the redirect"
 
 it "ask pane past 5m shows its age, ready pane off screen shows a check"
-assert_contains "$claude" "● pair $PAIR_A 7m  left-list  ▸ left item"
-assert_contains "$claude" "✓ pair $PAIR_B  right-list  no active"
+assert_contains "$claude" "● pair $PAIR_A 7m  pane-a  ▸ pane a item"
+assert_contains "$claude" "✓ pair $PAIR_B  pane-b  no active"
 
 it "api error shows ! and the row gets the attention background"
 assert_contains "$claude" "! bare  daily  ▸ my own thing"
@@ -106,12 +108,12 @@ assert_eq "0" "$(printf '%s\n' "$claude" | grep -c 'plain')"
 
 it "ACTIVE holds lists with an in-progress item, daily first, the rest by name"
 names=$(printf '%s\n' "$lists" | section ACTIVE | grep -v '^     ' | sed -E 's/^.* ([^ ]+) +[0-9]+$/\1/')
-assert_eq "daily left-list long-list multi solo-list win-list" "$(echo $names)"
+assert_eq "daily left-list long-list multi win-list" "$(echo $names)"
 
 it "OPEN holds idle lists; lists sharing a first segment fold into one row"
 open=$(printf '%s\n' "$lists" | section OPEN)
 assert_contains "$open" "+ grp-* (2)"
-assert_contains "$open" "  ✓ right-list"
+assert_contains "$open" "  right-list"
 assert_eq "0" "$(printf '%s\n' "$open" | grep -c 'grp-a')"
 
 it "EMPTY lists collapse into one line"
@@ -120,14 +122,15 @@ assert_contains "$lists" "EMPTY 1  empty"
 it "counts sit in one right-aligned column"
 assert_eq "1" "$(printf '%s\n' "$lists" | grep -E '^(\+ |- |  [^ ])' | jq -R length | sort -u | wc -l | tr -d ' ')"
 
-it "claude glyphs of panes working a list show before its name"
-assert_contains "$lists" "  ● left-list"
+it "lists a claude pane works are left out of LISTS, daily stays"
+assert_eq "0" "$(printf '%s\n' "$lists" | grep -cE 'solo-list|pane-a|pane-b')"
+assert_contains "$lists" "  daily "
 
 it "window links stay hidden until the row is selected"
 assert_eq "0" "$(printf '%s\n' "$lists" | grep -c '←')"
 
 it "active item sits under its list"
-assert_eq "     ▸ left item" "$(printf '%s\n' "$lists" | grep -A1 '● left-list' | tail -1)"
+assert_eq "     ▸ left item" "$(printf '%s\n' "$lists" | grep -A1 '  left-list ' | tail -1)"
 
 it "a blank row follows each claude session group and each list block with items"
 assert_eq "" "$(printf '%s\n' "$claude" | grep -B1 '^ t$' | head -1)"
@@ -162,7 +165,7 @@ assert_contains "$(DOIT_BOARD_FILTER=zzz board)" "  no match"
 it "unstamped pane falls back to the window link"
 T set -pqu -t "$PAIR_A" @doit-pane-list
 assert_contains "$(claude_rows)" "pair $PAIR_A 7m  win-list"
-T set -pq -t "$PAIR_A" @doit-pane-list left-list
+T set -pq -t "$PAIR_A" @doit-pane-list pane-a
 
 describe "todo board input"
 
