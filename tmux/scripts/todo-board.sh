@@ -75,18 +75,21 @@ def lcp:
   def item($k; $ind):
     {k: $k, segs: [[sgr(prio; (if .in_progress == true then "1" else "" end)),
       $ind + "   " + (if .in_progress == true then "▸ " else "· " end) + (.text | clean)]]};
+  # a block with item lines under it gets a blank row after, for air between blocks
   def listrow($ind):
     . as $r
     | ("L:" + $r.n) as $k
+    | [if $r.hits != null then ($r.hits[] | item($k; $ind))
+       elif expanded($k) then ($r.open[] | item($k; $ind))
+       elif $r.a then ($r.a | item($k; $ind))
+       else empty end] as $items
     | {k: $k,
        pre: ([["", $ind]] + (($onlist[$r.n] // []) | map(glyph + [["", " "]]) | add // [])
              + [[(if $r.a then "1" else "" end), $r.n]]),
        count: ($r.open | length),
        trail: (if ($links[$r.n] // []) == [] then [] else [["2", "  ← " + ($links[$r.n] | join(", "))]] end)},
-      (if $r.hits != null then ($r.hits[] | item($k; $ind))
-       elif expanded($k) then ($r.open[] | item($k; $ind))
-       elif $r.a then ($r.a | item($k; $ind))
-       else empty end);
+      $items[],
+      (if $items == [] then empty else {k: "", segs: []} end);
   # a filter shows matches flat; otherwise lists sharing a first dash segment fold into one row
   def folded:
     if $f != "" then .[] | listrow("  ")
@@ -105,8 +108,9 @@ def lcp:
 
   ([{k: "", segs: [["1", "CLAUDE"]]}]
    + (if $claude == [] then [{k: "", segs: [["2", " no claude panes"]]}]
-      else [$claude | group_by(.s)[] as $g
-        | {k: "", segs: [[(if $g[0].att then "1" else "2" end), " " + $g[0].s]]},
+      else [$claude | group_by(.s) | to_entries[] as $e | $e.value as $g
+        | (if $e.key > 0 then {k: "", segs: []} else empty end),
+          {k: "", segs: [[(if $g[0].att then "1" else "2" end), " " + $g[0].s]]},
           ($g[] as $r
            | ([$g[] | select(.w == $r.w)] | length > 1) as $shared
            | active($r.list) as $a
@@ -142,7 +146,8 @@ def lcp:
           + [($opn | map(select(.n == "daily")))[] | listrow("  ")]
           + [$opn | map(select(.n != "daily")) | folded] end)
      + (if $emp == [] then []
-        else [{k: "", segs: [["36", "EMPTY"], ["2", " \($emp | length)  " + ($emp | map(.n) | join("  "))]]}] end)) as $lrows
+        else [{k: "", segs: [["36", "EMPTY"], ["2", " \($emp | length)  " + ($emp | map(.n) | join("  "))]]}] end)
+     | if .[-1] == {k: "", segs: []} then .[:-1] else . end) as $lrows
   # counts right-aligned in one column so names scan as a list
   | ($lrows | map(select(.pre) | .pre | width) | max // 0) as $w
   | ($lrows | map(select(.pre) | .count | tostring | length) | max // 0) as $cw

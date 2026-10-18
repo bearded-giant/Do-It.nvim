@@ -81,6 +81,8 @@ T set -pq -t "$PAIR_B" @doit-pane-list right-list
 T set -wq -t s:pair @doit-window-list win-list
 T set -pq -t "$BARE" @claude_state busy
 T set -pq -t "$BARE" @claude_err "api error"
+T new-session -d -s t -n tw
+T set -pq -t t:tw @claude_state ready
 out=$(board)
 claude=$(claude_rows)
 lists=$(printf '%s\n' "$out" | sed -n '/^LISTS/,$p')
@@ -126,6 +128,14 @@ assert_eq "0" "$(printf '%s\n' "$lists" | grep -c '←')"
 
 it "active item sits under its list"
 assert_eq "     ▸ left item" "$(printf '%s\n' "$lists" | grep -A1 '● left-list' | tail -1)"
+
+it "a blank row follows each claude session group and each list block with items"
+assert_eq "" "$(printf '%s\n' "$claude" | grep -B1 '^ t$' | head -1)"
+assert_eq "" "$(printf '%s\n' "$lists" | grep -A1 '     ▸ left item' | tail -1)"
+
+it "one-line OPEN rows stay tight and the board does not end on a blank"
+assert_contains "$(printf '%s\n' "$lists" | grep -A1 '+ grp-' | tail -1)" "right-list"
+assert_contains "$(printf '%s\n' "$out" | tail -1)" "EMPTY"
 
 it "long items are never cut"
 assert_contains "$lists" "     ▸ ${LONG#claude: }"
