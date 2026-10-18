@@ -147,6 +147,12 @@ if [[ "$1" == "--once" ]]; then
     exit
 fi
 
+# the input loop needs a terminal: off one, a read failing at EOF would spin
+[[ -t 0 ]] || {
+    echo "todo-board: stdin is not a terminal (use --once)" >&2
+    exit 1
+}
+
 read_size() {
     local r c
     read -r r c < <(stty size < /dev/tty 2>/dev/null)
@@ -250,11 +256,8 @@ trap 'last=' WINCH
 last=""
 while :; do
     draw
-    IFS= read -rsn1 -t "$INTERVAL" key
-    rc=$?
-    # >128 is the timeout tick; 1 is EOF, which would otherwise spin
-    ((rc > 128)) && continue
-    ((rc == 0)) || exit 0
+    # bash 3.2 (macOS /bin/bash) returns 1 on timeout, same as EOF; a closed terminal ends us by SIGHUP
+    IFS= read -rsn1 -t "$INTERVAL" key || continue
     case "$key" in
         q) exit 0 ;;
         j) MOVE=1 FOLLOW=true ;;

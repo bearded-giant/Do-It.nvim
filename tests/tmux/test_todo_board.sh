@@ -37,7 +37,8 @@ mklist() {
 
 # the pty ends lines in \r\n
 strip() { LC_ALL=en_US.UTF-8 sed $'s/\e\\[[0-9;?]*[a-zA-Z]//g; s/\e\\][^\a]*\a//g; s/\r//g'; }
-board_raw() { env -u TMUX_PANE TMUX="$TM" bash "$SCRIPTS/todo-board.sh" --once; }
+# run through the shebang: /bin/bash on macOS is 3.2, which is what wezterm and tmux run
+board_raw() { env -u TMUX_PANE TMUX="$TM" "$SCRIPTS/todo-board.sh" --once; }
 board() { board_raw | strip; }
 pane() { T display -p -t "$1" '#{pane_id}'; }
 claude_rows() { board | sed -n '/^CLAUDE$/,/^LISTS$/p'; }
@@ -138,8 +139,8 @@ esac
 EOF
 chmod +x "$FAKE_BIN/tmux"
 
-# drive [LINES COLUMNS] keys...: keys go in through a pty one chunk at a time,
-# then q; prints the switch-client calls, the stripped screen lands in $SCREEN
+# drive [LINES COLUMNS] keys...: keys go in through a pty one chunk at a time
+# (PAUSE idles past a redraw tick), then q; prints the switch-client calls, the stripped screen lands in $SCREEN
 drive() {
     local lines=60 cols=200
     if [[ "$1" =~ ^[0-9]+$ ]]; then
@@ -150,12 +151,16 @@ drive() {
     (
         sleep 1
         for k in "$@"; do
+            if [[ "$k" == PAUSE ]]; then
+                sleep 2.5
+                continue
+            fi
             printf "$k"
             sleep 0.4
         done
         printf q
     ) | env -u TMUX_PANE -u WEZTERM_PANE TMUX="$TM" PATH="$FAKE_BIN:$PATH" COLUMNS="$cols" LINES="$lines" \
-        script -q /dev/null bash "$SCRIPTS/todo-board.sh" 2> /dev/null | tee "$SCREEN.raw" | strip > "$SCREEN"
+        DOIT_BOARD_INTERVAL=1 script -q /dev/null "$SCRIPTS/todo-board.sh" 2> /dev/null | tee "$SCREEN.raw" | strip > "$SCREEN"
     cat "$SWITCHED"
 }
 
@@ -177,6 +182,9 @@ assert_eq "" "$(drive '\r')"
 
 it "nothing selected: no row is highlighted"
 assert_eq "0" "$(grep -c $'\e\\[7' "$SCREEN.raw")"
+
+it "idle redraw ticks do not end the board"
+assert_eq "switch-client -c /dev/ttyfake -t $SOLO" "$(drive PAUSE j '\r')"
 
 MULTI_ROW=$(board | grep -n '^+ multi  3 open' | cut -d: -f1)
 it "click on a list expands it to every open item, priority first, without jumping"
