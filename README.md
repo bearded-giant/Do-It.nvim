@@ -435,9 +435,20 @@ Passing `#{window_id}` lets the status segment resolve the window's linked list;
 
 ### Pane Board
 
-The chip shows one window at a time. If you run a few Claude Code sessions side by side, `tmux/scripts/todo-board.sh` shows them all at once. You get one row per pane that has `@claude_state` set, grouped by session, with the pane's list and that list's in-progress item, and your `daily` item at the bottom. A pane's list is its `@doit-pane-list` option, then its window's link, then `daily`, so two Claude panes sharing a window each keep their own list. Your Claude Code hooks set both pane options; a SessionStart hook can run `tmux set -p -t "$TMUX_PANE" @doit-pane-list <list>`.
+The chip shows one window at a time. If you run a few Claude Code sessions side by side, `tmux/scripts/todo-board.sh` shows them all at once, plus every list. The top section has one row per pane with `@claude_state` set, grouped by session: its status glyph, window, list, and that list's in-progress item. The glyphs follow the usual claude strip rules (busy, ask, ready, error, age, low context). A pane's list is its `@doit-pane-list` option, then its window's link, then `daily`, so two Claude panes sharing a window each keep their own list. Your Claude Code hooks set both pane options; a SessionStart hook can run `tmux set -p -t "$TMUX_PANE" @doit-pane-list <list>`.
 
-The board runs outside tmux, so you can park it in a terminal split next to the tmux client and leave it open. It redraws only when something changes, `q` quits, and `--once` prints a single frame. Here's a WezTerm key that opens it on the left and closes it again:
+Below that comes every list, `daily` first and the rest by name. Each row shows the open count, the windows linked to it, and the glyphs of any Claude panes working it, with the in-progress item underneath. Rows are never cut short. The screen is a window onto the whole board, so long rows scroll sideways and a long board scrolls down, with a footer showing where you are.
+
+| Key | Does |
+|---|---|
+| up/down, `j`/`k` | move the selection |
+| enter, click | on a Claude row, switch the tmux client to that pane; on a list, expand it to all open items |
+| `a` | expand or collapse every list |
+| left/right, `h`/`l`, sideways wheel | scroll sideways |
+| wheel, `ctrl-d`/`ctrl-u`, `g`/`G` | scroll down and up |
+| `q` | quit |
+
+The board runs outside tmux, so you can park it in a terminal split next to the tmux client and leave it open. It redraws only when something changes, and `--once` prints the whole board without the viewport. A jump moves the tmux client in the pane to the board's right and focuses it, or the most recently active client when there's no WezTerm. Here's a WezTerm key that opens it on the left and closes it again:
 
 ```lua
 {
@@ -462,7 +473,7 @@ The board runs outside tmux, so you can park it in a terminal split next to the 
 },
 ```
 
-The board marks its pane with the `doit_board` user var, which is how the key finds it again.
+The board marks its pane with the `doit_board` user var, which is how the key finds it again. Set `config.swallow_mouse_click_on_pane_focus = false` so the first click on the board jumps instead of only focusing it.
 
 ## MCP Server (Claude Code Integration)
 

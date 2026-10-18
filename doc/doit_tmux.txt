@@ -241,16 +241,31 @@ name takes the label's place.
 ==============================================================================
 PANE BOARD                                               *doit-tmux-board*
 
-`scripts/todo-board.sh` shows every Claude Code pane at once, for a terminal
-split beside the tmux client. One row per pane with `@claude_state` set,
-grouped by session: the pane's list and its in-progress item, then the
-`daily` item. A pane's list is its `@doit-pane-list` option, then its window
-link, then `daily`, so two Claude panes in one window keep their own lists.
-Both pane options come from your Claude Code hooks.
+`scripts/todo-board.sh` shows every Claude Code pane and every list at once,
+for a terminal split beside the tmux client.
 
-It redraws on change, `q` quits, `--once` prints one frame. It marks its
-pane with the `doit_board` user var so a WezTerm key can find and close it;
-the README has a toggle binding.
+Top: one row per pane with `@claude_state` set, grouped by session, with the
+claude strip's status glyph, window, list, and in-progress item. A pane's
+list is its `@doit-pane-list` option, then its window link, then `daily`, so
+two Claude panes in one window keep their own lists. Both pane options come
+from your Claude Code hooks.
+
+Below: every list, `daily` first then by name, with open count, linked
+windows, the glyphs of Claude panes on it, and its in-progress item.
+
+Rows are never cut; the screen is a scrolled viewport with a position footer.
+
+    up/down j/k             move the selection
+    enter, click            Claude row: switch the tmux client to that pane
+                            list: expand to every open item
+    a                       expand or collapse every list
+    left/right h/l          scroll sideways (also the sideways wheel)
+    wheel ctrl-d/u g/G      scroll down and up
+    q                       quit
+
+`--once` prints the whole board. It marks its pane with the `doit_board`
+user var so a WezTerm key can find and close it; the README has a toggle
+binding.
 
 ==============================================================================
 SHARED STORAGE                                          *doit-tmux-storage*
