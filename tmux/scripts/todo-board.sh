@@ -103,7 +103,7 @@ def draw: map(esc(.[0]) + .[1] + esc("0")) | add // "";
          else ($keys | pos($sel)) as $i
            | $keys[if $i < 0 then (if $move > 0 then 0 else $nk - 1 end) else ((($i + $move) % $nk) + $nk) % $nk end]
          end) as $nsel
-      | ($c | map(.k) | pos($nsel)) as $line
+      | (if $nsel == "" then -1 else $c | map(.k) | pos($nsel) end) as $line
       | ([$rows - 1, 1] | max) as $body
       | ($c | length) as $total
       | (if $follow and $line >= 0 then

@@ -155,7 +155,7 @@ drive() {
         done
         printf q
     ) | env -u TMUX_PANE -u WEZTERM_PANE TMUX="$TM" PATH="$FAKE_BIN:$PATH" COLUMNS="$cols" LINES="$lines" \
-        script -q /dev/null bash "$SCRIPTS/todo-board.sh" 2> /dev/null | strip > "$SCREEN"
+        script -q /dev/null bash "$SCRIPTS/todo-board.sh" 2> /dev/null | tee "$SCREEN.raw" | strip > "$SCREEN"
     cat "$SWITCHED"
 }
 
@@ -174,6 +174,9 @@ assert_eq "" "$(drive '\e[<0;2;1M')"
 
 it "enter with nothing selected does nothing"
 assert_eq "" "$(drive '\r')"
+
+it "nothing selected: no row is highlighted"
+assert_eq "0" "$(grep -c $'\e\\[7' "$SCREEN.raw")"
 
 MULTI_ROW=$(board | grep -n '^+ multi  3 open' | cut -d: -f1)
 it "click on a list expands it to every open item, priority first, without jumping"
