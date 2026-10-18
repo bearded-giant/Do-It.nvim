@@ -9,9 +9,10 @@ CONTENTS                                                *doit-tmux-contents*
   4. Keybindings ................................... |doit-tmux-keybindings|
   5. Interactive Manager ......................... |doit-tmux-interactive|
   6. Status Bar ........................................ |doit-tmux-status|
-  7. Shared Storage ................................... |doit-tmux-storage|
-  8. Window-Linked Lists ......................... |doit-tmux-window-links|
-  9. Configuration .............................. |doit-tmux-configuration|
+  7. Pane Board ......................................... |doit-tmux-board|
+  8. Shared Storage ................................... |doit-tmux-storage|
+  9. Window-Linked Lists ......................... |doit-tmux-window-links|
+ 10. Configuration .............................. |doit-tmux-configuration|
 
 ==============================================================================
 INTRODUCTION                                               *doit-tmux-intro*
@@ -236,6 +237,20 @@ label shortened to `owed:`, cut at `@doit-todo-chars` characters
 (default 25). With nothing in progress it shows
 `<session>:<window>: no active`. Run outside tmux with no window, the list
 name takes the label's place.
+
+==============================================================================
+PANE BOARD                                               *doit-tmux-board*
+
+`scripts/todo-board.sh` shows every Claude Code pane at once, for a terminal
+split beside the tmux client. One row per pane with `@claude_state` set,
+grouped by session: the pane's list and its in-progress item, then the
+`daily` item. A pane's list is its `@doit-pane-list` option, then its window
+link, then `daily`, so two Claude panes in one window keep their own lists.
+Both pane options come from your Claude Code hooks.
+
+It redraws on change, `q` quits, `--once` prints one frame. It marks its
+pane with the `doit_board` user var so a WezTerm key can find and close it;
+the README has a toggle binding.
 
 ==============================================================================
 SHARED STORAGE                                          *doit-tmux-storage*

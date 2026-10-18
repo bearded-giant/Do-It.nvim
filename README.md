@@ -433,6 +433,37 @@ set -g status-right "#(~/.tmux/plugins/do-it.nvim/tmux/scripts/todo-status.sh #{
 
 Passing `#{window_id}` lets the status segment resolve the window's linked list; status commands run without a client context, so the script cannot discover the window on its own. By hand, any tmux target works as the argument, such as `'work:api'`.
 
+### Pane Board
+
+The chip shows one window at a time. If you run a few Claude Code sessions side by side, `tmux/scripts/todo-board.sh` shows them all at once. You get one row per pane that has `@claude_state` set, grouped by session, with the pane's list and that list's in-progress item, and your `daily` item at the bottom. A pane's list is its `@doit-pane-list` option, then its window's link, then `daily`, so two Claude panes sharing a window each keep their own list. Your Claude Code hooks set both pane options; a SessionStart hook can run `tmux set -p -t "$TMUX_PANE" @doit-pane-list <list>`.
+
+The board runs outside tmux, so you can park it in a terminal split next to the tmux client and leave it open. It redraws only when something changes, `q` quits, and `--once` prints a single frame. Here's a WezTerm key that opens it on the left and closes it again:
+
+```lua
+{
+  key = "d",
+  mods = "CMD|SHIFT",
+  action = wezterm.action_callback(function(_, pane)
+    local tab = pane:tab()
+    if not tab then return end
+    for _, p in ipairs(tab:panes()) do
+      if p:get_user_vars().doit_board then
+        p:send_text("q")
+        return
+      end
+    end
+    pane:split({
+      direction = "Left",
+      size = 0.2,
+      args = { "/bin/bash", "-lc", wezterm.home_dir .. "/.tmux/plugins/do-it.nvim/tmux/scripts/todo-board.sh" },
+    })
+    pane:activate()
+  end),
+},
+```
+
+The board marks its pane with the `doit_board` user var, which is how the key finds it again.
+
 ## MCP Server (Claude Code Integration)
 
 Do-it.nvim includes an MCP server that exposes your todo lists to [Claude Code](https://claude.ai/code) and other MCP-compatible tools. This lets you read, create, update, and search todos without leaving your AI coding session.
