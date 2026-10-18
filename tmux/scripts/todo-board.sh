@@ -83,10 +83,10 @@ def draw: map(esc(.[0]) + .[1] + esc("0")) | add // "";
       | expanded($n) as $exp
       | (($onlist[$n] // []) | map(glyph + [["", " "]]) | add // []) as $dots
       | {k: ("L:" + $n),
-         segs: [["2", (if $open == [] then "  " elif $exp then "- " else "+ " end)]]
+         segs: ([["2", (if $open == [] then "  " elif $exp then "- " else "+ " end)]]
            + $dots
            + [[(if $open == [] then "2" elif $a then "1" else "" end), $n], ["2", "  \($open | length) open"]]
-           + (if ($links[$n] // []) == [] then [] else [["2", "  ← " + ($links[$n] | join(", "))]] end)},
+           + (if ($links[$n] // []) == [] then [] else [["2", "  ← " + ($links[$n] | join(", "))]] end))},
         (if $exp then
            ($open | sort_by((if (.sequence | type) == "number" then [0, .sequence] else [1, 0] end), rank, .order_index)[]
             | {k: ("L:" + $n), segs: [[sgr(prio; (if .in_progress == true then "1" else "" end)),
