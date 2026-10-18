@@ -250,15 +250,21 @@ list is its `@doit-pane-list` option, then its window link, then `daily`, so
 two Claude panes in one window keep their own lists. Both pane options come
 from your Claude Code hooks.
 
-Below: every list, `daily` first then by name, with open count, linked
-windows, the glyphs of Claude panes on it, and its in-progress item.
+Below: every list in ACTIVE (in-progress item shown), OPEN (open items,
+nothing in progress; lists sharing a first dash segment fold into one row)
+and EMPTY (one line of names). `daily` leads its group, the rest go by name.
+Rows carry the glyphs of Claude panes on the list and an aligned open count;
+linked windows show only on the selected row.
 
 Rows are never cut; the screen is a scrolled viewport with a position footer.
+`/` filters list names and item text as you type; item-text hits show only
+the matching items, and folds open flat while filtering.
 
     up/down j/k             move the selection
     enter, click            Claude row: switch the tmux client to that pane
-                            list: expand to every open item
-    a                       expand or collapse every list
+                            list: show every open item; fold: open it
+    a                       open or close every list and fold
+    /                       filter (enter keeps it, esc clears it)
     left/right h/l          scroll sideways (also the sideways wheel)
     wheel ctrl-d/u g/G      scroll down and up
     q                       quit
