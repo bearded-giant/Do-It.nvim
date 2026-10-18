@@ -185,7 +185,7 @@ EOF
 chmod +x "$FAKE_BIN/tmux"
 
 # drive [LINES COLUMNS] keys...: keys go in through a pty one chunk at a time
-# (PAUSE idles past a redraw tick), then q; prints the switch-client calls, the
+# (PAUSE idles past a redraw tick, BURST:n:seq streams), then q; prints the switch-client calls, the
 # stripped screen lands in $SCREEN
 drive() {
     local lines=60 cols=200
@@ -199,6 +199,16 @@ drive() {
         for k in "$@"; do
             if [[ "$k" == PAUSE ]]; then
                 sleep 2.5
+                continue
+            fi
+            # BURST:n:seq sends seq n times 20ms apart, the way a trackpad streams wheel events
+            if [[ "$k" == BURST:* ]]; then
+                local spec=${k#BURST:} i
+                for ((i = 0; i < ${spec%%:*}; i++)); do
+                    printf "${spec#*:}"
+                    sleep 0.02
+                done
+                sleep 0.4
                 continue
             fi
             printf "$k"
@@ -279,5 +289,14 @@ it "wheel scrolls down, footer shows the window into the board"
 drive 6 200 '\e[<65;5;3M' > /dev/null
 assert_contains "$(cat "$SCREEN")" " 1-5/"
 assert_contains "$(cat "$SCREEN")" " 4-8/"
+
+it "a burst of wheel events scrolls without echoing them onto the screen"
+drive 6 200 'BURST:20:\e[<65;5;3M' > /dev/null
+assert_eq "0" "$(grep -c '\[<65' "$SCREEN")"
+assert_eq "0" "$(last_frame | grep -c '^ 1-5/')"
+
+it "shift+wheel, how a trackpad sends sideways, scrolls sideways"
+drive 60 30 '\e[<69;5;3M' > /dev/null
+assert_contains "$(grep -c '^olo  solo-list  ▸ \[bug\] 4. fix$' "$SCREEN")" "1"
 
 report

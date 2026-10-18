@@ -308,31 +308,28 @@ read_escape() {
             done
             [[ "$c" == M ]] || return
             IFS=';' read -r b x y <<< "$seq"
-            case "$b" in
-                0)
+            # bits 4/8/16 are shift/meta/ctrl; a trackpad sends its sideways motion as shift+wheel
+            case "$((b & ~28))$((b & 4 ? 1 : 0))" in
+                00 | 01)
                     target=${LINE_TARGET[$((y - 1))]}
                     [[ -n "$target" ]] && SEL=$target && act "$target"
                     ;;
-                64) ROW_OFF=$((ROW_OFF - 3)) ;;
-                65) ROW_OFF=$((ROW_OFF + 3)) ;;
-                66) COL_OFF=$((COL_OFF - 8)) ;;
-                67) COL_OFF=$((COL_OFF + 8)) ;;
+                640) ROW_OFF=$((ROW_OFF > 3 ? ROW_OFF - 3 : 0)) ;;
+                650) ROW_OFF=$((ROW_OFF + 3)) ;;
+                641 | 660 | 661) COL_OFF=$((COL_OFF > 8 ? COL_OFF - 8 : 0)) ;;
+                651 | 670 | 671) COL_OFF=$((COL_OFF + 8)) ;;
             esac
             ;;
     esac
 }
 
-# wezterm finds this pane by the user var to toggle it
-printf '\e]1337;SetUserVar=doit_board=MQ==\a'
-printf '\e[?1000h\e[?1006h'
-tput civis 2>/dev/null
-trap 'printf "\e[?1000l\e[?1006l"; tput cnorm 2>/dev/null; printf "\e[2J\e[H"' EXIT
-trap 'last=' WINCH
-last=""
-while :; do
-    draw
-    # bash 3.2 (macOS /bin/bash) returns 1 on timeout, same as EOF; a closed terminal ends us by SIGHUP
-    IFS= read -rsn1 -t "$INTERVAL" key || continue
+# bash 3.2 has no read -t 0 poll; select on stdin says whether more input is already queued
+pending() {
+    perl -e 'vec($r = "", 0, 1) = 1; exit(select($r, undef, undef, 0) > 0 ? 0 : 1)'
+}
+
+handle() {
+    local key=$1
     if [[ "$TYPING" == true ]]; then
         case "$key" in
             "") TYPING=false ;;
@@ -340,7 +337,7 @@ while :; do
             $'\x7f' | $'\b') FILTER=${FILTER%?} ROW_OFF=0 ;;
             *) FILTER+=$key ROW_OFF=0 ;;
         esac
-        continue
+        return
     fi
     case "$key" in
         q) exit 0 ;;
@@ -357,4 +354,26 @@ while :; do
         "") act "$SEL" ;;
         $'\e') read_escape ;;
     esac
+}
+
+# wezterm finds this pane by the user var to toggle it
+printf '\e]1337;SetUserVar=doit_board=MQ==\a'
+printf '\e[?1000h\e[?1006h'
+tput civis 2>/dev/null
+# read -s only hides input during a read; bytes landing mid-redraw (a trackpad streams
+# dozens of wheel events a second) would echo. -icanon lets select see unterminated input.
+STTY_SAVED=$(stty -g)
+stty -echo -icanon min 1 time 0
+trap 'stty "$STTY_SAVED"; printf "\e[?1000l\e[?1006l"; tput cnorm 2>/dev/null; printf "\e[2J\e[H"' EXIT
+trap 'last=' WINCH
+last=""
+while :; do
+    draw
+    # bash 3.2 (macOS /bin/bash) returns 1 on timeout, same as EOF; a closed terminal ends us by SIGHUP
+    IFS= read -rsn1 -t "$INTERVAL" key || continue
+    handle "$key"
+    # one redraw per burst, not per event
+    while pending && IFS= read -rsn1 -t 1 key; do
+        handle "$key"
+    done
 done
