@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { composeTodoText, nextRank, normalizeTodoText, parseTodoText, relabelTwin } from "./todo-text.js";
+import { composeTodoText, nextRank, normalizeTodoText, parseTags, parseTodoText, relabelTwin } from "./todo-text.js";
 import { isSequenced, setSequence } from "./sequence.js";
 
 // Root VERSION is the single source of truth, read at runtime exactly as the
@@ -218,16 +218,6 @@ function removeTodo(data, id) {
     data._metadata.deleted_todos.unshift(removed);
     data._metadata.deleted_todos = data._metadata.deleted_todos.slice(0, 10);
     return removed;
-}
-
-// Tags live inline in the todo text, not in a schema field — same contract as
-// the nvim and tmux surfaces. Matching is exact-token, so #labels never matches
-// #labels-web. Charset mirrors state/tags.lua's [%w_%-/]+.
-const TAG_PATTERN = /#([\w\-/]+)/g;
-
-// all-digit tokens are rank refs ("owed in daily #73", "dep on #12"), not tags
-function parseTags(text) {
-    return [...String(text || "").matchAll(TAG_PATTERN)].map(m => m[1]).filter(t => !/^\d+$/.test(t));
 }
 
 function hasTag(text, tag) {

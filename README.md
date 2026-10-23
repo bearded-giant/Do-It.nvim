@@ -605,6 +605,32 @@ Duplicate detection strips that whole wrapper before comparing, so an item you t
 
 The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
 
+## Obsidian Vault Export
+
+Want your lists in Obsidian, next to the rest of your notes? `mcp/vault-export.js` mirrors every list into a vault folder: one folder per list, one note per item, so you can browse items and read their notes without a popup covering your panes. It's one-way. Edit todos through Neovim, tmux, or MCP, and the vault copy follows. Anything you change in an exported note gets overwritten on the next export.
+
+```bash
+node mcp/vault-export.js <vault>/doit-todos            # export once
+node mcp/vault-export.js <vault>/doit-todos --watch    # export, then re-export whenever a list changes
+node mcp/vault-export.js <vault>/doit-todos --install  # macOS: run --watch as a launchd agent
+```
+
+`--install` writes `~/Library/LaunchAgents/com.doit.vault-export.plist` and loads it, so the export stays current across reboots. It pins the `node` binary you ran it with, so run it again after switching Node versions. Errors go to `vault-export.log` in the data directory. To remove it, run `launchctl bootout gui/$(id -u)/com.doit.vault-export` and delete the plist.
+
+Here's what lands in the folder:
+
+| Path | What it holds |
+|------|---------------|
+| `doit-todos.md` | Every list with its in-progress, pending, and done counts |
+| `<list>/<list>.md` | The list's index: in progress, pending (run queue first, then priority), done, and list notes |
+| `<list>/<rank>-<slug>.md` | One open item. Frontmatter carries status, priority, type, rank, due, sequence, and links to its deps and its owed twin. The body is the item's notes |
+| `<list>/done/<rank>-<slug>.md` | One finished item, same shape |
+| `<list>/notes/<slug>.md` | One list-level note |
+
+File names come from the item text, so editing an item's text renames its note. The exporter only rewrites notes whose content changed, and it only deletes notes it generated (the ones with a `doit_list` key in frontmatter), so anything else you drop in the folder stays put.
+
+If your vault syncs to git, think about ignoring the export folder: item notes often hold commands, hostnames, and the odd credential pasted in while working.
+
 ## Contributing
 
 See the [developer documentation](./docs/) for:
