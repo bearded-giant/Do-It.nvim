@@ -116,6 +116,13 @@ function retagLiveWindows(from, to) {
     }
 }
 
+// unflagged lists count as claude; mirrors tmux/scripts/lib-source.sh
+function isMineList(name, data) {
+    return name === "daily" || data?._metadata?.source === "user";
+}
+
+const SOURCE_FILTERS = ["all", "mine", "claude"];
+
 function readSession() {
     try {
         return readJSON(SESSION_FILE);
@@ -519,6 +526,9 @@ Behavior:
 - "create list X" → create_list
 - "rename list X to Y" → rename_list
 - "delete list X" → delete_list
+- "X is my list" / "mark X as claude's" → set_list_source (source "user" or "mcp"); unflagged lists count as claude, daily is always the user's
+- "show only my lists" / "hide claude lists" / "show all lists" → set_source_filter (the user's tmux/nvim views only)
+- "which lists are mine" → list_lists with source="mine"
 - "make a todo from this file" / "take X.md and make a todo" → add_todo with text summarizing the file, and description containing the full file path as a markdown link: [filename](absolute/path/to/file.md). If the file has a title (h1), use that as the todo text. Otherwise use a short summary.
 - "add that as a note to X todo" → add_note with the file path or content as the note
 
@@ -1493,9 +1503,11 @@ server.tool(
 
 server.tool(
     "list_lists",
-    "Show all available do-it todo lists (from ~/.local/share/nvim/doit/lists/), which one is active, and which tmux windows link each.",
-    {},
-    async () => {
+    "Show all available do-it todo lists (from ~/.local/share/nvim/doit/lists/), which one is active, which tmux windows link each, and whose each is ([mine] or [claude]). Every list stays usable from here whatever its source.",
+    {
+        source: z.enum(SOURCE_FILTERS).optional().describe("Only lists of this source. Omit for all; the user's view filter does not apply here."),
+    },
+    async ({ source }) => {
         const files = fs.readdirSync(LISTS_DIR).filter(f => f.endsWith(".json"));
         const active = getActiveListName();
         const activeVia = process.env.DOIT_ACTIVE_LIST
@@ -1507,20 +1519,65 @@ server.tool(
             (linksByList[list] = linksByList[list] || []).push(win);
         }
 
-        const lines = files.map(f => {
+        const lines = files.flatMap(f => {
             const name = f.replace(/\.json$/, "");
             const data = readJSON(path.join(LISTS_DIR, f));
+            const mine = isMineList(name, data);
+            if (source === "mine" && !mine) return [];
+            if (source === "claude" && mine) return [];
             const total = (data.todos || []).length;
             const pending = (data.todos || []).filter(t => !t.done).length;
             const linked = linksByList[name] ? ` (linked: ${linksByList[name].join(", ")})` : "";
             const marker = name === active ? ` <-- active${activeVia}` : "";
-            return `${name}: ${pending} pending / ${total} total${linked}${marker}`;
+            return [`${name} [${mine ? "mine" : "claude"}]: ${pending} pending / ${total} total${linked}${marker}`];
         });
 
         return {
             content: [{
                 type: "text",
-                text: lines.join("\n"),
+                text: lines.join("\n") || `No ${source} lists.`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "set_list_source",
+    "Mark a list as the user's ('user', shown as mine) or Claude's ('mcp'). Only changes which of the user's views (mine / claude / all) show it; any session can still use the list. 'daily' is always the user's. Call only when the user asks.",
+    {
+        name: z.string().describe("List name"),
+        source: z.enum(["user", "mcp"]).describe("'user' = the user's list, 'mcp' = Claude's"),
+    },
+    async ({ name, source }) => {
+        const { filepath, data } = loadList(name);
+        if (name === "daily" && source !== "user") {
+            throw new Error(`"daily" is always the user's list.`);
+        }
+        data._metadata = { ...(data._metadata || {}), source };
+        saveList(filepath, data);
+        return {
+            content: [{
+                type: "text",
+                text: `List "${name}" is now ${source === "user" ? "mine" : "claude"}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "set_source_filter",
+    "Set the user's list view filter shared by the tmux board, tmux pickers, and nvim: 'mine', 'claude', or 'all'. Changes only what those views show; never what any tool here can read or write. Call only when the user asks.",
+    {
+        filter: z.enum(SOURCE_FILTERS).describe("Which lists the user's views show"),
+    },
+    async ({ filter }) => {
+        updateSession(session => {
+            session.source_filter = filter;
+        });
+        return {
+            content: [{
+                type: "text",
+                text: `List views now show ${filter === "all" ? "all lists" : `${filter} lists`}`,
             }],
         };
     }

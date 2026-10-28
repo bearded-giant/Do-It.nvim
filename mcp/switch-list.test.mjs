@@ -98,7 +98,7 @@ try {
     assert.equal(readSession().active_list, "proj");
 
     // list_lists names the linking windows
-    assert.match(await callTool("list_lists", {}), /proj: .*\(linked: sess:tmux config\)/);
+    assert.match(await callTool("list_lists", {}), /proj \[claude\]: .*\(linked: sess:tmux config\)/);
 
     // a list rename carries the live link and its persisted copy
     await callTool("rename_list", { old_name: "proj", new_name: "proj2" });
