@@ -324,6 +324,7 @@ function M.setup(parent_module)
         end
         
         local lines = {}
+        local mine_cols = {}
         local rule_width = math.max(20, api.nvim_win_get_width(win_id) - 4)
         
         -- Start with Available Lists at the top
@@ -348,6 +349,12 @@ function M.setup(parent_module)
                 table.insert(lines, "  Press 'n' to create your first list")
             end
         else
+            local function mine_tag(name, metadata, line_nr, col)
+                if not source.is_mine(name, metadata) then return "" end
+                mine_cols[line_nr] = col
+                return " mine"
+            end
+
             -- Add numbered lists
             for i, list in ipairs(displayed_lists) do
                 if i <= 10 then
@@ -358,8 +365,9 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s[%s] %s%s (%d todos) %s", 
-                        selection_marker, num, overdue_badge(metadata), list.name, todo_count, active_marker))
+                    local prefix = string.format("%s[%s] %s%s", selection_marker, num, overdue_badge(metadata), list.name)
+                    table.insert(lines, prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
+                        .. string.format(" (%d todos) %s", todo_count, active_marker))
                 else
                     -- Lists beyond 10
                     local active_marker = list.name == active_list and "[active]" or ""
@@ -368,8 +376,9 @@ function M.setup(parent_module)
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
                     
-                    table.insert(lines, string.format("%s    %s%s (%d todos) %s", 
-                        selection_marker, overdue_badge(metadata), list.name, todo_count, active_marker))
+                    local prefix = string.format("%s    %s%s", selection_marker, overdue_badge(metadata), list.name)
+                    table.insert(lines, prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
+                        .. string.format(" (%d todos) %s", todo_count, active_marker))
                 end
             end
         end
@@ -434,6 +443,10 @@ function M.setup(parent_module)
                 api.nvim_buf_add_highlight(buf_id, namespace, "PmenuSel", i - 1, 0, -1)
             elseif line and line:match("%*") then
                 api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticOk", i - 1, 0, -1)
+            end
+
+            if line and mine_cols[i] then
+                api.nvim_buf_add_highlight(buf_id, namespace, "DiagnosticOk", i - 1, mine_cols[i] + 1, mine_cols[i] + 5)
             end
 
             if line then

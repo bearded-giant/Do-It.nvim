@@ -40,7 +40,7 @@ describe("list source", function()
 	end
 
 	local function shows(text, name)
-		return text:find(" " .. name .. " (", 1, true) ~= nil
+		return text:find(" " .. name .. " (", 1, true) ~= nil or text:find(" " .. name .. " mine (", 1, true) ~= nil
 	end
 
 	before_each(function()
@@ -252,6 +252,9 @@ describe("list source", function()
 			assert.is_true(shows(text, "zeta"))
 			assert.is_true(shows(text, "alpha"))
 			assert.is_false(shows(text, "beta"))
+			assert.is_truthy(text:find(" daily mine (", 1, true))
+			assert.is_truthy(text:find(" zeta mine (", 1, true))
+			assert.is_truthy(text:find(" alpha (", 1, true))
 
 			todos.ui.list_manager_window.cycle_view()
 			text = buffer_text()
@@ -312,7 +315,7 @@ describe("list source", function()
 
 			local text = buffer_text()
 			assert.is_truthy(text:find("view: mine", 1, true))
-			assert.is_truthy(text:find("daily", 1, true))
+			assert.is_truthy(text:find("daily mine", 1, true))
 			assert.is_falsy(text:find("alpha", 1, true))
 			assert.is_falsy(text:find("zeta", 1, true))
 
@@ -321,6 +324,7 @@ describe("list source", function()
 			assert.is_truthy(text:find("view: claude", 1, true))
 			assert.is_truthy(text:find("alpha", 1, true))
 			assert.is_truthy(text:find("beta", 1, true))
+			assert.is_falsy(text:find("beta mine", 1, true))
 			assert.is_falsy(text:find("daily", 1, true))
 
 			vim.api.nvim_feedkeys("S", "x", false)

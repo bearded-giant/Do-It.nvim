@@ -107,8 +107,12 @@ it "non-claude window is not a claude row"
 assert_eq "0" "$(printf '%s\n' "$claude" | grep -c 'plain')"
 
 it "ACTIVE holds lists with an in-progress item, daily first, the rest by name"
-names=$(printf '%s\n' "$lists" | section ACTIVE | grep -v '^     ' | sed -E 's/^.* ([^ ]+) +[0-9]+$/\1/')
+names=$(printf '%s\n' "$lists" | section ACTIVE | grep -v '^     ' | sed -E 's/ mine( +[0-9]+)$/\1/; s/^.* ([^ ]+) +[0-9]+$/\1/')
 assert_eq "daily left-list long-list multi win-list" "$(echo $names)"
+
+it "daily carries the mine tag, an unflagged list does not"
+assert_eq "1" "$(printf '%s\n' "$lists" | grep -cE '  daily mine +[0-9]+$')"
+assert_eq "0" "$(printf '%s\n' "$lists" | grep -c 'left-list mine')"
 
 it "OPEN holds idle lists; lists sharing a first segment fold into one row"
 open=$(printf '%s\n' "$lists" | section OPEN)
@@ -398,6 +402,7 @@ it "S flips the selected list between mine and claude"
 view ""
 drive "\e[<0;3;$(row_of '  right-list ')M" S > /dev/null
 assert_eq "user" "$(jq -r '._metadata.source' "$DATA/lists/right-list.json")"
+assert_contains "$(board)" "  right-list mine"
 drive "\e[<0;3;$(row_of '  right-list ')M" S > /dev/null
 assert_eq "mcp" "$(jq -r '._metadata.source' "$DATA/lists/right-list.json")"
 

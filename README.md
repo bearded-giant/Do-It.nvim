@@ -431,7 +431,7 @@ One view filter (`source_filter` in `session.json`: `all`, `mine`, or `claude`, 
 | Neovim list manager (`L`) | `s` | `S` |
 | MCP server | `set_source_filter` | `set_list_source` |
 
-The list manager and switcher always show the active list, even when the view would hide it.
+Your lists carry a green `mine` tag after the name in every list view, `daily` included. The list manager and switcher always show the active list, even when the view would hide it.
 
 ### Status Bar Integration
 

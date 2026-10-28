@@ -452,7 +452,7 @@ Press L in the main todo window to open the list manager where you can:
 
 Each list is yours or Claude's: yours when its `_metadata.source` is "user"
 (daily always is), Claude's otherwise, including lists with no flag. Lists
-you create here are yours. The view is shared with the tmux UI and the MCP
+you create here are yours, and their rows carry a `mine` tag. The view is shared with the tmux UI and the MCP
 server and only changes which lists show; the current list always stays.
 See |doit-tmux-source|.
 

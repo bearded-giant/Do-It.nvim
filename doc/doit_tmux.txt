@@ -414,8 +414,9 @@ a Claude session can use any list.
     List switcher      ctrl-s cycles the view, ctrl-f flips the selected list
                        (plain letters keep filtering as you type)
 
-The manager and switcher always show the active list, even when the view
-hides it. Through the MCP server, set_list_source flips a list and
+Your lists carry a green `mine` tag after the name in every view, daily
+included. The manager and switcher always show the active list, even when
+the view hides it. Through the MCP server, set_list_source flips a list and
 set_source_filter sets the view.
 
 ==============================================================================

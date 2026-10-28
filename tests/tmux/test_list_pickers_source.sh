@@ -53,6 +53,14 @@ for script in todo-list-manager.sh todo-list-switch.sh; do
     _update_session_file '.source_filter = "mine"'
     CURRENT_LIST=bot
     assert_eq "bot daily mine " "$(names | tr ' ' '\n' | sort | tr '\n' ' ')"
+
+    it "rows tag daily and user lists mine, claude lists stay bare"
+    _update_session_file '.source_filter = "all"'
+    CURRENT_LIST=bot
+    rows=$(build_rows | sed 's/\x1b\[[0-9;]*m//g')
+    assert_eq "1" "$(grep -cE '^ *daily \([0-9]+ pending\) mine' <<< "$rows")"
+    assert_eq "1" "$(grep -cE '^ *mine mine$' <<< "$rows")"
+    assert_eq "0" "$(grep -cE 'bot2? mine' <<< "$rows")"
 done
 
 describe "create_list"

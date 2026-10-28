@@ -87,7 +87,7 @@ def lcp:
        elif $r.a then ($r.a | item($r.n; $ind))
        else empty end] as $items
     | {k: $k,
-       pre: [["", $ind], [(if $r.a then "1" else "" end), $r.n]],
+       pre: ([["", $ind], [(if $r.a then "1" else "" end), $r.n]] + (if $r.mine then [["32", " mine"]] else [] end)),
        count: ($r.open | length),
        trail: (if ($links[$r.n] // []) == [] then [] else [["2", "  ← " + ($links[$r.n] | join(", "))]] end)},
       $items[],
@@ -133,7 +133,7 @@ def lcp:
      | (if $f == "" or ($n | ascii_downcase | contains($f)) then null
         else [$open[] | select(.text | ascii_downcase | contains($f))] end) as $hits
      | select($hits == null or ($hits | length) > 0)
-     | {n: $n, open: $open, a: active($n), hits: $hits}] as $L
+     | {n: $n, open: $open, a: active($n), hits: $hits, mine: ($lists[$n] | is_mine($n))}] as $L
   | ($L | map(select(.a != null))) as $act
   | ($L | map(select(.a == null and (.open | length) > 0))) as $opn
   | ($L | map(select(.a == null and (.open | length) == 0))) as $emp

@@ -26,6 +26,11 @@ list_is_mine() {
     [[ -f "$file" ]] && [[ "$(jq -r '._metadata.source? // empty' "$file" 2>/dev/null)" == user ]]
 }
 
+mine_badge() {
+    list_is_mine "$1" && printf ' \033[32mmine\033[0m'
+    return 0
+}
+
 # true when list $1 shows under the current filter
 list_in_filter() {
     case "${2:-$(source_filter)}" in

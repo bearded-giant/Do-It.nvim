@@ -62,7 +62,8 @@ local function create_list_selector_window(lists, current_list, callback)
             if list.metadata and list.metadata.todo_count then
                 todo_count_str = string.format(" (%d)", list.metadata.todo_count)
             end
-            table.insert(lines, prefix .. list.name .. todo_count_str)
+            local mine_tag = source.is_mine(list.name, list.metadata) and " mine" or ""
+            table.insert(lines, prefix .. list.name .. mine_tag .. todo_count_str)
         end
         if #available_lists == 0 then
             table.insert(lines, "  No lists in view: " .. filter .. " (s cycles)")

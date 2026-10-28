@@ -132,14 +132,14 @@ build_rows() {
         pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
         marker="  "; [[ "daily" == "$CURRENT_LIST" ]] && marker="* "
         printf '%sdaily (%s pending)%s%s\n' "$marker" "$pending" \
-            "$(overdue_badge_for_list daily)" "$(badge_for_list daily)"
+            "$(mine_badge daily)$(overdue_badge_for_list daily)" "$(badge_for_list daily)"
     fi
     while IFS= read -r name; do
         [[ -z "$name" || "$name" == "daily" ]] && continue
         list_in_filter "$name" || [[ "$name" == "$CURRENT_LIST" ]] || continue
         marker="  "; [[ "$name" == "$CURRENT_LIST" ]] && marker="* "
         printf '%s%s%s%s\n' "$marker" "$name" \
-            "$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
+            "$(mine_badge "$name")$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
     done < <(get_available_lists)
 }
 
