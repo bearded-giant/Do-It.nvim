@@ -417,6 +417,22 @@ The MCP server is the exception. Links track what you are looking at, which is r
 
 In the list switcher (`prefix + d + l`), `Enter` links the selected list to the current window (and refreshes the global pointer). In the list manager (`prefix + d + L`, or `L`/`q` from the interactive manager), `Enter` opens the list to view and edit without touching any link, and `l` does the linking instead. In both, `g` sets the global pointer only, and `u` unlinks the current window (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which windows link each list as `session:window`, with dead windows dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any window without touching any link.
 
+### List Source
+
+If Claude Code sessions make a list per repo or feature, those lists pile up fast and bury yours. So every list is either yours or Claude's. A list is yours when its `_metadata.source` is `"user"`, and `daily` always is. Everything else counts as Claude's, unflagged lists included, so session lists stay out of your way without anyone stamping them. Lists you create in the tmux list manager or in Neovim get stamped as yours.
+
+One view filter (`source_filter` in `session.json`: `all`, `mine`, or `claude`, unset means `all`) drives every list view, so flip it anywhere and the rest follow. It only changes what the views show. Active-list resolution, window links, and the MCP server ignore it, so a Claude session can still work in any list, yours included.
+
+| Surface | Cycle the view | Flip a list mine/claude |
+|---------|----------------|-------------------------|
+| Pane board (tmux popup or WezTerm split) | `s` | `S` on a list row |
+| tmux list manager (`prefix + d + L`) | `s` | `S` |
+| tmux list switcher (`prefix + d + l`) | `ctrl-s` | `ctrl-f` |
+| Neovim list manager (`L`) | `s` | `S` |
+| MCP server | `set_source_filter` | `set_list_source` |
+
+The list manager and switcher always show the active list, even when the view would hide it.
+
 ### Status Bar Integration
 
 If using [bearded-giant-tmux](https://github.com/bearded-giant/bearded-giant-tmux) theme, add `todo` to your status modules:
@@ -574,7 +590,9 @@ Lists:
 
 | Tool | Description |
 |------|-------------|
-| `list_lists` | Show all lists, which one is active, and which tmux windows link each |
+| `list_lists` | Show all lists, which one is active, which tmux windows link each, and whose each is (`[mine]` or `[claude]`). `source` narrows it to `mine` or `claude` |
+| `set_list_source` | Mark a list as yours (`user`) or Claude's (`mcp`). See [List Source](#list-source) |
+| `set_source_filter` | Set the shared view filter (`mine`, `claude`, `all`) the tmux and nvim list views follow |
 | `switch_list` | Change the active list. Inside tmux it links the current window and updates the global pointer; `scope` narrows the write to `window` (or its older name `session`) or `global` |
 | `create_list` | Create a new empty list. It links nothing; `switch_list` does that |
 | `rename_list` | Rename a list. Switch away from it first |

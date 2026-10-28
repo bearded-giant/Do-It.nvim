@@ -29,7 +29,7 @@ TODO WINDOW KEYMAPS:
   Organization:
     t            - Toggle tags window (filter by #tag)
     L            - List manager - switch lists, create new lists
-    m            - Move current todo to another list
+    m            - Move current todo to another list (s cycles view, S flips list)
     f            - Clear active filter
     /            - Search todos
 
@@ -37,9 +37,11 @@ TODO WINDOW KEYMAPS:
     h            - Remove due date
     H            - Add/edit due date (calendar)
     r            - Reorder current todo (use j/k to move)
+    S            - Set or clear sequence (run order across priorities)
     T            - Add time estimation
     R            - Remove time estimation
-    K            - View todo detail (full text + description)
+    K            - View todo detail (full text + description, including the item id)
+    y            - Copy the item id (the doit MCP resolves it across lists)
     o            - Open linked note
     <leader>p    - Open scratchpad for todo
 
@@ -58,6 +60,9 @@ LIST MANAGER KEYMAPS:
   r              - Rename selected list
   i              - Import list from file
   e              - Export selected list
+  s              - Cycle view: all -> mine -> claude (shared with tmux)
+  S              - Flip selected list between mine and claude
+  ?              - Show full help
   q/Esc          - Close manager
 
 NOTES WINDOW KEYMAPS:

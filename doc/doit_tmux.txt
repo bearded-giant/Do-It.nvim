@@ -12,7 +12,8 @@ CONTENTS                                                *doit-tmux-contents*
   7. Pane Board ......................................... |doit-tmux-board|
   8. Shared Storage ................................... |doit-tmux-storage|
   9. Window-Linked Lists ......................... |doit-tmux-window-links|
- 10. Configuration .............................. |doit-tmux-configuration|
+ 10. List Source ................................... |doit-tmux-source|
+ 11. Configuration .............................. |doit-tmux-configuration|
 
 ==============================================================================
 INTRODUCTION                                               *doit-tmux-intro*
@@ -261,6 +262,9 @@ Rows are never cut; the screen is a scrolled viewport with a position footer.
 `/` filters list names and item text as you type; item-text hits show only
 the matching items, and folds open flat while filtering.
 
+`s` cycles the lists view (all, mine, claude) and `S` flips the selected list
+between mine and claude (|doit-tmux-source|). The LISTS header shows the view.
+
     up/down j/k             move the selection
     enter, click            Claude row: switch the tmux client to that pane
                             list: show every open item; fold: open it
@@ -388,6 +392,31 @@ switches write the global pointer only.
 The daily popup (prefix + d + d, or Alt+Shift+D) opens the interactive
 manager pinned to the daily list from any window without changing any link
 or pointer.
+
+==============================================================================
+LIST SOURCE                                              *doit-tmux-source*
+
+Each list is either yours or Claude's. A list is yours when its
+`_metadata.source` is "user", and `daily` is always yours. Any other list,
+including one with no flag, counts as Claude's, so session lists the MCP
+server creates stay out of your view without anyone stamping them. Lists you
+create in the list manager (or in Neovim) are stamped "user".
+
+One view filter, `source_filter` in session.json (all, mine, claude; unset
+means all), drives every list view: the pane board, the list manager, the
+list switcher, and the Neovim list windows. Change it in one place and the
+others follow on their next render. It only changes which lists the views
+show. Active-list resolution, window links, and the MCP server ignore it, so
+a Claude session can use any list.
+
+    Pane board         s cycles the view, S flips the selected list
+    List manager       s cycles the view, S flips the selected list
+    List switcher      ctrl-s cycles the view, ctrl-f flips the selected list
+                       (plain letters keep filtering as you type)
+
+The manager and switcher always show the active list, even when the view
+hides it. Through the MCP server, set_list_source flips a list and
+set_source_filter sets the view.
 
 ==============================================================================
 CONFIGURATION                                      *doit-tmux-configuration*
