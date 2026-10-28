@@ -341,4 +341,71 @@ n=$(start_row)
 assert_not_empty "$n"
 assert_eq "multi" "$(sed -n "${n}p" "$TEST_TMPDIR/fzf.rows" | sed 's/\x1b\[[0-9;]*m//g; s/^[* ]*//' | awk '{print $1}')"
 
+describe "todo board source view"
+
+mklist own-list "own item" false ""
+jq '._metadata.source = "user"' "$DATA/lists/own-list.json" > "$TEST_TMPDIR/own.json" && mv "$TEST_TMPDIR/own.json" "$DATA/lists/own-list.json"
+view() { jq -n --arg f "$1" 'if $f == "" then {} else {source_filter: $f} end' > "$DATA/session.json"; }
+lists_of() { board | sed -n '/^LISTS/,$p'; }
+lists_sum() { cat "$DATA"/lists/*.json | cksum; }
+
+it "no view filter shows every list and says view: all"
+view ""
+f=$(lists_of)
+assert_contains "$f" "LISTS  / filter  view: all"
+assert_contains "$f" "  daily "
+assert_contains "$f" "  own-list "
+assert_contains "$f" "  right-list "
+
+it "mine view hides unflagged lists, keeps daily and source user lists"
+view mine
+f=$(lists_of)
+assert_contains "$f" "view: mine"
+assert_contains "$f" "  daily "
+assert_contains "$f" "  own-list "
+assert_contains "$f" "ACTIVE 1"
+assert_contains "$f" "OPEN 1"
+assert_eq "0" "$(printf '%s\n' "$f" | grep -cE 'right-list|multi|grp-|^EMPTY')"
+
+it "claude view shows the reverse"
+view claude
+f=$(lists_of)
+assert_contains "$f" "view: claude"
+assert_contains "$f" "  right-list "
+assert_contains "$f" "EMPTY 1  empty"
+assert_eq "0" "$(printf '%s\n' "$f" | grep -cE '  (daily|own-list) ')"
+
+it "the view combines with the / filter"
+view mine
+assert_contains "$(DOIT_BOARD_FILTER=own lists_of)" "  own-list "
+assert_contains "$(DOIT_BOARD_FILTER=right lists_of)" "  no match"
+view claude
+assert_contains "$(DOIT_BOARD_FILTER=own lists_of)" "  no match"
+assert_contains "$(DOIT_BOARD_FILTER=right lists_of)" "LISTS  /right  esc clears  view: claude"
+assert_contains "$(DOIT_BOARD_FILTER=right lists_of)" "  right-list "
+
+it "s cycles the view all, mine, claude, all and the header follows"
+view ""
+drive s > /dev/null
+assert_contains "$(last_frame)" "view: mine"
+assert_eq "0" "$(last_frame | grep -c 'right-list')"
+assert_eq "mine" "$(jq -r .source_filter "$DATA/session.json")"
+drive s s > /dev/null
+assert_contains "$(last_frame)" "view: all"
+assert_contains "$(last_frame)" "  right-list "
+
+it "S flips the selected list between mine and claude"
+view ""
+drive "\e[<0;3;$(row_of '  right-list ')M" S > /dev/null
+assert_eq "user" "$(jq -r '._metadata.source' "$DATA/lists/right-list.json")"
+drive "\e[<0;3;$(row_of '  right-list ')M" S > /dev/null
+assert_eq "mcp" "$(jq -r '._metadata.source' "$DATA/lists/right-list.json")"
+
+it "S on a claude pane, a fold or an item flips nothing"
+before=$(lists_sum)
+drive j S > /dev/null
+drive "\e[<0;3;$(row_of '+ grp-')M" S > /dev/null
+drive "\e[<0;8;$(row_of '     ▸ left item')M" S > /dev/null
+assert_eq "$before" "$(lists_sum)"
+
 report

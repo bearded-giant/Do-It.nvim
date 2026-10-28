@@ -7,11 +7,13 @@
 #
 # up/down j/k select   enter/click: jump to pane, open list or group, item -> doit
 # manager on it   e/right-click: doit manager for the list   L: list manager
-# a: open all   / filter (enter keeps it, esc clears)   left/right h/l scroll
-# sideways   wheel, ctrl-d/u, g/G scroll   q quit
+# a: open all   / filter (enter keeps it, esc clears)   s: lists view all/mine/claude
+# S: flip the selected list mine/claude   left/right h/l scroll sideways   wheel,
+# ctrl-d/u, g/G scroll   q quit
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-source.sh"
 shopt -s nullglob
 
 # integer: bash 3.2 read -t takes no fractions
@@ -126,6 +128,7 @@ def lcp:
 
   # a list a claude pane works already has its row up top; daily stays, unstamped panes fall back to it
   | [(["daily"] + ($lists | keys | map(select(. != "daily" and $onlist[.] == null))))[] as $n
+     | select($view == "all" or (($lists[$n] | is_mine($n)) == ($view == "mine")))
      | (($lists[$n].todos // []) | map(select(.done | not)) | order) as $open
      | (if $f == "" or ($n | ascii_downcase | contains($f)) then null
         else [$open[] | select(.text | ascii_downcase | contains($f))] end) as $hits
@@ -138,7 +141,8 @@ def lcp:
       {k: "", segs: ([["1", "LISTS"]]
          + (if $typing then [["", "  /" + $filter], ["7", " "]]
             elif $filter != "" then [["33", "  /" + $filter], ["2", "  esc clears"]]
-            else [["2", "  / filter"]] end))}]
+            else [["2", "  / filter"]] end)
+         + [[(if $view == "all" then "2" else "33" end), "  view: " + $view]])}]
      + (if $L == [] then [{k: "", segs: [["2", "  no match"]]}] else [] end)
      + (if $act == [] then []
         else [{k: "", segs: [["36", "ACTIVE"], ["2", " \($act | length)"]]}] + [$act[] | listrow("  ")] end)
@@ -205,8 +209,8 @@ render() {
     jq -rn --arg panes "$(tmux list-panes -a -F "$FMT" 2>/dev/null)" --arg sep "$S" --arg sel "$SEL" \
         --argjson move "$MOVE" --argjson follow "$FOLLOW" --argjson row_off "$ROW_OFF" --argjson col_off "$COL_OFF" \
         --argjson rows "$ROWS" --argjson cols "$COLS" --argjson expanded "$EXPANDED" --argjson once "$once" \
-        --arg filter "$FILTER" --argjson typing "$TYPING" \
-        "$RENDER" "$LISTS_DIR"/*.json /dev/null
+        --arg filter "$FILTER" --argjson typing "$TYPING" --arg view "$(source_filter)" \
+        "$DOIT_SOURCE_JQ$RENDER" "$LISTS_DIR"/*.json /dev/null
 }
 
 if [[ "$1" == "--once" ]]; then
@@ -411,6 +415,8 @@ handle() {
         a) EXPANDED=$(jq -cn --argjson e "$EXPANDED" 'if any($e[]; . == "*") then [] else ["*"] end') ;;
         e) manage "$SEL" ;;
         L) manage_lists "$SEL" ;;
+        s) cycle_source_filter > /dev/null && ROW_OFF=0 ;;
+        S) [[ "$SEL" == L:* ]] && toggle_list_source "${SEL#L:}" > /dev/null ;;
         "") act "$SEL" ;;
         $'\e') read_escape ;;
     esac
