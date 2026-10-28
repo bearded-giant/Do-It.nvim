@@ -447,8 +447,9 @@ Press L in the main todo window to open the list manager where you can:
 - Rename existing lists
 - Delete lists (except the active one)
 - Preview list contents and statistics
-- Cycle the view between all, mine, and claude lists with s, and flip the
-  list under the cursor between mine and claude with S
+- Cycle the view between all, mine, and claude lists with s, jump straight
+  between mine and claude with m, and flip the list under the cursor between
+  mine and claude with S
 
 Each list is yours or Claude's: yours when its `_metadata.source` is "user"
 (daily always is), Claude's otherwise, including lists with no flag. Lists

@@ -22,12 +22,20 @@ function M.get_filter()
     return NEXT_FILTER[filter] and filter or "all"
 end
 
-function M.cycle_filter()
-    local next_filter = NEXT_FILTER[M.get_filter()]
+local function set_filter(filter)
     session.update(function(data)
-        data.source_filter = next_filter
+        data.source_filter = filter
     end)
-    return next_filter
+    return filter
+end
+
+function M.cycle_filter()
+    return set_filter(NEXT_FILTER[M.get_filter()])
+end
+
+-- mine <-> claude, all lands on mine
+function M.toggle_view()
+    return set_filter(M.get_filter() == "mine" and "claude" or "mine")
 end
 
 function M.in_filter(name, metadata, filter)

@@ -286,14 +286,14 @@ while true; do
  List Manager - Active: $CURRENT_LIST$WINDOW_HINT   view: $(source_filter)
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup    y: Copy name
- s: Cycle view (all/mine/claude)    S: Flip list mine/claude
+ s: Cycle view (all/mine/claude)    m: Mine/claude view    S: Flip list mine/claude
  ENTER: Open    l: Link to window    g: Set global    u: Unlink window    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=100% \
         --layout=reverse \
-        --expect=n,r,d,b,y,l,g,u,s,S,enter,q,/ \
+        --expect=n,r,d,b,y,l,g,u,s,m,S,enter,q,/ \
         --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)
 
@@ -317,6 +317,9 @@ while true; do
             ;;
         "s")
             cycle_source_filter > /dev/null
+            ;;
+        "m")
+            toggle_source_view > /dev/null
             ;;
         "S")
             if [[ -n "$SELECTED_LIST" ]]; then

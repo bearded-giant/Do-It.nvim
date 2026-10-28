@@ -7,7 +7,7 @@
 #
 # up/down j/k select   enter/click: jump to pane, open list or group, item -> doit
 # manager on it   e/right-click: doit manager for the list   L: list manager
-# a: open all   / filter (enter keeps it, esc clears)   s: lists view all/mine/claude
+# a: open all   / filter (enter keeps it, esc clears)   s: lists view all/mine/claude   m: mine/claude
 # S: flip the selected list mine/claude   left/right h/l scroll sideways   wheel,
 # ctrl-d/u, g/G scroll   q quit
 
@@ -416,6 +416,7 @@ handle() {
         e) manage "$SEL" ;;
         L) manage_lists "$SEL" ;;
         s) cycle_source_filter > /dev/null && ROW_OFF=0 ;;
+        m) toggle_source_view > /dev/null && ROW_OFF=0 ;;
         S) [[ "$SEL" == L:* ]] && toggle_list_source "${SEL#L:}" > /dev/null ;;
         "") act "$SEL" ;;
         $'\e') read_escape ;;

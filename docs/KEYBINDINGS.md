@@ -47,7 +47,7 @@
 |-----|-------------|
 | `t` | Toggle tags window (filter by #tag) |
 | `L` | List manager - switch lists, create new lists |
-| `m` | Move current todo to another list (s cycles view, S flips list) |
+| `m` | Move current todo to another list (s cycles view, m mine/claude, S flips list) |
 | `f` | Clear active filter |
 | `/` | Search todos |
 
@@ -88,6 +88,7 @@
 | `i` | Import list from file |
 | `e` | Export selected list |
 | `s` | Cycle view: all -> mine -> claude (shared with tmux) |
+| `m` | Toggle view straight between mine and claude |
 | `S` | Flip selected list between mine and claude |
 | `?` | Show full help |
 | `q/Esc` | Close manager |

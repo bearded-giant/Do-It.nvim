@@ -398,6 +398,18 @@ drive s s > /dev/null
 assert_contains "$(last_frame)" "view: all"
 assert_contains "$(last_frame)" "  right-list "
 
+it "m toggles the view straight between mine and claude, all lands on mine"
+view ""
+drive m > /dev/null
+assert_eq "mine" "$(jq -r .source_filter "$DATA/session.json")"
+assert_contains "$(last_frame)" "view: mine"
+drive m > /dev/null
+assert_eq "claude" "$(jq -r .source_filter "$DATA/session.json")"
+assert_contains "$(last_frame)" "  right-list "
+drive m > /dev/null
+assert_eq "mine" "$(jq -r .source_filter "$DATA/session.json")"
+view ""
+
 it "S flips the selected list between mine and claude"
 view ""
 drive "\e[<0;3;$(row_of '  right-list ')M" S > /dev/null

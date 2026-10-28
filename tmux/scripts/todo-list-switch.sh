@@ -102,11 +102,11 @@ while true; do
     if [[ -n "$WIN" ]]; then
         HEADER="Lists — window: $WIN → $CURRENT_LIST   view: $(source_filter)
 ENTER: link to window   ctrl-g: set global only   ctrl-u: unlink window
-ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
+ctrl-s: cycle view (all/mine/claude)   ctrl-t: mine/claude view   ctrl-f: flip list mine/claude"
     else
         HEADER="Switch Todo List (current: $CURRENT_LIST)   view: $(source_filter)
 ENTER: switch   ctrl-g: set global
-ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
+ctrl-s: cycle view (all/mine/claude)   ctrl-t: mine/claude view   ctrl-f: flip list mine/claude"
     fi
 
     RESULT=$(build_rows | \
@@ -115,7 +115,7 @@ ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
             --prompt="List > " \
             --height=100% \
             --layout=reverse \
-            --expect=ctrl-g,ctrl-u,ctrl-s,ctrl-f \
+            --expect=ctrl-g,ctrl-u,ctrl-s,ctrl-t,ctrl-f \
             --preview='bash -c "preview_list {}"' \
             --preview-window=right:50%:wrap)
 
@@ -124,6 +124,7 @@ ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
 
     case "$KEY" in
         "ctrl-s") cycle_source_filter > /dev/null ;;
+        "ctrl-t") toggle_source_view > /dev/null ;;
         "ctrl-f") [[ -n "$SELECTED" ]] && toggle_list_source "$SELECTED" > /dev/null ;;
         *) break ;;
     esac

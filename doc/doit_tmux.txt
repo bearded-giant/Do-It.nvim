@@ -262,8 +262,8 @@ Rows are never cut; the screen is a scrolled viewport with a position footer.
 `/` filters list names and item text as you type; item-text hits show only
 the matching items, and folds open flat while filtering.
 
-`s` cycles the lists view (all, mine, claude) and `S` flips the selected list
-between mine and claude (|doit-tmux-source|). The LISTS header shows the view.
+`s` cycles the lists view (all, mine, claude), `m` jumps straight between
+mine and claude, and `S` flips the selected list (|doit-tmux-source|). The LISTS header shows the view.
 
     up/down j/k             move the selection
     enter, click            Claude row: switch the tmux client to that pane
@@ -409,10 +409,16 @@ others follow on their next render. It only changes which lists the views
 show. Active-list resolution, window links, and the MCP server ignore it, so
 a Claude session can use any list.
 
-    Pane board         s cycles the view, S flips the selected list
-    List manager       s cycles the view, S flips the selected list
-    List switcher      ctrl-s cycles the view, ctrl-f flips the selected list
+    Pane board         s cycles the view, m toggles mine/claude,
+                       S flips the selected list
+    List manager       s cycles the view, m toggles mine/claude,
+                       S flips the selected list
+    List switcher      ctrl-s cycles the view, ctrl-t toggles mine/claude,
+                       ctrl-f flips the selected list
                        (plain letters keep filtering as you type)
+
+s walks all, mine, claude. The mine/claude toggle skips all and lands on
+mine when the view was all.
 
 Your lists carry a green `mine` tag after the name in every view, daily
 included. The manager and switcher always show the active list, even when

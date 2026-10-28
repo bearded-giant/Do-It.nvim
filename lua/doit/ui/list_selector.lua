@@ -42,7 +42,7 @@ local function create_list_selector_window(lists, current_list, callback)
         border = "rounded",
         title = " Move to List ",
         title_pos = "center",
-        footer = " <Enter> select | s view | S flip | <Esc> cancel ",
+        footer = " <Enter> select | s view | m mine/claude | S flip | <Esc> cancel ",
         footer_pos = "center"
     })
 
@@ -122,6 +122,12 @@ local function create_list_selector_window(lists, current_list, callback)
 
     vim.keymap.set("n", "s", function()
         source.cycle_filter()
+        selected_index = 1
+        render()
+    end, keymap_opts)
+
+    vim.keymap.set("n", "m", function()
+        source.toggle_view()
         selected_index = 1
         render()
     end, keymap_opts)

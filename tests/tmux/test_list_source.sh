@@ -59,6 +59,14 @@ assert_eq "claude" "$(cycle_source_filter)"
 assert_eq "all" "$(cycle_source_filter)"
 assert_eq "flip" "$(jq -r '.sessions["s:w"]' "$SESSION_FILE")"
 
+it "toggle view lands all on mine, then flips mine and claude"
+_update_session_file '.source_filter = "all"'
+assert_eq "mine" "$(toggle_source_view)"
+assert_eq "claude" "$(toggle_source_view)"
+assert_eq "mine" "$(toggle_source_view)"
+assert_eq "flip" "$(jq -r '.sessions["s:w"]' "$SESSION_FILE")"
+_update_session_file 'del(.source_filter)'
+
 it "list_in_filter honours mine and claude"
 shows() { list_in_filter "$1" "$2" && echo y || echo n; }
 assert_eq "y n y" "$(shows mine mine) $(shows unflagged mine) $(shows daily mine)"

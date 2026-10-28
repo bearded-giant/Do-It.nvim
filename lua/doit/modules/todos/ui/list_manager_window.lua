@@ -394,7 +394,8 @@ function M.setup(parent_module)
         table.insert(lines, "  [n] New          [d] Delete")
         table.insert(lines, "  [r] Rename       [e] Export")
         table.insert(lines, "  [i] Import       [/] Search")
-        table.insert(lines, "  [s] Cycle view   [S] Flip mine/claude")
+        table.insert(lines, "  [s] Cycle view   [m] Mine/claude view")
+        table.insert(lines, "  [S] Flip mine/claude")
         table.insert(lines, "  [q] Close        [?] Show full help")
         
         -- Set buffer content
@@ -603,6 +604,7 @@ function M.setup(parent_module)
         set_keymap("i", function() M.import_list() end)
         set_keymap("e", function() M.export_list() end)
         set_keymap("s", function() M.cycle_view() end)
+        set_keymap("m", function() M.toggle_view() end)
         set_keymap("S", function() M.flip_source() end)
         set_keymap("?", function() require("doit.ui.help_window").create_help_window() end)
         
@@ -666,6 +668,12 @@ function M.setup(parent_module)
     
     function M.cycle_view()
         source.cycle_filter()
+        selected_index = 1
+        render_lists()
+    end
+
+    function M.toggle_view()
+        source.toggle_view()
         selected_index = 1
         render_lists()
     end

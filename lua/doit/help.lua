@@ -29,7 +29,7 @@ M.keymaps = {
 		organization = {
 			{ key = "t", desc = "Toggle tags window (filter by #tag)" },
 			{ key = "L", desc = "List manager - switch lists, create new lists" },
-			{ key = "m", desc = "Move current todo to another list (s cycles view, S flips list)" },
+			{ key = "m", desc = "Move current todo to another list (s cycles view, m mine/claude, S flips list)" },
 			{ key = "f", desc = "Clear active filter" },
 			{ key = "/", desc = "Search todos" },
 		},
@@ -62,6 +62,7 @@ M.keymaps = {
 		{ key = "i", desc = "Import list from file" },
 		{ key = "e", desc = "Export selected list" },
 		{ key = "s", desc = "Cycle view: all -> mine -> claude (shared with tmux)" },
+		{ key = "m", desc = "Toggle view straight between mine and claude" },
 		{ key = "S", desc = "Flip selected list between mine and claude" },
 		{ key = "?", desc = "Show full help" },
 		{ key = "q/Esc", desc = "Close manager" },

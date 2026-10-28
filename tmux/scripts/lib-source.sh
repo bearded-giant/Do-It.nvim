@@ -20,6 +20,13 @@ cycle_source_filter() {
     _update_session_file --arg f "$next" '.source_filter = $f' && echo "$next"
 }
 
+# mine <-> claude, all lands on mine; prints the new value
+toggle_source_view() {
+    local next=mine
+    [[ "$(source_filter)" == mine ]] && next=claude
+    _update_session_file --arg f "$next" '.source_filter = $f' && echo "$next"
+}
+
 list_is_mine() {
     local name=$1 file="$LISTS_DIR/$1.json"
     [[ "$name" == daily ]] && return 0

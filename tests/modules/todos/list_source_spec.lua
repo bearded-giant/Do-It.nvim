@@ -175,6 +175,15 @@ describe("list source", function()
 			assert.are.same({ "mine", "claude", "all" }, seen)
 		end)
 
+		it("toggle_view lands all on mine, then flips mine and claude", function()
+			local seen = {}
+			for _ = 1, 3 do
+				table.insert(seen, source.toggle_view())
+				assert.are.equal(seen[#seen], vim.fn.json_decode(read_raw(session_path())).source_filter)
+			end
+			assert.are.same({ "mine", "claude", "mine" }, seen)
+		end)
+
 		it("session writes keep keys owned by tmux and the MCP", function()
 			write_raw(session_path(),
 				'{"active_list":"daily","sessions":{"s:w":"zeta"},"mcp_key":{"nested":{"a":1}},"empty_obj":{}}')
@@ -264,9 +273,15 @@ describe("list source", function()
 			assert.is_false(shows(text, "daily"))
 			assert.is_false(shows(text, "zeta"))
 			assert.are.equal("claude", vim.fn.json_decode(read_raw(session_path())).source_filter)
+
+			todos.ui.list_manager_window.toggle_view()
+			text = buffer_text()
+			assert.is_truthy(text:find("view: mine", 1, true))
+			assert.is_true(shows(text, "daily"))
+			assert.is_false(shows(text, "beta"))
 		end)
 
-		it("s and S are mapped in the manager buffer", function()
+		it("s, m and S are mapped in the manager buffer", function()
 			todos.ui.list_manager_window.toggle_window()
 			local mapped = {}
 			for _, map in ipairs(vim.api.nvim_buf_get_keymap(0, "n")) do
@@ -274,6 +289,7 @@ describe("list source", function()
 			end
 			assert.is_true(mapped["s"])
 			assert.is_true(mapped["S"])
+			assert.is_true(mapped["m"])
 			assert.is_true(mapped["?"])
 		end)
 
@@ -326,6 +342,11 @@ describe("list source", function()
 			assert.is_truthy(text:find("beta", 1, true))
 			assert.is_falsy(text:find("beta mine", 1, true))
 			assert.is_falsy(text:find("daily", 1, true))
+
+			vim.api.nvim_feedkeys("m", "x", false)
+			assert.is_truthy(buffer_text():find("view: mine", 1, true))
+			vim.api.nvim_feedkeys("m", "x", false)
+			assert.is_truthy(buffer_text():find("view: claude", 1, true))
 
 			vim.api.nvim_feedkeys("S", "x", false)
 			assert.are.equal("user", read_list("alpha")._metadata.source)

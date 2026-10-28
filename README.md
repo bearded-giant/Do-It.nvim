@@ -423,13 +423,15 @@ If Claude Code sessions make a list per repo or feature, those lists pile up fas
 
 One view filter (`source_filter` in `session.json`: `all`, `mine`, or `claude`, unset means `all`) drives every list view, so flip it anywhere and the rest follow. It only changes what the views show. Active-list resolution, window links, and the MCP server ignore it, so a Claude session can still work in any list, yours included.
 
-| Surface | Cycle the view | Flip a list mine/claude |
-|---------|----------------|-------------------------|
-| Pane board (tmux popup or WezTerm split) | `s` | `S` on a list row |
-| tmux list manager (`prefix + d + L`) | `s` | `S` |
-| tmux list switcher (`prefix + d + l`) | `ctrl-s` | `ctrl-f` |
-| Neovim list manager (`L`) | `s` | `S` |
-| MCP server | `set_source_filter` | `set_list_source` |
+| Surface | Cycle the view | Mine/claude view | Flip a list mine/claude |
+|---------|----------------|------------------|-------------------------|
+| Pane board (tmux popup or WezTerm split) | `s` | `m` | `S` on a list row |
+| tmux list manager (`prefix + d + L`) | `s` | `m` | `S` |
+| tmux list switcher (`prefix + d + l`) | `ctrl-s` | `ctrl-t` | `ctrl-f` |
+| Neovim list manager (`L`) and move picker (`m`) | `s` | `m` | `S` |
+| MCP server | `set_source_filter` | `set_source_filter` | `set_list_source` |
+
+Cycling walks all, mine, claude. The mine/claude key skips all and jumps straight between the two, landing on mine when the view was all.
 
 Your lists carry a green `mine` tag after the name in every list view, `daily` included. The list manager and switcher always show the active list, even when the view would hide it.
 
