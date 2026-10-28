@@ -1,3 +1,5 @@
+local source = require("doit.modules.todos.state.source")
+
 local M = {}
 
 local function create_list_selector_window(lists, current_list, callback)
@@ -5,18 +7,19 @@ local function create_list_selector_window(lists, current_list, callback)
     local api = vim.api
 
     -- Filter out the current list
-    local available_lists = {}
+    local candidates = {}
     for _, list in ipairs(lists) do
         if list.name ~= current_list then
-            table.insert(available_lists, list)
+            table.insert(candidates, list)
         end
     end
 
-    if #available_lists == 0 then
+    if #candidates == 0 then
         vim.notify("No other lists available to move to", vim.log.levels.WARN)
         return
     end
 
+    local available_lists = {}
     local selected_index = 1
     local buf_id = api.nvim_create_buf(false, true)
     api.nvim_buf_set_option(buf_id, "bufhidden", "wipe")
@@ -24,7 +27,7 @@ local function create_list_selector_window(lists, current_list, callback)
 
     local ui = api.nvim_list_uis()[1]
     local width = math.min(50, math.floor(ui.width * 0.4))
-    local height = math.min(#available_lists + 4, math.floor(ui.height * 0.5))
+    local height = math.min(#candidates + 4, math.floor(ui.height * 0.5))
 
     local row = math.floor((ui.height - height) / 2)
     local col = math.floor((ui.width - width) / 2)
@@ -39,7 +42,7 @@ local function create_list_selector_window(lists, current_list, callback)
         border = "rounded",
         title = " Move to List ",
         title_pos = "center",
-        footer = " <Enter> to select | <Esc> to cancel ",
+        footer = " <Enter> select | s view | S flip | <Esc> cancel ",
         footer_pos = "center"
     })
 
@@ -48,7 +51,10 @@ local function create_list_selector_window(lists, current_list, callback)
     api.nvim_win_set_option(win_id, "cursorline", true)
 
     local function render()
-        local lines = { "" }
+        local filter = source.get_filter()
+        available_lists = source.filter_lists(candidates, filter)
+        selected_index = math.max(1, math.min(selected_index, #available_lists))
+        local lines = { "  view: " .. filter }
 
         for i, list in ipairs(available_lists) do
             local prefix = (i == selected_index) and "> " or "  "
@@ -57,6 +63,9 @@ local function create_list_selector_window(lists, current_list, callback)
                 todo_count_str = string.format(" (%d)", list.metadata.todo_count)
             end
             table.insert(lines, prefix .. list.name .. todo_count_str)
+        end
+        if #available_lists == 0 then
+            table.insert(lines, "  No lists in view: " .. filter .. " (s cycles)")
         end
 
         table.insert(lines, "")
@@ -109,6 +118,28 @@ local function create_list_selector_window(lists, current_list, callback)
     end, keymap_opts)
 
     vim.keymap.set("n", "<CR>", select_list, keymap_opts)
+
+    vim.keymap.set("n", "s", function()
+        source.cycle_filter()
+        selected_index = 1
+        render()
+    end, keymap_opts)
+
+    vim.keymap.set("n", "S", function()
+        local list = available_lists[selected_index]
+        if not list then
+            return
+        end
+        local new_source, err = source.toggle_list_source(list.name)
+        if not new_source then
+            vim.notify(err, vim.log.levels.WARN)
+            return
+        end
+        list.metadata = list.metadata or {}
+        list.metadata.source = new_source
+        render()
+        vim.notify(list.name .. ": " .. source.label(new_source), vim.log.levels.INFO)
+    end, keymap_opts)
 
     vim.keymap.set("n", "<Esc>", function()
         close_window()

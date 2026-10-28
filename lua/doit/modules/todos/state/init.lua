@@ -69,6 +69,7 @@ function M.setup(parent_module)
     M.get_list_path = storage.get_list_path
 
     require("doit.modules.todos.state.twin").setup(M)
+    require("doit.modules.todos.state.source").setup(M)
 
     -- List-scoped notes
     M.get_notes = storage.get_notes

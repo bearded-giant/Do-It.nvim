@@ -328,7 +328,12 @@ function M.setup(module)
                     return
                 end
                 
-                local success, msg = module.state.create_list(list_name, {})
+                local now = os.time()
+                local success, msg = module.state.create_list(list_name, {}, {
+                    created_at = now,
+                    updated_at = now,
+                    source = "user",
+                })
                 vim.notify(msg, success and vim.log.levels.INFO or vim.log.levels.ERROR)
             elseif command == "delete" or command == "remove" then
                 -- Delete a list

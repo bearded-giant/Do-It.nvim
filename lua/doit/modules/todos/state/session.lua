@@ -94,11 +94,25 @@ local function write_session(data)
     if type(data.sessions) == "table" and next(data.sessions) == nil then
         data.sessions = nil
     end
-    local file = io.open(get_session_file(), "w")
+    -- tmp + rename: tmux and the MCP must never read a half-written file and fall back to {}
+    local path = get_session_file()
+    local tmp = path .. "." .. vim.fn.getpid() .. ".tmp"
+    local file = io.open(tmp, "w")
     if file then
         file:write(vim.fn.json_encode(data))
         file:close()
+        os.rename(tmp, path)
     end
+end
+
+function M.read()
+    return read_session()
+end
+
+function M.update(mutate)
+    local data = read_session()
+    mutate(data)
+    write_session(data)
 end
 
 -- Save current list selection. The file is shared with the tmux and MCP

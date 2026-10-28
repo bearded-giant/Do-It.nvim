@@ -362,6 +362,7 @@ function storage.setup(M)
         
         -- If loading failed, initialize with empty list
         M.todos = {}
+        M.todo_lists.metadata = {}
         M.todo_lists.notes = {}
         M.todo_lists.active = list_name
         config.active_list = list_name
@@ -846,7 +847,8 @@ function storage.setup(M)
 
         local source_data = {
             _metadata = vim.deepcopy(M.todo_lists.metadata) or {},
-            todos = serializable_todos(source_todos)
+            todos = serializable_todos(source_todos),
+            notes = M.todo_lists.notes or {}
         }
         source_data._metadata.updated_at = os.time()
 

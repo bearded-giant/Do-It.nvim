@@ -1,6 +1,7 @@
 local sorting = require("doit.modules.todos.state.sorting")
 local due_dates = require("doit.modules.todos.state.due_dates")
 local PERMANENT_LIST = require("doit.modules.todos.state.storage").PERMANENT_LIST
+local source = require("doit.modules.todos.state.source")
 
 -- badge sits left of the name so it survives truncation in a narrow panel
 local function overdue_badge(metadata)
@@ -139,16 +140,21 @@ function M.setup(parent_module)
         local namespace = api.nvim_create_namespace("DoitListPreview")
         api.nvim_buf_clear_namespace(preview_buf_id, namespace, 0, -1)
         
-        -- Load the list data temporarily
-        local saved_active = todo_module.state.todo_lists.active
+        -- load_list swaps the active list's metadata and notes too; the next save writes whatever is left here
+        local lists_state = todo_module.state.todo_lists
+        local saved_active = lists_state.active
+        local saved_metadata = lists_state.metadata
+        local saved_notes = lists_state.notes
         local saved_todos = vim.deepcopy(todo_module.state.todos)
-        
+
         todo_module.state.load_list(list_name)
         local todos = M.visible_todos(list_name, todo_module.state.todos or {})
-        local metadata = todo_module.state.todo_lists.metadata[list_name] or {}
-        
+        local metadata = lists_state.metadata or {}
+
         -- Restore original list
-        todo_module.state.todo_lists.active = saved_active
+        lists_state.active = saved_active
+        lists_state.metadata = saved_metadata
+        lists_state.notes = saved_notes
         todo_module.state.todos = saved_todos
         
         -- Header
@@ -297,8 +303,9 @@ function M.setup(parent_module)
         end
         
         -- Refresh lists to get updated active list
-        local all_lists = todo_module.state.get_available_lists()
         local active_list = todo_module.state.todo_lists.active
+        local filter = source.get_filter()
+        local all_lists = source.filter_lists(todo_module.state.get_available_lists(), filter, active_list)
 
         if search_query ~= "" then
             displayed_lists = {}
@@ -321,9 +328,9 @@ function M.setup(parent_module)
         
         -- Start with Available Lists at the top
         if search_query ~= "" then
-            table.insert(lines, "  Search: " .. search_query)
+            table.insert(lines, "  Search: " .. search_query .. "   view: " .. filter)
         else
-            table.insert(lines, "  Todo Lists")
+            table.insert(lines, "  Todo Lists   view: " .. filter)
         end
         table.insert(lines, "  " .. string.rep("═", rule_width))
         table.insert(lines, "")
@@ -333,6 +340,9 @@ function M.setup(parent_module)
             if search_query ~= "" then
                 table.insert(lines, "  No matching lists")
                 table.insert(lines, "  Press Esc to clear search")
+            elseif filter ~= "all" then
+                table.insert(lines, "  No lists in view: " .. filter)
+                table.insert(lines, "  Press 's' to cycle the view")
             else
                 table.insert(lines, "  No todo lists found")
                 table.insert(lines, "  Press 'n' to create your first list")
@@ -375,6 +385,7 @@ function M.setup(parent_module)
         table.insert(lines, "  [n] New          [d] Delete")
         table.insert(lines, "  [r] Rename       [e] Export")
         table.insert(lines, "  [i] Import       [/] Search")
+        table.insert(lines, "  [s] Cycle view   [S] Flip mine/claude")
         table.insert(lines, "  [q] Close        [?] Show full help")
         
         -- Set buffer content
@@ -578,6 +589,9 @@ function M.setup(parent_module)
         set_keymap("r", function() M.rename_list() end)
         set_keymap("i", function() M.import_list() end)
         set_keymap("e", function() M.export_list() end)
+        set_keymap("s", function() M.cycle_view() end)
+        set_keymap("S", function() M.flip_source() end)
+        set_keymap("?", function() require("doit.ui.help_window").create_help_window() end)
         
         -- Search
         set_keymap("/", function()
@@ -615,7 +629,12 @@ function M.setup(parent_module)
                 return
             end
             
-            local success, msg = todo_module.state.create_list(input, {})
+            local now = os.time()
+            local success, msg = todo_module.state.create_list(input, {}, {
+                created_at = now,
+                updated_at = now,
+                source = "user",
+            })
             if success then
                 vim.notify(msg, vim.log.levels.INFO)
                 todo_module.state.switch_list(input)
@@ -632,6 +651,25 @@ function M.setup(parent_module)
         end)
     end
     
+    function M.cycle_view()
+        source.cycle_filter()
+        selected_index = 1
+        render_lists()
+    end
+
+    function M.flip_source()
+        if selected_index > #displayed_lists then return end
+
+        local list_name = displayed_lists[selected_index].name
+        local new_source, err = source.toggle_list_source(list_name)
+        if not new_source then
+            vim.notify(err, vim.log.levels.WARN)
+            return
+        end
+        render_lists()
+        vim.notify(list_name .. ": " .. source.label(new_source), vim.log.levels.INFO)
+    end
+
     function M.delete_list()
         if selected_index > #displayed_lists then return end
 
