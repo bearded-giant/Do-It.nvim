@@ -5,6 +5,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-source.sh"
 source "$SCRIPT_DIR/lib-twin.sh"
 source "$SCRIPT_DIR/lib-origin.sh"
 
@@ -127,7 +128,7 @@ badge_for_list() {
 # daily pinned to the top with its pending count; active list marked with *
 build_rows() {
     local name pending marker
-    if [[ -f "$LISTS_DIR/daily.json" ]]; then
+    if [[ -f "$LISTS_DIR/daily.json" ]] && { list_in_filter daily || [[ daily == "$CURRENT_LIST" ]]; }; then
         pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
         marker="  "; [[ "daily" == "$CURRENT_LIST" ]] && marker="* "
         printf '%sdaily (%s pending)%s%s\n' "$marker" "$pending" \
@@ -135,6 +136,7 @@ build_rows() {
     fi
     while IFS= read -r name; do
         [[ -z "$name" || "$name" == "daily" ]] && continue
+        list_in_filter "$name" || [[ "$name" == "$CURRENT_LIST" ]] || continue
         marker="  "; [[ "$name" == "$CURRENT_LIST" ]] && marker="* "
         printf '%s%s%s%s\n' "$marker" "$name" \
             "$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
@@ -166,7 +168,8 @@ create_list() {
   "todos": [],
   "_metadata": {
     "created_at": $(date +%s),
-    "updated_at": $(date +%s)
+    "updated_at": $(date +%s),
+    "source": "user"
   }
 }
 EOF
@@ -280,16 +283,17 @@ while true; do
     SELECTION=$(echo "$LIST_DISPLAY" | fzf --ansi \
         "${START_BIND[@]}" \
         --header="
- List Manager - Active: $CURRENT_LIST$WINDOW_HINT
+ List Manager - Active: $CURRENT_LIST$WINDOW_HINT   view: $(source_filter)
 ─────────────────────────────────────────
  n: New    r: Rename    d: Delete    b: Backup    y: Copy name
+ s: Cycle view (all/mine/claude)    S: Flip list mine/claude
  ENTER: Open    l: Link to window    g: Set global    u: Unlink window    /: Search
 ─────────────────────────────────────────
 " \
         --prompt="List > " \
         --height=100% \
         --layout=reverse \
-        --expect=n,r,d,b,y,l,g,u,enter,q,/ \
+        --expect=n,r,d,b,y,l,g,u,s,S,enter,q,/ \
         --preview='bash -c "preview_list {}"' \
         --preview-window=right:50%:wrap)
 
@@ -309,6 +313,16 @@ while true; do
         "r")
             if [[ -n "$SELECTED_LIST" ]]; then
                 rename_list "$SELECTED_LIST"
+            fi
+            ;;
+        "s")
+            cycle_source_filter > /dev/null
+            ;;
+        "S")
+            if [[ -n "$SELECTED_LIST" ]]; then
+                new_src=$(toggle_list_source "$SELECTED_LIST") &&
+                    echo "${COLOR_GREEN}$SELECTED_LIST: $([[ $new_src == user ]] && echo mine || echo claude)${COLOR_RESET}"
+                sleep 0.5
             fi
             ;;
         "d")

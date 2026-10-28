@@ -6,6 +6,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
+source "$SCRIPT_DIR/lib-source.sh"
 source "$SCRIPT_DIR/lib-origin.sh"
 
 DOIT_DATA_DIR="${DOIT_DATA_DIR:-$HOME/.local/share/nvim/doit}"
@@ -84,38 +85,49 @@ badge_for_list() {
 # daily pinned to the top with its pending count, the rest as-is
 build_rows() {
     local name pending
-    if [[ -f "$LISTS_DIR/daily.json" ]]; then
+    if [[ -f "$LISTS_DIR/daily.json" ]] && { list_in_filter daily || [[ daily == "$CURRENT_LIST" ]]; }; then
         pending=$(jq '[.todos[] | select(.done == false)] | length' "$LISTS_DIR/daily.json" 2>/dev/null || echo 0)
         printf 'daily (%s pending)%s%s\n' "$pending" \
             "$(overdue_badge_for_list daily)" "$(badge_for_list daily)"
     fi
     while IFS= read -r name; do
         [[ -z "$name" || "$name" == "daily" ]] && continue
+        list_in_filter "$name" || [[ "$name" == "$CURRENT_LIST" ]] || continue
         printf '%s%s%s\n' "$name" \
             "$(overdue_badge_for_list "$name")" "$(badge_for_list "$name")"
     done < <(get_available_lists)
 }
 
-if [[ -n "$WIN" ]]; then
-    HEADER="Lists — window: $WIN → $CURRENT_LIST
-ENTER: link to window   ctrl-g: set global only   ctrl-u: unlink window"
-else
-    HEADER="Switch Todo List (current: $CURRENT_LIST)
-ENTER: switch   ctrl-g: set global"
-fi
+while true; do
+    if [[ -n "$WIN" ]]; then
+        HEADER="Lists — window: $WIN → $CURRENT_LIST   view: $(source_filter)
+ENTER: link to window   ctrl-g: set global only   ctrl-u: unlink window
+ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
+    else
+        HEADER="Switch Todo List (current: $CURRENT_LIST)   view: $(source_filter)
+ENTER: switch   ctrl-g: set global
+ctrl-s: cycle view (all/mine/claude)   ctrl-f: flip list mine/claude"
+    fi
 
-RESULT=$(build_rows | \
-    fzf --ansi \
-        --header="$HEADER" \
-        --prompt="List > " \
-        --height=100% \
-        --layout=reverse \
-        --expect=ctrl-g,ctrl-u \
-        --preview='bash -c "preview_list {}"' \
-        --preview-window=right:50%:wrap)
+    RESULT=$(build_rows | \
+        fzf --ansi \
+            --header="$HEADER" \
+            --prompt="List > " \
+            --height=100% \
+            --layout=reverse \
+            --expect=ctrl-g,ctrl-u,ctrl-s,ctrl-f \
+            --preview='bash -c "preview_list {}"' \
+            --preview-window=right:50%:wrap)
 
-KEY=$(echo "$RESULT" | head -1)
-SELECTED=$(echo "$RESULT" | tail -1 | awk '{print $1}')
+    KEY=$(echo "$RESULT" | head -1)
+    SELECTED=$(echo "$RESULT" | tail -1 | awk '{print $1}')
+
+    case "$KEY" in
+        "ctrl-s") cycle_source_filter > /dev/null ;;
+        "ctrl-f") [[ -n "$SELECTED" ]] && toggle_list_source "$SELECTED" > /dev/null ;;
+        *) break ;;
+    esac
+done
 
 case "$KEY" in
     "ctrl-u")
