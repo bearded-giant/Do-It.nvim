@@ -76,10 +76,13 @@ edit_body() {
     rm -f "$tmp"
 }
 
+# --todo <id> scopes rows to notes linked to that todo; SHOW_ALL lifts the scope
 format_notes() {
-    jq -r '(.notes // []) | .[] |
+    jq -r --arg tid "$LINK_TODO_ID" --arg all "$SHOW_ALL" '(.notes // []) | .[] |
+        select($tid == "" or $all == "1" or ((.todo_ids // []) | any(. == $tid))) |
         (if (.title // "") == "" then ((.body // "") | split("\n")[0]) else (.title) end) as $t |
-        "'"$COLOR_PURPLE"'• '"$COLOR_RESET"'\($t)  '"$COLOR_DIM"'[\(.id)]'"$COLOR_RESET"'"' "$TODO_LIST_PATH"
+        (if $tid != "" and ((.todo_ids // []) | any(. == $tid)) then "● " else "• " end) as $mark |
+        "'"$COLOR_PURPLE"'\($mark)'"$COLOR_RESET"'\($t)  '"$COLOR_DIM"'[\(.id)]'"$COLOR_RESET"'"' "$TODO_LIST_PATH"
 }
 
 preview_note() {
@@ -99,29 +102,55 @@ create_note() {
     title=$(input_line "" "New note title (enter to save, esc to cancel)")
     [[ $? -eq 130 ]] && return 130
     body=$(edit_body "")
-    write_list --arg id "$(new_note_id)" --arg t "$title" --arg b "$body" '
+    write_list --arg id "$(new_note_id)" --arg t "$title" --arg b "$body" --arg tid "$LINK_TODO_ID" '
         .notes = ((.notes // []) + [{
             id: $id, title: $t, body: $b,
             created_at: (now | floor), updated_at: (now | floor)
-        }]) |
+        } + (if $tid == "" then {} else {todo_ids: [$tid]} end)]) |
         ._metadata.updated_at = (now | floor)'
 }
 
+NEW_ONLY=""
+LINK_TODO_ID=""
+SHOW_ALL=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --new) NEW_ONLY=1 ;;
+        --todo) LINK_TODO_ID="$2"; shift ;;
+    esac
+    [[ $# -gt 0 ]] && shift
+done
+
+TODO_LABEL=""
+if [[ -n "$LINK_TODO_ID" ]]; then
+    TODO_LABEL=$(jq -r --arg id "$LINK_TODO_ID" '.todos[]? | select(.id == $id) | .text | split("\n")[0]' "$TODO_LIST_PATH")
+    [[ -n "$TODO_LABEL" ]] || { echo "Error: todo $LINK_TODO_ID not found in $ACTIVE_LIST_NAME"; exit 1; }
+fi
+
 # --new: create one note and return to the caller (the main manager)
-if [[ "$1" == "--new" ]]; then
+if [[ -n "$NEW_ONLY" ]]; then
     create_note
     exit $?
 fi
 
 while true; do
     clear
-    SELECTION=$(format_notes | fzf --ansi --disabled \
-        --header="
+    HEADER="
  Notes — ${ACTIVE_LIST_NAME}
  n: New    e: Edit    d: Delete    y: Copy    q: Back
-" \
+"
+    if [[ -n "$LINK_TODO_ID" ]]; then
+        SCOPE="linked only" TOGGLE="a: All notes"
+        [[ -n "$SHOW_ALL" ]] && SCOPE="all notes" TOGGLE="a: Linked only"
+        HEADER="
+ Notes — ${ACTIVE_LIST_NAME} — todo: ${TODO_LABEL} (${SCOPE})
+ n: New (linked)    l: Link/unlink    e: Edit    d: Delete    y: Copy    ${TOGGLE}    q: Back
+"
+    fi
+    SELECTION=$(format_notes | fzf --ansi --disabled \
+        --header="$HEADER" \
         --prompt="" \
-        --expect=enter,n,e,d,y,q \
+        --expect=enter,n,e,d,y,a,l,q \
         --no-sort \
         --height=100% \
         --layout=reverse \
@@ -138,6 +167,20 @@ while true; do
     case "$KEY" in
         "n")
             create_note
+            ;;
+        "a")
+            [[ -n "$LINK_TODO_ID" ]] || continue
+            if [[ -n "$SHOW_ALL" ]]; then SHOW_ALL=""; else SHOW_ALL=1; fi
+            ;;
+        "l")
+            [[ -n "$LINK_TODO_ID" && -n "$NID" ]] || continue
+            write_list --arg id "$NID" --arg tid "$LINK_TODO_ID" '
+                .notes |= map(if .id == $id then
+                    ((.todo_ids // []) | if any(. == $tid) then map(select(. != $tid)) else . + [$tid] end) as $ids |
+                    (if ($ids | length) == 0 then del(.todo_ids) else .todo_ids = $ids end) |
+                    .updated_at = (now | floor)
+                else . end) |
+                ._metadata.updated_at = (now | floor)'
             ;;
         "e"|"enter")
             [[ -z "$NID" ]] && continue

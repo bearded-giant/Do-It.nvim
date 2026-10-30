@@ -48,6 +48,10 @@ const SEQUENCE_HINT =
     " across priorities; items already at this position and after it shift down one." +
     " To set a whole list's order at once, use sequence_todos.";
 
+const NOTE_TODOS_HINT =
+    " Todos on the same list this note relates to: each a rank number (the leading N.) or a todo id," +
+    " e.g. [3, 12]. Unknown ones are rejected.";
+
 const NOTE_FORMAT_HINT =
     " Format for a human reader: each labeled section on its own line, a blank" +
     " line between sections, commands/paths/code on their own lines (fence" +
@@ -404,6 +408,42 @@ function formatNoteLine(n) {
     return `${n.title}  [id:${n.id}]`;
 }
 
+// unranked todos carry their id so the reference stays usable as a todo_ids entry
+function formatTodoRef(t) {
+    const first = (t.text || "").split("\n")[0];
+    const { rankLabel, body } = parseTodoText(first);
+    return rankLabel ? `#${rankLabel} ${body}` : `${first} [id:${t.id}]`;
+}
+
+// stale ids (deleted or moved todos) drop out instead of erroring
+function linkedTodos(data, note) {
+    const ids = new Set(note.todo_ids || []);
+    return (data.todos || []).filter(t => ids.has(t.id));
+}
+
+function linkedNotes(data, todoId) {
+    return (data.notes || []).filter(n => (n.todo_ids || []).includes(todoId));
+}
+
+function formatNoteTodos(data, note) {
+    const todos = linkedTodos(data, note);
+    return todos.length ? `todos: ${todos.map(formatTodoRef).join(", ")}` : "";
+}
+
+function resolveNoteTodoIds(data, listName, refs) {
+    const ids = refs.map(ref => {
+        const todo = resolveTodoRef(data.todos || [], ref);
+        if (!todo) throw new Error(`Todo "${ref}" not found in list "${listName}". Pass a rank number or an id from that list.`);
+        return todo.id;
+    });
+    return [...new Set(ids)];
+}
+
+function setNoteTodoIds(note, ids) {
+    if (ids.length) note.todo_ids = ids;
+    else delete note.todo_ids;
+}
+
 function presentNoteChoices(matches, context, actionHint) {
     const lines = matches.map((n, i) => `${i + 1}. ${formatNoteLine(n)}`);
     return {
@@ -532,10 +572,12 @@ Behavior:
 - "make a todo from this file" / "take X.md and make a todo" → add_todo with text summarizing the file, and description containing the full file path as a markdown link: [filename](absolute/path/to/file.md). If the file has a title (h1), use that as the todo text. Otherwise use a short summary.
 - "add that as a note to X todo" → add_note with the file path or content as the note
 
-List notes: each list also has standalone scratch notes (title + body), parallel to the todo items — NOT attached to any todo. add_note = note ON a todo item; the note tools below manage list-level notes.
+List notes: each list also has scratch notes (title + body), parallel to the todo items and stored outside any todo's description. A note may link to todos on the same list (todo_ids); list_notes / get_note show those links and get_todo shows the notes linked to an item. add_note = note ON a todo item; the note tools below manage list-level notes.
 - "show notes" / "what notes are on X list" → list_notes (list_todos also shows note titles)
 - "read the X note" / "open that note" → get_note with query
 - "save this as a note" / "new note: ..." → create_note with title + body
+- "note this for #3" / "new note about the auth todo" → create_note with todo_ids=[3] (rank numbers or ids)
+- "link the X note to #3 and #5" → update_note with todo_ids=[3, 5]; it REPLACES the set, so pass the existing links too when adding one; [] unlinks all
 - "add this to the X note" → update_note with mode="append"
 - "rewrite the X note" / "rename the note" → update_note (mode="replace" default)
 - "delete the X note" → delete_note with query
@@ -743,6 +785,11 @@ server.tool(
         if (children.length) {
             lines.push(`Children (${children.length}):`);
             for (const child of children) lines.push(`  ${formatTodoLine(child)}`);
+        }
+        const notes = linkedNotes(found.data, id);
+        if (notes.length) {
+            lines.push(`List notes (${notes.length}):`);
+            for (const note of notes) lines.push(`  ${formatNoteLine(note)}`);
         }
         lines.push("", todo.text || "");
         if (todo.description) lines.push("", "Notes:", todo.description);
@@ -1283,14 +1330,17 @@ server.tool(
 
 server.tool(
     "list_notes",
-    "List the list-scoped scratch notes on a do-it list (top-level notes array, separate from todo item descriptions). Returns titles + ids; use get_note for a full body.",
+    "List the list-scoped scratch notes on a do-it list (top-level notes array, separate from todo item descriptions). Returns titles + ids and the todos each note links to; use get_note for a full body.",
     {
         list: z.string().optional().describe("List name (default: active list)"),
     },
     async ({ list }) => {
         const { name, data } = loadList(list);
         const notes = data.notes || [];
-        const lines = notes.map(n => `- ${formatNoteLine(n)}`);
+        const lines = notes.map(n => {
+            const todos = formatNoteTodos(data, n);
+            return `- ${formatNoteLine(n)}${todos ? `\n    ${todos}` : ""}`;
+        });
 
         return {
             content: [{
@@ -1321,10 +1371,11 @@ server.tool(
         }
 
         const n = result.note;
+        const todos = formatNoteTodos(data, n);
         return {
             content: [{
                 type: "text",
-                text: `# ${n.title}  [id:${n.id}]\n\n${n.body || "(empty body)"}`,
+                text: `# ${n.title}  [id:${n.id}]${todos ? `\n${todos}` : ""}\n\n${n.body || "(empty body)"}`,
             }],
         };
     }
@@ -1332,13 +1383,14 @@ server.tool(
 
 server.tool(
     "create_note",
-    "Create a new list-scoped scratch note on a do-it list (standalone, not attached to any todo — to note on a todo item use add_note).",
+    "Create a new list-scoped scratch note on a do-it list. It lives in the list's notes, not in any todo's description (to write onto a todo item use add_note), and may link to todos on the same list via todo_ids.",
     {
         title: z.string().describe("Note title (single line, shown in list rows)"),
         body: z.string().optional().describe("Note body (may contain newlines)"),
         list: z.string().optional().describe("List name (default: active list)"),
+        todo_ids: z.array(z.union([z.number(), z.string()])).optional().describe("Link the note to these todos." + NOTE_TODOS_HINT),
     },
-    async ({ title, body, list }) => {
+    async ({ title, body, list, todo_ids }) => {
         const { name, filepath, data } = loadList(list);
         const now = Math.floor(Date.now() / 1000);
         const note = {
@@ -1348,14 +1400,16 @@ server.tool(
             created_at: now,
             updated_at: now,
         };
+        if (todo_ids) setNoteTodoIds(note, resolveNoteTodoIds(data, name, todo_ids));
         data.notes = data.notes || [];
         data.notes.push(note);
         saveList(filepath, data);
 
+        const todos = formatNoteTodos(data, note);
         return {
             content: [{
                 type: "text",
-                text: `Created note on "${name}": ${formatNoteLine(note)}`,
+                text: `Created note on "${name}": ${formatNoteLine(note)}${todos ? `\n${todos}` : ""}`,
             }],
         };
     }
@@ -1363,7 +1417,7 @@ server.tool(
 
 server.tool(
     "update_note",
-    "Update a list note's title and/or body. Find by id or fuzzy query. Body mode: 'replace' (default) overwrites, 'append' adds to existing body.",
+    "Update a list note's title, body, and/or linked todos. Find by id or fuzzy query. Body mode: 'replace' (default) overwrites, 'append' adds to existing body.",
     {
         id: z.string().optional().describe("Note ID."),
         query: z.string().optional().describe("Fuzzy text match on title/body (all words must appear)."),
@@ -1371,8 +1425,9 @@ server.tool(
         title: z.string().optional().describe("New title"),
         body: z.string().optional().describe("New/additional body text"),
         mode: z.enum(["replace", "append"]).optional().describe("'replace' (default) overwrites body, 'append' adds to it"),
+        todo_ids: z.array(z.union([z.number(), z.string()])).optional().describe("Replace the note's linked todos with these; [] clears them. Omit to leave links as they are." + NOTE_TODOS_HINT),
     },
-    async ({ id, query, list, title, body, mode = "replace" }) => {
+    async ({ id, query, list, title, body, mode = "replace", todo_ids }) => {
         const { name, filepath, data } = loadList(list);
         const result = resolveNote(data, name, { id, query });
 
@@ -1384,6 +1439,7 @@ server.tool(
         }
 
         const note = result.note;
+        if (todo_ids !== undefined) setNoteTodoIds(note, resolveNoteTodoIds(data, name, todo_ids));
         if (title !== undefined) note.title = title;
         if (body !== undefined) {
             if (mode === "append" && note.body) {
@@ -1395,10 +1451,11 @@ server.tool(
         note.updated_at = Math.floor(Date.now() / 1000);
         saveList(filepath, data);
 
+        const todos = formatNoteTodos(data, note);
         return {
             content: [{
                 type: "text",
-                text: `Updated note on "${name}": ${formatNoteLine(note)}`,
+                text: `Updated note on "${name}": ${formatNoteLine(note)}${todos ? `\n${todos}` : ""}`,
             }],
         };
     }

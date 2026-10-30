@@ -106,7 +106,12 @@ function renderItem(list, { todo, parsed }, linkTo, idByRank) {
     return `${head}\n# ${parsed.rankLabel ? `${parsed.rankLabel}. ` : ""}${title}\n${body ? `\n${body}\n` : ""}`;
 }
 
-function renderNote(list, note) {
+// todo_ids may name deleted todos; only ones still exported become links
+function renderNote(list, note, linkTo) {
+    const todos = (Array.isArray(note.todo_ids) ? note.todo_ids : [])
+        .map(linkTo)
+        .filter(Boolean)
+        .map(target => `[[${target}]]`);
     const head = frontmatter({
         id: `doit-note-${note.id}`,
         aliases: [],
@@ -117,6 +122,7 @@ function renderNote(list, note) {
         doit_note_id: note.id,
         created: stamp(note.created_at),
         updated: stamp(note.updated_at),
+        todos: todos.length ? todos : undefined,
     });
     const body = (note.body || "").trim();
     return `${head}\n# ${note.title || "note"}\n${body ? `\n${body}\n` : ""}`;
@@ -173,7 +179,7 @@ export function buildVault(lists, root) {
     for (const { name, data, items, notes } of placed) {
         const idByRank = new Map(items.filter(i => i.parsed.rankLabel).map(i => [i.parsed.rankLabel, i.todo.id]));
         for (const item of items) files.set(`${item.rel}.md`, renderItem(name, item, id => where.get(id), idByRank));
-        for (const { entry, rel } of notes) files.set(`${rel}.md`, renderNote(name, entry));
+        for (const { entry, rel } of notes) files.set(`${rel}.md`, renderNote(name, entry, id => where.get(id)));
         const { counts, text } = renderList(name, data, items, notes, root);
         files.set(`${name}/${name}.md`, text);
         rows.push(`| [[${root}/${name}/${name}\\|${name}]] | ${counts.join(" | ")} |`);

@@ -366,7 +366,7 @@ Then install with `prefix + I`.
 | `e`       | Edit todo text        |
 | `P`       | Set priority          |
 | `N`       | Edit note (description) |
-| `g`       | List notes modal      |
+| `g`       | Notes modal (on a todo row: the notes linked to it; `n` adds a linked note, `l` links one, `a` shows all) |
 | `K`/`J`   | Reorder (a parent moves with its subtree) |
 | `[`/`]`   | Jump section down/up  |
 | `m`       | Move todo to another list |
@@ -426,7 +426,7 @@ Links from older versions bound whole tmux sessions. When the plugin loads, each
 
 The MCP server is the exception. Links track what you are looking at, which is rarely the list a model's work belongs to, so the server ignores them and the global pointer: a call without `list` goes to `DOIT_ACTIVE_LIST` when set, else `daily`. Model sessions pass `list` explicitly for project work.
 
-In the list switcher (`prefix + d + l`), `Enter` links the selected list to the current window (and refreshes the global pointer). In the list manager (`prefix + d + L`, or `L`/`q` from the interactive manager), `Enter` opens the list to view and edit without touching any link, and `l` does the linking instead. In both, `g` sets the global pointer only, and `u` unlinks the current window (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which windows link each list as `session:window`, with dead windows dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any window without touching any link.
+In the list switcher (`prefix + d + l`), `Enter` links the selected list to the current window (and refreshes the global pointer). In the list manager (`prefix + d + L`, or `L`/`q` from the interactive manager), `Enter` opens the list to view and edit without touching any link, and `l` does the linking instead. In both, `g` sets the global pointer only, and `u` unlinks the current window (in the switcher these are `ctrl-g` and `ctrl-u`, so plain letters keep filtering as you type). Rows show which windows link each list as `session:window`, with dead windows dimmed, and `daily` stays pinned to the top with its pending count. A list holding open items past their due date is badged `!N overdue` (the preview repeats the count), and the nvim list manager badges the row `!M name (N todos)` in red. `prefix + d + d` (or `Alt+Shift+D`) opens the interactive manager pinned to `daily` from any window without touching any link. The Neovim list manager (`L`) uses the same keys: `Enter` opens without touching links, `l` links, `g` sets the global pointer, `u` unlinks, and rows show linked windows plus a `[here]` tag on the list this window links.
 
 ### List Source
 
@@ -552,7 +552,7 @@ Todo items:
 | Tool | Description |
 |------|-------------|
 | `list_todos` | List items from a list, filtered by status, priority, #tag and/or due date |
-| `get_todo` | Fetch one item by id from whichever list holds it, no list name needed |
+| `get_todo` | Fetch one item by id from whichever list holds it, no list name needed, with the list notes linked to it |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
 | `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item), `sequence`, and `owe` (also write a linked twin into `daily`) |
@@ -593,10 +593,10 @@ Notes. Two different things share the word: `add_note` writes the description on
 | Tool | Description |
 |------|-------------|
 | `add_note` | Write a note onto a todo item. Appends by default; `mode='replace'` overwrites |
-| `list_notes` | List the standalone notes on a list, returning titles and ids |
-| `get_note` | Read one list note in full |
-| `create_note` | Create a standalone list note, not attached to any todo |
-| `update_note` | Update a list note's title and/or body. Replaces by default; `mode='append'` adds |
+| `list_notes` | List the standalone notes on a list, returning titles, ids, and each note's linked todos |
+| `get_note` | Read one list note in full, with its linked todos |
+| `create_note` | Create a list note; `todo_ids` (ranks or ids) links it to todos on the list |
+| `update_note` | Update a list note's title and/or body. Replaces by default; `mode='append'` adds; `todo_ids` replaces its linked todos, `[]` clears |
 | `delete_note` | Delete a list note, keeping the last 10 for undo |
 
 Lists:

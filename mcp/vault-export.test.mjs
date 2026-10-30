@@ -30,7 +30,9 @@ const lists = [
                 { id: "e_1111", text: "buy milk", priorities: "critical", order_index: 1 },
                 { id: "e_2222", text: "buy milk", order_index: 2 },
             ],
-            notes: [{ id: "n_0001", title: "Plan: overview", body: "the plan", created_at: "1790643681" }],
+            notes: [
+                { id: "n_0001", title: "Plan: overview", body: "the plan", created_at: "1790643681", todo_ids: ["b_0001", "gone"] },
+            ],
         },
     },
 ];
@@ -129,3 +131,11 @@ assert.deepEqual([...files.keys()].sort(), [
 }
 
 console.log("vault-export.test.mjs ok");
+
+// a note links its todos by vault path; ids with no exported todo are dropped
+{
+    const note = files.get("proj/notes/plan-overview.md");
+    assert.match(note, /\ntodos: \["\[\[doit-todos\/proj\/4-fix-api-parser\]\]"\]\n/);
+    assert.doesNotMatch(note, /gone/);
+}
+

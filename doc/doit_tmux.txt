@@ -150,7 +150,8 @@ Editing~
     N                  Edit the todo's note (description)
     h                  Set or clear due date
     S                  Set or clear sequence (run order)
-    g                  Open list notes modal (create/edit/delete notes)
+    g                  Open list notes modal (create/edit/delete notes);
+                       on a todo row, the notes linked to that todo
 
     In new/edit mode: Enter to save, Esc to cancel
 
@@ -164,6 +165,19 @@ List Notes~
         q                  Back to the todo list
     In the main list, `n` anywhere in the Notes section, or Enter on the
     "Notes" header or the "(no notes)" line, creates a note directly.
+
+    A note can link to todos on the same list (set here with `l`, from nvim,
+    or with the MCP `todo_ids` param). A linked note row shows a count such as "(2 todos)".
+    The preview pane lists a todo's linked notes under "Notes:" and a note's
+    linked todos under "Todos:". Links to deleted or moved todos are skipped.
+
+    `g` on a todo row opens the modal scoped to that todo
+    (`todo-notes.sh --todo <id>`): the header names the todo and the rows
+    are the notes linked to it.
+        n                  New note, already linked to the todo
+        a                  Toggle between linked notes and every note
+        l                  Link or unlink the selected note (● marks linked)
+    `e`, `d`, `y`, and `q` work as above.
 
 View/Copy~
     Enter              Open the item (or note row) in nvim: view status,

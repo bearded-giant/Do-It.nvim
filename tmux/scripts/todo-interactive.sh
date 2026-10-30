@@ -162,15 +162,21 @@ preview_todo() {
     local line="$1"
     local todo_id=$(echo "$line" | grep -oE '\[[^]]+\]$' | tr -d '[]')
     if [[ "$todo_id" == note_* ]]; then
+        # todo_ids may name deleted or moved todos; only live ones render
         jq -r --arg id "${todo_id#note_}" '
+            (.todos // []) as $todos |
             (.notes // [])[] | select(.id == $id) |
+            [(.todo_ids // [])[] as $tid | $todos[] | select(.id == $tid) | .text | split("\n")[0]] as $linked |
             "Note" +
             "\n────────────────────────────────" +
             "\n" + (if (.title // "") != "" then .title + "\n\n" else "" end) +
-            (.body // "")
+            (.body // "") +
+            (if ($linked | length) > 0 then "\n\nTodos:\n" + ($linked | map("• " + .) | join("\n")) else "" end)
         ' "$TODO_LIST_PATH" 2>/dev/null
     elif [[ -n "$todo_id" ]]; then
         jq -r --arg id "$todo_id" --arg today "$(date +%Y-%m-%d)" "$DUE_JQ"'
+            [(.notes // [])[] | select((.todo_ids // []) | any(. == $id)) |
+                if (.title // "") == "" then ((.body // "") | split("\n")[0]) else .title end] as $linked |
             .todos[] | select(.id == $id) |
             "Status: " + (if .in_progress then "In Progress" elif .done then "Done" else "Pending" end) +
             "\nPriority: " + (.priorities // "none") +
@@ -180,7 +186,8 @@ preview_todo() {
             (if .obsidian_ref then "\nObsidian:  " + (.obsidian_ref.date // "linked") else "" end) +
             "\n────────────────────────────────" +
             "\n" + .text +
-            (if (.description // "") != "" then "\n\nDescription:\n" + .description else "" end)
+            (if (.description // "") != "" then "\n\nDescription:\n" + .description else "" end) +
+            (if ($linked | length) > 0 then "\n\nNotes:\n" + ($linked | map("• " + .) | join("\n")) else "" end)
         ' "$TODO_LIST_PATH" 2>/dev/null
     fi
 }
@@ -349,12 +356,16 @@ format_todos() {
     echo ""
     printf "%s%s%s\n" "$COLOR_HEADER" "Notes" "$COLOR_RESET"
     local note_rows=0
-    while IFS='|' read -r nid ntitle; do
+    local nsuffix
+    while IFS='|' read -r nid nlinked ntitle; do
         note_rows=$((note_rows + 1))
-        printf "  %s• %-${text_w}s%s %s[note_%s]%s\n" "$COLOR_PURPLE" "$ntitle" "$COLOR_RESET" "$COLOR_DIM" "$nid" "$COLOR_RESET"
-    done < <(jq -r --argjson tw "$text_w" '(.notes // []) | .[] |
+        nsuffix=""
+        (( nlinked == 1 )) && nsuffix=" ${COLOR_DIM}(1 todo)${COLOR_RESET}"
+        (( nlinked > 1 )) && nsuffix=" ${COLOR_DIM}($nlinked todos)${COLOR_RESET}"
+        printf "  %s• %-${text_w}s%s%s %s[note_%s]%s\n" "$COLOR_PURPLE" "$ntitle" "$COLOR_RESET" "$nsuffix" "$COLOR_DIM" "$nid" "$COLOR_RESET"
+    done < <(jq -r --argjson tw "$text_w" '[.todos[]?.id] as $tids | (.notes // []) | .[] |
         (if (.title // "") == "" then ((.body // "") | split("\n")[0]) else (.title) end)[0:$tw] as $t |
-        "\(.id)|\($t)"' "$TODO_LIST_PATH")
+        "\(.id)|\([(.todo_ids // [])[] | select(IN($tids[]))] | length)|\($t)"' "$TODO_LIST_PATH")
     [[ "$note_rows" -eq 0 ]] && printf "  %s(no notes)%s\n" "$COLOR_DIM" "$COLOR_RESET"
 
     # Finally print completed todos (if show_completed is enabled)
@@ -765,9 +776,14 @@ while true; do
         continue
     fi
 
-    # g browses the full notes list (CRUD modal); selecting a note row opens it
+    # g browses the notes modal: on a todo row, the notes linked to that todo
     if [[ "$KEY" == "g" ]]; then
-        "$SCRIPT_DIR/todo-notes.sh"
+        if [[ -n "$TODO_ID" ]]; then
+            "$SCRIPT_DIR/todo-notes.sh" --todo "$TODO_ID"
+            CURSOR_TARGET="$TODO_ID"
+        else
+            "$SCRIPT_DIR/todo-notes.sh"
+        fi
         continue
     fi
 
@@ -1471,7 +1487,7 @@ while true; do
             printf "\n"
             help_row "NOTES"                             "ORGANIZE"
             help_row "  N        Edit note (description)" "  m      Move todo to list"
-            help_row "  g        List notes (modal)"      "  l      Switch list"
+            help_row "  g        Notes modal (todo: linked)" "  l      Switch list"
             help_row "  in Notes: n new · Enter/e open"   "  L    List manager"
             help_row "            d delete · y copy"      ""
             help_row "VIEW / MISC"                       "  /      Search / filter"
