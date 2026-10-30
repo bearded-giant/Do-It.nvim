@@ -3,17 +3,13 @@
 local vim = vim
 
 local footer = require("doit.core.utils.footer")
+local current_state = require("doit.modules.todos.state.current")
+local note_links = require("doit.modules.todos.state.note_links")
 
 local M = {}
 
 M.TODO_MARKER = "── details ─────────────────────────────"
 M.NOTE_MARKER = "── body ────────────────────────────────"
-
-local function get_state()
-	local ok, core = pcall(require, "doit.core")
-	local module = ok and core.get_module and core.get_module("todos")
-	return (module and module.state) or require("doit.state")
-end
 
 local function find_todo(state, id)
 	for _, todo in ipairs(state.todos or {}) do
@@ -36,6 +32,18 @@ end
 local function join(lines)
 	local text = table.concat(lines, "\n")
 	text = text:gsub("^%s*\n", ""):gsub("%s+$", "")
+	return text
+end
+
+local function first_lines(items, label, width)
+	local parts = {}
+	for _, item in ipairs(items) do
+		table.insert(parts, label(item))
+	end
+	local text = table.concat(parts, ", ")
+	if #text > width then
+		text = text:sub(1, width - 3) .. "..."
+	end
 	return text
 end
 
@@ -111,6 +119,16 @@ local function open(opts)
 		vim.keymap.set("n", key, fn, { buffer = buf, nowait = true })
 	end
 
+	if opts.on_close then
+		vim.api.nvim_create_autocmd("BufWipeout", {
+			buffer = buf,
+			once = true,
+			callback = function()
+				vim.schedule(opts.on_close)
+			end,
+		})
+	end
+
 	pcall(vim.api.nvim_win_set_cursor, win, opts.cursor or { 1, 0 })
 	return buf, win
 end
@@ -125,6 +143,17 @@ function M.edit_todo(todo, opts)
 	local lines = vim.list_extend(vim.list_extend({}, head), { M.TODO_MARKER })
 	vim.list_extend(lines, vim.split(original_details, "\n", { plain = true }))
 
+	local linked = note_links.notes_for_todo(current_state().get_notes and current_state().get_notes() or {}, todo.id)
+	local footer_text = opts.footer
+	if not footer_text then
+		footer_text = " gN notes · q save + close · :w save "
+		if #linked > 0 then
+			footer_text = " notes: " .. first_lines(linked, function(n)
+				return n.title ~= "" and n.title or "(untitled)"
+			end, 50) .. " · gN open · q save + close "
+		end
+	end
+
 	local status = todo.done and "done" or (todo.in_progress and "in-progress" or "pending")
 	local priority = type(todo.priorities) == "string" and todo.priorities ~= "" and todo.priorities or "default"
 
@@ -132,11 +161,12 @@ function M.edit_todo(todo, opts)
 		name = "doit://todo/" .. todo.id,
 		lines = lines,
 		title = string.format(" [%s] [%s] [id:%s] ", status, priority, todo.id),
-		footer = opts.footer,
+		footer = footer_text,
 		keys = opts.keys,
+		on_close = opts.on_close,
 		cursor = { #head + 2, 0 },
 		on_save = function(buf_lines)
-			local state = get_state()
+			local state = current_state()
 			local live = find_todo(state, todo.id)
 			if not live then
 				vim.notify("That to-do is no longer in this list", vim.log.levels.WARN)
@@ -164,6 +194,13 @@ end
 function M.edit_note(note, opts)
 	opts = opts or {}
 	local current = note
+	local footer_text = opts.footer
+	local linked = note and note_links.todos_for_note(current_state().todos, note) or {}
+	if not footer_text and #linked > 0 then
+		footer_text = " todos: " .. first_lines(linked, function(t)
+			return vim.split(t.text or "", "\n", { plain = true })[1]
+		end, 60) .. " · q save + close "
+	end
 	local lines = { note and note.title or "", M.NOTE_MARKER }
 	vim.list_extend(lines, vim.split(note and note.body or "", "\n", { plain = true }))
 
@@ -171,11 +208,12 @@ function M.edit_note(note, opts)
 		name = "doit://note/" .. (note and note.id or ("new-" .. tostring((vim.uv or vim.loop).hrtime()))),
 		lines = lines,
 		title = note and " note " or " new note ",
-		footer = opts.footer,
+		footer = footer_text,
 		keys = opts.keys,
+		on_close = opts.on_close,
 		cursor = note and { 3, 0 } or { 1, 0 },
 		on_save = function(buf_lines)
-			local state = get_state()
+			local state = current_state()
 			local title_lines, body_lines = split_at_marker(buf_lines)
 			local title, body = join(title_lines), join(body_lines)
 			if current then

@@ -368,7 +368,7 @@ end
 
 function M.new_note(on_render, todo_ids)
 	ensure_state_loaded()
-	require("doit.ui.editor").edit_note(nil, { todo_ids = todo_ids, on_saved = on_render })
+	require("doit.ui.editor").edit_note(nil, { todo_ids = todo_ids, on_saved = on_render, on_close = on_render })
 end
 
 function M.edit_note(win_id, on_render)
@@ -377,7 +377,7 @@ function M.edit_note(win_id, on_render)
 	if not note then
 		return
 	end
-	require("doit.ui.editor").edit_note(note, { on_saved = on_render })
+	require("doit.ui.editor").edit_note(note, { on_saved = on_render, on_close = on_render })
 end
 
 function M.delete_note(win_id, on_render)
@@ -601,121 +601,6 @@ function M.delete_completed(on_render)
 end
 
 -- Link a todo to a note (UI for note selection)
-function M.link_to_note(win_id, on_render)
-    ensure_state_loaded()
-    if not win_id or not vim.api.nvim_win_is_valid(win_id) then
-        return
-    end
-
-    local cursor = vim.api.nvim_win_get_cursor(win_id)
-    local line_num = cursor[1]
-
-    local buf_id = vim.api.nvim_win_get_buf(win_id)
-
-    local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
-    if not bullet_line then
-        return
-    end
-
-    local todo_index = get_real_todo_index(bullet_line, state.active_filter)
-    if todo_index then
-            -- Try to get a reference to the notes module
-            local core = package.loaded["doit.core"]
-            local notes_module = core and core.get_module and core.get_module("notes")
-            
-            if not notes_module or not notes_module.state then
-                vim.notify("Notes module not available", vim.log.levels.WARN)
-                return
-            end
-            
-            -- Get all available notes
-            local available_notes = notes_module.state.get_all_notes_titles()
-            
-            if #available_notes == 0 then
-                vim.notify("No notes available. Create some notes first.", vim.log.levels.WARN)
-                return
-            end
-            
-            -- Create a selection list for notes
-            local note_options = {}
-            for _, note_data in ipairs(available_notes) do
-                table.insert(note_options, {
-                    text = note_data.title .. " (" .. (note_data.mode or "unknown") .. ")",
-                    data = note_data
-                })
-            end
-            
-            -- Add option to create a new link using [[]] syntax
-            table.insert(note_options, {
-                text = "--- Add a new [[note-title]] link ---",
-                data = { custom = true }
-            })
-            
-            -- Show the selection menu
-            vim.ui.select(note_options, {
-                prompt = "Select a note to link:",
-                format_item = function(item)
-                    return item.text
-                end
-            }, function(choice)
-                if not choice then
-                    return -- User cancelled
-                end
-                
-                if choice.data.custom then
-                    -- Ask for link text
-                    vim.ui.input({ prompt = "Enter note title for [[title]] link:" }, function(title)
-                        -- Clear the command line after input
-                        vim.cmd("echo ''")
-                        if title and title ~= "" then
-                            -- Append to the todo text
-                            local todo = state.todos[todo_index]
-                            local new_text = todo.text
-                            
-                            -- Check if the text already has a link
-                            if not new_text:match("%[%[.+%]%]") then
-                                new_text = new_text .. " [[" .. title .. "]]"
-                                state.todos[todo_index].text = new_text
-                                state.save_to_disk()
-                                maybe_render(on_render)
-                                
-                                vim.notify("Added link to note: " .. title, vim.log.levels.INFO)
-                            else
-                                vim.notify("Todo already has a link. Edit the todo text directly.", vim.log.levels.WARN)
-                            end
-                        end
-                    end)
-                else
-                    -- Link directly to an existing note
-                    local note_data = choice.data
-                    local todo_module = core.get_module("todos")
-                    
-                    if todo_module and todo_module.state and todo_module.state.link_todo_to_note then
-                        todo_module.state.link_todo_to_note(todo_index, note_data.id, note_data.title)
-                        maybe_render(on_render)
-                        vim.notify("Linked to note: " .. note_data.title, vim.log.levels.INFO)
-                    else
-                        -- Fallback to updating the text with the [[]] syntax
-                        local todo = state.todos[todo_index]
-                        local new_text = todo.text
-                        
-                        -- Check if the text already has a link
-                        if not new_text:match("%[%[.+%]%]") then
-                            new_text = new_text .. " [[" .. note_data.title .. "]]"
-                            state.todos[todo_index].text = new_text
-                            state.save_to_disk()
-                            maybe_render(on_render)
-                            
-                            vim.notify("Added link to note: " .. note_data.title, vim.log.levels.INFO)
-                        else
-                            vim.notify("Todo already has a link. Edit the todo text directly.", vim.log.levels.WARN)
-                        end
-                    end
-                end
-            end)
-    end
-end
-
 function M.remove_duplicates(on_render)
 	ensure_state_loaded()
 	if not state.remove_duplicates then
@@ -799,7 +684,7 @@ function M.edit_description(win_id, on_render)
 	local todo_index = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
 	local todo = todo_index and state.todos[todo_index]
 	if todo then
-		require("doit.ui.editor").edit_todo(todo, { on_saved = on_render })
+		require("doit.ui.editor").edit_todo(todo, { on_saved = on_render, on_close = on_render })
 	end
 end
 

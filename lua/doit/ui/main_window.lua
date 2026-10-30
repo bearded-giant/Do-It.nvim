@@ -12,6 +12,8 @@ local list_selector = require("doit.ui.list_selector")
 local tags_util = require("doit.modules.todos.state.tags")
 local due_dates = require("doit.modules.todos.state.due_dates")
 local sorting = require("doit.modules.todos.state.sorting")
+local note_links = require("doit.modules.todos.state.note_links")
+local footer_util = require("doit.core.utils.footer")
 
 local core = require("doit.core")
 
@@ -306,9 +308,13 @@ end
 -- Returns an ordered list of rows, one per buffer line:
 --   { display = <string>, kind = "blank"|"filter"|"divider"|"todo",
 --     todo = <todo|nil>, todo_index = <int|nil>, is_first = <bool>, is_description = <bool> }
+-- linked list-note count per todo id, rebuilt each render for format_todo_line
+local linked_note_counts = {}
+
 function M.build_render_rows()
 	state = ensure_state_loaded()
 	state.sort_todos()
+	linked_note_counts = note_links.counts_by_todo(state.get_notes and state.get_notes() or {})
 
 	local rows = {}
 	local function push(display, meta)
@@ -363,7 +369,12 @@ function M.build_render_rows()
 					local first = note.body and vim.split(note.body, "\n", { plain = true })[1]
 					title = (first and first ~= "" and first) or "(untitled)"
 				end
-				push("    • " .. title, { kind = "note", note = note, note_index = ni })
+				local linked = #note_links.todos_for_note(state.todos, note)
+				local suffix = linked > 0 and ("  ≡" .. linked) or ""
+				if note.updated_at then
+					suffix = suffix .. "  " .. os.date("%m-%d", note.updated_at)
+				end
+				push("    • " .. title .. suffix, { kind = "note", note = note, note_index = ni })
 			end
 		end
 	end
@@ -692,11 +703,8 @@ function M.format_todo_line(todo)
 		end
 	end
 
-	-- note/detail indicator: linked note (note_id) vs inline notes/description (Enter to view)
 	local notes_icon = ""
-	if todo.note_id then
-		notes_icon = config.options.notes and config.options.notes.linked_icon or "🔗"
-	elseif (todo.notes and todo.notes ~= "") or (todo.description and todo.description ~= "") then
+	if (todo.notes and todo.notes ~= "") or footer_util.strip(todo.description or ""):match("%S") then
 		notes_icon = config.options.notes and config.options.notes.icon or "✎"
 	end
 
@@ -740,9 +748,12 @@ function M.format_todo_line(todo)
 		elseif part == "notes_marker" then
 			-- text marker (no icon) when the todo carries a note, description, or
 			-- obsidian sync ref; Enter to view the detail
-			if todo.note_id or (todo.notes and todo.notes ~= "")
-				or (todo.description and todo.description ~= "") or todo.obsidian_ref then
+			if (todo.notes and todo.notes ~= "")
+				or footer_util.strip(todo.description or ""):match("%S") or todo.obsidian_ref then
 				table.insert(components, "- [NOTES]")
+			end
+			if (linked_note_counts[todo.id] or 0) > 0 then
+				table.insert(components, "≡" .. linked_note_counts[todo.id])
 			end
 		elseif part == "notes_icon" then
 			table.insert(components, notes_icon)
@@ -802,11 +813,26 @@ function M.open_todo_details()
 		vim.notify("No todo under cursor", vim.log.levels.WARN)
 		return
 	end
+	local function render()
+		M.render_todos()
+	end
 	require("doit.ui.editor").edit_todo(todo, {
-		on_saved = function()
-			M.render_todos()
-		end,
+		on_saved = render,
+		on_close = render,
+		keys = {
+			gN = function()
+				require("doit.ui.notes_picker").open({ todo = todo, on_change = render })
+			end,
+		},
 	})
+end
+
+-- On a todo row the picker opens on that todo's notes; elsewhere on all list notes.
+function M.open_notes_picker()
+	local function render()
+		M.render_todos()
+	end
+	require("doit.ui.notes_picker").open({ todo = M.get_todo_at_cursor(), on_change = render, on_close = render })
 end
 
 -- Enter mirrors tmux: a note row opens the note, the Notes header adds one, a todo row shows its detail.
@@ -1225,9 +1251,21 @@ local function create_window()
 	end
 
 	setup_keymap("new_todo", function()
+		local row = (M._rendered_rows or {})[vim.api.nvim_win_get_cursor(win_id)[1]]
+		local kind = row and row.kind
+		if kind == "note" or kind == "note_header" or kind == "note_empty" then
+			todo_actions.new_note(function()
+				M.render_todos()
+			end)
+			return
+		end
 		todo_actions.new_todo(function()
 			M.render_todos()
 		end)
+	end)
+
+	setup_keymap("notes_picker", function()
+		M.open_notes_picker()
 	end)
 
 	setup_keymap("new_child_todo", function()
@@ -1367,11 +1405,6 @@ local function create_window()
 		end)
 	end)
 	
-	-- Add keymap for opening linked notes
-	setup_keymap("open_linked_note", function()
-		M.open_linked_note()
-	end)
-
 	setup_keymap("view_detail", function()
 		M.open_at_cursor()
 	end)
@@ -1388,13 +1421,6 @@ local function create_window()
 		M.copy_todo_id()
 	end)
 	
-	-- Add keymap for linking to notes
-	vim.keymap.set("n", "N", function()
-		todo_actions.link_to_note(win_id, function()
-			M.render_todos()
-		end)
-	end, { buffer = buf_id, nowait = true, desc = "Link todo to note" })
-
 	setup_keymap("open_todo_scratchpad", function()
 		scratchpad.open_todo_scratchpad(win_id)
 	end)
@@ -1492,88 +1518,6 @@ local function create_window()
 	vim.keymap.set("n", "<Esc>", function()
 		M.close_window()
 	end, { buffer = buf_id, nowait = true, desc = "Close todo window" })
-end
-
--- Open linked note for a todo
-function M.open_linked_note()
-	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
-		return
-	end
-
-	local cursor_pos = vim.api.nvim_win_get_cursor(win_id)
-	local line_nr = cursor_pos[1]
-	local todo = M.get_todo_at_cursor()
-
-	if not todo then
-		vim.notify("No todo selected", vim.log.levels.WARN)
-		return
-	end
-
-	-- First check if there's a direct note_id link
-	if todo.note_id then
-		-- Try to get a reference to the notes module
-		local notes_module = core.get_module("notes")
-		if notes_module then
-			-- Make sure the UI is initialized
-			if not notes_module.ui then
-				vim.notify("Notes UI not initialized", vim.log.levels.WARN)
-				return
-			end
-			
-			-- Make sure notes_window is available
-			if not notes_module.ui.notes_window then
-				vim.notify("Notes window not available", vim.log.levels.WARN)
-				return
-			end
-
-			-- Close todos window
-			M.close_window()
-			-- Open notes window
-			notes_module.ui.notes_window.toggle_notes_window()
-			-- TODO: Ideally we would jump to the specific note, but that's handled by the notes module
-			return
-		end
-	end
-
-	-- If there's no direct link, check for [[]] links in the text
-	if not todo.text:match("%[%[.+%]%]") then
-		vim.notify("No linked note found", vim.log.levels.WARN)
-		return
-	end
-
-	-- Try to get a reference to the notes module
-	local notes_module = core.get_module("notes")
-	if not notes_module or not notes_module.state then
-		vim.notify("Notes module not available", vim.log.levels.WARN)
-		return
-	end
-
-	-- Extract the first link
-	local links = notes_module.state.parse_note_links(todo.text)
-	if #links == 0 then
-		vim.notify("No note links found", vim.log.levels.WARN)
-		return
-	end
-
-	-- Try to find the note by title pattern
-	local note = notes_module.state.find_note_by_title(links[1])
-	if not note then
-		vim.notify("Linked note not found: " .. links[1], vim.log.levels.WARN)
-		return
-	end
-
-	-- Open the notes window
-	M.close_window()
-	
-	-- Make sure the notes UI is initialized
-	if not notes_module.ui or not notes_module.ui.notes_window then
-		vim.notify("Notes window not available", vim.log.levels.WARN)
-		return
-	end
-	
-	notes_module.ui.notes_window.toggle_notes_window()
-	-- The notes window will open with the current note mode
-	-- TODO: Ideally we would jump to the specific note
 end
 
 function M.toggle_todo_window()

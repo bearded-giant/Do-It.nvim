@@ -57,40 +57,10 @@ function M.setup(state)
             new_todo.priorities = priorities
         end
         
-        M.process_note_links(new_todo)
-        
         table.insert(state.todos, new_todo)
         state.save_todos()
         
         return new_todo
-    end
-    
-    -- Process note links in todo text and sync with notes module
-    function M.process_note_links(todo)
-        if not todo or not todo.text then return end
-        
-        local core = package.loaded["doit.core"]
-        local notes_module = core and core.get_module and core.get_module("notes")
-        
-        local notes_state = notes_module and notes_module.state
-        -- the notes module can be present but only partly wired (disabled, or a
-        -- todos-only setup), so every entry point is checked before it is called
-        if not notes_state or not notes_state.parse_note_links or not notes_state.find_note_by_title then
-            return
-        end
-
-        local links = notes_state.parse_note_links(todo.text)
-
-        if #links > 0 then
-            local note = notes_state.find_note_by_title(links[1])
-            if note and note.id then
-                todo.note_id = note.id
-                if notes_state.generate_summary then
-                    todo.note_summary = notes_state.generate_summary(note.content)
-                end
-                todo.note_updated_at = os.time()
-            end
-        end
     end
     
     function M.get_todo_by_id(id)
@@ -286,8 +256,6 @@ function M.setup(state)
         if state.todos[index] then
             local todo = state.todos[index]
             todo.text = new_text
-            
-            M.process_note_links(todo)
             
             state.save_todos()
         end

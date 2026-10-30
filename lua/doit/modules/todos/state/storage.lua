@@ -716,11 +716,14 @@ function storage.setup(M)
         return note
     end
 
-    storage.update_note = function(note_id, title, body)
+    storage.update_note = function(note_id, title, body, todo_ids)
         for _, note in ipairs(storage.get_notes()) do
             if note.id == note_id then
                 if title ~= nil then note.title = title end
                 if body ~= nil then note.body = body end
+                if todo_ids ~= nil then
+                    note.todo_ids = #todo_ids > 0 and todo_ids or nil
+                end
                 note.updated_at = os.time()
                 storage.save_to_disk()
                 return true
