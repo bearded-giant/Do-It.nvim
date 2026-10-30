@@ -11,8 +11,6 @@ function M.setup(module)
     local components = {
         "help_window",
         "tag_window", 
-        "search_window", 
-        "scratchpad", 
         "main_window", 
         "list_window",
         "list_manager_window"

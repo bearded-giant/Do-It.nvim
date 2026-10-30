@@ -38,8 +38,6 @@ Generic utilities and components that can be used by multiple modules:
 ### `/legacy/`
 Tests from the pre-framework architecture. These are being gradually migrated or removed:
 - `doit_spec.lua` - Old monolithic plugin tests
-- `main_window_spec.lua` - Old UI tests
-- `search_window_spec.lua` - Old search functionality
 
 ## Running Tests
 

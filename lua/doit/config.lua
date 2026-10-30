@@ -71,9 +71,6 @@ M.defaults = {
 						close_calendar = "q",
 					},
 				},
-				scratchpad = {
-					syntax_highlight = "markdown",
-				},
 			},
 			formatting = {
 				pending = {
@@ -246,9 +243,6 @@ M.defaults = {
 			select_day = "<CR>",
 			close_calendar = "q",
 		},
-	},
-	scratchpad = {
-		syntax_highlight = "markdown",
 	},
 }
 

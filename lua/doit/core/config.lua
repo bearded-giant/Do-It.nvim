@@ -70,9 +70,6 @@ M.defaults = {
                     close_calendar = "q",
                 },
             },
-            scratchpad = {
-                syntax_highlight = "markdown",
-            },
             priorities = {
                 { name = "critical", weight = 16 },
                 { name = "urgent", weight = 8 },

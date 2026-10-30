@@ -6,8 +6,6 @@ local highlights = require("doit.ui.highlights")
 local todo_actions = require("doit.ui.todo_actions")
 local help_window = require("doit.ui.help_window")
 local tag_window = require("doit.ui.tag_window")
-local search_window = require("doit.ui.search_window")
-local scratchpad = require("doit.ui.scratchpad")
 local list_selector = require("doit.ui.list_selector")
 local tags_util = require("doit.modules.todos.state.tags")
 local due_dates = require("doit.modules.todos.state.due_dates")
@@ -1527,9 +1525,6 @@ local function create_window()
 		restore_anchor(anchor)
 	end)
 	
-	setup_keymap("open_todo_scratchpad", function()
-		scratchpad.open_todo_scratchpad(win_id)
-	end)
 	
 	setup_keymap("toggle_list_manager", function()
 		local module = get_todo_module()
@@ -1653,9 +1648,6 @@ function M.close_window()
 		tag_window.close_tag_window()
 	end
 
-	if search_window.close_search_window then
-		search_window.close_search_window()
-	end
 
 	stop_watch()
 

@@ -115,7 +115,7 @@ Configuration Structure Overview:
                         border = "rounded",
                         position = "center",
                     },
-                    -- list_window, calendar, scratchpad...
+                    -- list_window, calendar...
                 },
                 formatting = {
                     pending = { icon = "○" },
