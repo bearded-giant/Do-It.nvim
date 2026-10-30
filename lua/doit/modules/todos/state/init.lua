@@ -67,6 +67,7 @@ function M.setup(parent_module)
     M.get_available_lists = storage.get_available_lists
     M.move_todo_to_list = storage.move_todo_to_list
     M.get_list_path = storage.get_list_path
+    M.refresh_if_changed = storage.refresh_if_changed
 
     require("doit.modules.todos.state.twin").setup(M)
     require("doit.modules.todos.state.source").setup(M)

@@ -41,6 +41,96 @@ local function serializable_todos(todos)
     return out
 end
 
+local function is_transient(k)
+    return type(k) == "string" and k:sub(1, 1) == "_"
+end
+
+local function index_by_id(items)
+    local out = {}
+    for _, item in ipairs(items or {}) do
+        if item.id ~= nil then
+            out[item.id] = item
+        end
+    end
+    return out
+end
+
+-- Per field: what nvim changed since its last load or save keeps nvim's value; every
+-- other field takes the disk value, so tmux and MCP edits to the same item survive.
+local function merge_fields(base, ours, theirs)
+    local merged = {}
+    for k, v in pairs(theirs or {}) do
+        merged[k] = v
+    end
+    for k, v in pairs(ours) do
+        if not is_transient(k) and not vim.deep_equal(v, base and base[k]) then
+            merged[k] = v
+        end
+    end
+    for k in pairs(base or {}) do
+        if ours[k] == nil then
+            merged[k] = nil
+        end
+    end
+    return merged
+end
+
+-- Live objects stay the same tables so callers holding a todo keep writing to state.
+local function assign(target, fields)
+    for k in pairs(target) do
+        if fields[k] == nil and not is_transient(k) then
+            target[k] = nil
+        end
+    end
+    for k, v in pairs(fields) do
+        target[k] = v
+    end
+end
+
+local function merge_items(base, ours, theirs)
+    local base_by, ours_by = index_by_id(base), index_by_id(ours)
+    local out, seen = {}, {}
+    for _, t in ipairs(theirs or {}) do
+        local o = t.id ~= nil and ours_by[t.id] or nil
+        if o then
+            seen[t.id] = true
+            assign(o, merge_fields(base_by[t.id], o, t))
+            table.insert(out, o)
+        elseif t.id == nil or base_by[t.id] == nil then
+            table.insert(out, t)
+        end
+    end
+    for _, o in ipairs(ours or {}) do
+        local b = base_by[o.id]
+        if not seen[o.id] and (b == nil or not vim.deep_equal(strip_transient(o), b)) then
+            table.insert(out, o)
+        end
+    end
+    return out
+end
+storage._merge_items = merge_items
+
+local function disk_stamp(path)
+    local stat = (vim.uv or vim.loop).fs_stat(path)
+    if not stat then
+        return nil
+    end
+    return string.format("%d.%d:%d", stat.mtime.sec, stat.mtime.nsec or 0, stat.size)
+end
+
+local function read_list_file(path)
+    local file = io.open(path, "r")
+    if not file then
+        return nil
+    end
+    local content = file:read("*all")
+    file:close()
+    local ok, data = pcall(vim.fn.json_decode, content)
+    if ok and type(data) == "table" then
+        return data
+    end
+end
+
 -- Mutates in place: used on load so pre-existing leaked keys are dropped from live state.
 local function scrub_transient(todos)
     local scrubbed = false
@@ -108,6 +198,17 @@ function storage.setup(M)
         available = {},
         active = config.active_list
     }
+
+    -- the merge base for save_to_disk: what this list looked like on disk when nvim last read or wrote it
+    local function take_snapshot(list_name, list_path)
+        M.todo_lists.base = {
+            list = list_name,
+            stamp = disk_stamp(list_path),
+            todos = vim.deepcopy(serializable_todos(M.todos)),
+            notes = vim.deepcopy(M.todo_lists.notes or {}),
+            metadata = vim.deepcopy(M.todo_lists.metadata or {}),
+        }
+    end
 
     -- Get list of available todo lists
     storage.get_available_lists = function()
@@ -245,7 +346,8 @@ function storage.setup(M)
         end
         
         local list_path = get_list_path(list_name)
-        
+        M.todo_lists.base = nil
+
         -- Debug logging
         if config.development_mode then
             vim.notify(string.format("Loading list '%s' from path: %s", list_name, list_path), vim.log.levels.DEBUG)
@@ -354,6 +456,7 @@ function storage.setup(M)
                     if needs_migration then
                         storage.save_to_disk()
                     end
+                    take_snapshot(list_name, list_path)
 
                     return true, "Loaded list '" .. list_name .. "'"
                 end
@@ -366,8 +469,19 @@ function storage.setup(M)
         M.todo_lists.notes = {}
         M.todo_lists.active = list_name
         config.active_list = list_name
+        take_snapshot(list_name, list_path)
 
         return false, "Failed to load list or list is empty"
+    end
+
+    storage.refresh_if_changed = function()
+        local list_name = M.todo_lists.active or default_list_name
+        local base = M.todo_lists.base
+        if base and base.list == list_name and base.stamp == disk_stamp(get_list_path(list_name)) then
+            return false
+        end
+        storage.load_list(list_name)
+        return true
     end
     
     -- persists the link; load_list alone must not, it also runs for startup restore, previews and moves
@@ -532,27 +646,50 @@ function storage.setup(M)
     storage.save_to_disk = function()
         local list_name = M.todo_lists.active or default_list_name
         local list_path = get_list_path(list_name)
-        
-        -- Update metadata
+
+        local base = M.todo_lists.base
+        if base and base.list == list_name and base.stamp ~= disk_stamp(list_path) then
+            local theirs = read_list_file(list_path)
+            if theirs then
+                M.todos = merge_items(base.todos, M.todos, theirs.todos)
+                M.todo_lists.notes = merge_items(base.notes, M.todo_lists.notes, theirs.notes)
+                local metadata = M.todo_lists.metadata or {}
+                assign(metadata, merge_fields(base.metadata, metadata, theirs._metadata))
+                M.todo_lists.metadata = metadata
+            end
+        end
+
         local metadata = M.todo_lists.metadata or {}
         metadata.updated_at = os.time()
-        
-        -- Prepare data structure
+        M.todo_lists.metadata = metadata
+
         local data = {
             _metadata = metadata,
             todos = serializable_todos(M.todos),
             notes = M.todo_lists.notes or {}
         }
-        
-        -- Save to file
-        local file = io.open(list_path, "w")
-        if file then
-            file:write(vim.fn.json_encode(data))
-            file:close()
-            return true
+        local content = vim.fn.json_encode(data)
+
+        -- tmp + rename so tmux and the MCP never read a half-written file
+        local tmp_path = list_path .. ".nvim.tmp"
+        local written = false
+        local tmp = io.open(tmp_path, "w")
+        if tmp then
+            tmp:write(content)
+            tmp:close()
+            written = os.rename(tmp_path, list_path) == true
         end
-        
-        return false
+        if not written then
+            local file = io.open(list_path, "w")
+            if not file then
+                return false
+            end
+            file:write(content)
+            file:close()
+        end
+
+        take_snapshot(list_name, list_path)
+        return true
     end
 
     -- List-scoped scratch notes (stored in the active list's JSON top-level `notes`)

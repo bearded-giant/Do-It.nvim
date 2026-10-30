@@ -94,6 +94,8 @@ local M = {}
 
 local win_id = nil
 local buf_id = nil
+-- an action holds row indexes across its prompts, so a disk reload waits until it ends
+local action_busy = false
 
 function M.get_window_id()
     return win_id
@@ -482,6 +484,7 @@ function M.render_todos()
 
 	-- Ensure state is loaded
 	state = ensure_state_loaded()
+	action_busy = false
 
 	-- Save cursor position before rendering
 	local saved_cursor = nil
@@ -920,6 +923,103 @@ function M.jump_section(dir)
 	vim.api.nvim_win_set_cursor(win_id, { target, 0 })
 end
 
+local function cursor_anchor()
+	local rows = M._rendered_rows
+	if not (rows and win_id and vim.api.nvim_win_is_valid(win_id)) then
+		return nil
+	end
+	local row = rows[vim.api.nvim_win_get_cursor(win_id)[1]]
+	if row and row.todo then
+		return { todo = row.todo.id }
+	elseif row and row.note then
+		return { note = row.note.id }
+	end
+end
+
+local function restore_anchor(anchor)
+	if not anchor then
+		return
+	end
+	for i, row in ipairs(M._rendered_rows or {}) do
+		if (anchor.todo and row.todo and row.todo.id == anchor.todo)
+			or (anchor.note and row.note and row.note.id == anchor.note) then
+			pcall(vim.api.nvim_win_set_cursor, win_id, { i, 0 })
+			return
+		end
+	end
+end
+
+-- Reloads the list when tmux or the MCP changed it since nvim last read it.
+function M.sync_from_disk()
+	state = ensure_state_loaded()
+	if not (state and state.refresh_if_changed) then
+		return
+	end
+	local anchor = cursor_anchor()
+	if state.refresh_if_changed() then
+		M.render_todos()
+		restore_anchor(anchor)
+	end
+end
+
+local watcher, debounce
+
+local function stop_watch()
+	if watcher then
+		watcher:stop()
+		watcher:close()
+		watcher = nil
+	end
+	if debounce then
+		debounce:stop()
+		debounce:close()
+		debounce = nil
+	end
+end
+
+local function on_disk_change()
+	if not (win_id and vim.api.nvim_win_is_valid(win_id)) then
+		stop_watch()
+		return
+	end
+	if action_busy then
+		if debounce then
+			debounce:start(300, 0, vim.schedule_wrap(on_disk_change))
+		end
+		return
+	end
+	M.sync_from_disk()
+end
+
+local function start_watch()
+	stop_watch()
+	if not (state and state.get_list_path and state.todo_lists) then
+		return
+	end
+	local uv = vim.uv or vim.loop
+	local dir = vim.fn.fnamemodify(state.get_list_path(state.todo_lists.active), ":h")
+	watcher = uv.new_fs_event()
+	debounce = uv.new_timer()
+	if not (watcher and debounce) then
+		stop_watch()
+		return
+	end
+	local ok = pcall(watcher.start, watcher, dir, {}, function(err, fname)
+		if err or not debounce then
+			return
+		end
+		-- the active list can change while the window is open, so match the name at event time
+		local active = state.todo_lists and state.todo_lists.active
+		if fname and active and fname ~= active .. ".json" then
+			return
+		end
+		debounce:start(100, 0, vim.schedule_wrap(on_disk_change))
+	end)
+	if not ok then
+		stop_watch()
+	end
+end
+
 -- The id is the cross-list handle: the MCP resolves it without a list name.
 function M.copy_todo_id(todo)
 	todo = todo or M.get_todo_at_cursor()
@@ -1168,7 +1268,15 @@ local function create_window()
 		
 		-- Set the keymap if we found a key
 		if key then
-			vim.keymap.set("n", key, fn, { buffer = buf_id, nowait = true })
+			vim.keymap.set("n", key, function()
+				action_busy = false
+				M.sync_from_disk()
+				action_busy = true
+				fn()
+				if vim.api.nvim_get_current_win() == win_id then
+					action_busy = false
+				end
+			end, { buffer = buf_id, nowait = true })
 		end
 	end
 
@@ -1540,6 +1648,7 @@ function M.toggle_todo_window()
 
 		create_window()
 		M.render_todos()
+		start_watch()
 	end
 end
 
@@ -1554,6 +1663,8 @@ function M.close_window()
 	if search_window.close_search_window then
 		search_window.close_search_window()
 	end
+
+	stop_watch()
 
 	-- Reset reordering state when closing the window
 	if state.reordering_todo_index ~= nil then
