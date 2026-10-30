@@ -689,7 +689,7 @@ function M.format_todo_line(todo)
 		end
 	end
 
-	-- note/detail indicator: linked note (note_id) vs inline notes/description (K to view)
+	-- note/detail indicator: linked note (note_id) vs inline notes/description (Enter to view)
 	local notes_icon = ""
 	if todo.note_id then
 		notes_icon = config.options.notes and config.options.notes.linked_icon or "🔗"
@@ -736,7 +736,7 @@ function M.format_todo_line(todo)
 			table.insert(components, todo.text)
 		elseif part == "notes_marker" then
 			-- text marker (no icon) when the todo carries a note, description, or
-			-- obsidian sync ref; K to view the detail
+			-- obsidian sync ref; Enter to view the detail
 			if todo.note_id or (todo.notes and todo.notes ~= "")
 				or (todo.description and todo.description ~= "") or todo.obsidian_ref then
 				table.insert(components, "- [NOTES]")
@@ -860,6 +860,27 @@ function M.open_todo_details()
 	vim.keymap.set("n", "y", function()
 		M.copy_todo_id(todo)
 	end, { buffer = pbuf, nowait = true, desc = "Copy todo id" })
+end
+
+-- Enter mirrors tmux: a note row opens the note, the Notes header adds one, a todo row shows its detail.
+function M.open_at_cursor()
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+	local line_nr = vim.api.nvim_win_get_cursor(win_id)[1]
+	local row = (M._rendered_rows or M.build_render_rows())[line_nr]
+	local kind = row and row.kind
+	if kind == "note" then
+		todo_actions.edit_note(win_id, function()
+			M.render_todos()
+		end)
+	elseif kind == "note_header" or kind == "note_empty" then
+		todo_actions.new_note(function()
+			M.render_todos()
+		end)
+	else
+		M.open_todo_details()
+	end
 end
 
 -- The id is the cross-list handle: the MCP resolves it without a list name.
@@ -1262,9 +1283,8 @@ local function create_window()
 		M.open_linked_note()
 	end)
 
-	-- Detail popup for the todo under the cursor
 	setup_keymap("view_detail", function()
-		M.open_todo_details()
+		M.open_at_cursor()
 	end)
 
 	setup_keymap("copy_todo_id", function()

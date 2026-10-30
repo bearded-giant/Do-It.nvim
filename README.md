@@ -135,7 +135,8 @@ _Calendar (macOS only):_
 
 **Basic Keys (in todo window):**
 
-- `<CR>` - Add new todo
+- `<CR>` - Open item detail (on a note row: open the note)
+- `n` - Add new todo
 - `a` - Add a child todo under the current one
 - `c` - Toggle status (pending → in-progress → done)
 - `d` - Delete todo

@@ -270,7 +270,8 @@ Main Window~
     <leader>do   Toggle to-do window
     <leader>dl   Toggle active to-dos list window
     <leader>dn   Toggle project notes window
-    <CR>        Add new to-do
+    <CR>        Open to-do detail (note row: open the note; Notes: add one)
+    n           Add new to-do
     a           Add a child to-do under the current one
     c           Toggle to-do status
     X           Revert to-do to pending

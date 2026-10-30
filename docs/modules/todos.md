@@ -27,7 +27,8 @@ The todos module provides comprehensive task management functionality within Neo
 
 | Key | Action |
 |-----|--------|
-| `i` | Add new todo |
+| `<CR>` | Open item detail |
+| `n` | Add new todo |
 | `x` | Toggle todo status |
 | `d` | Delete current todo |
 | `H` | Add due date |

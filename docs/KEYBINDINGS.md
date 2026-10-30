@@ -27,7 +27,8 @@
 
 | Key | Description |
 |-----|-------------|
-| `<CR>` | Add new todo |
+| `<CR>` | Open item detail (on a note row: open the note; on Notes: add one) |
+| `n` | Add new todo |
 | `a` | Add a child todo nested under the current one |
 | `c` | Toggle todo status (pending→in-progress→done) |
 | `X` | Revert todo to pending (not started) |
@@ -61,7 +62,6 @@
 | `S` | Set or clear sequence (run order across priorities) |
 | `T` | Add time estimation |
 | `R` | Remove time estimation |
-| `K` | View todo detail (full text + description, including the item id) |
 | `y` | Copy the item id (the doit MCP resolves it across lists) |
 | `o` | Open linked note |
 | `<leader>p` | Open scratchpad for todo |
@@ -119,7 +119,7 @@ require("doit").setup({
   modules = {
     todos = {
       keymaps = {
-        new_todo = "n",  -- Change '<CR>' to 'n' for legacy style
+        view_detail = "K",  -- Change '<CR>' to 'K' for legacy style
         toggle_todo = "<Space>",  -- Use space to toggle
         -- etc...
       }

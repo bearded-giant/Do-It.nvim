@@ -12,7 +12,8 @@ M.keymaps = {
 	},
 	todo_window = {
 		basic = {
-			{ key = "<CR>", desc = "Add new todo" },
+			{ key = "<CR>", desc = "Open item detail (on a note row: open the note; on Notes: add one)" },
+			{ key = "n", desc = "Add new todo" },
 			{ key = "a", desc = "Add a child todo nested under the current one" },
 			{ key = "c", desc = "Toggle todo status (pending→in-progress→done)" },
 		{ key = "X", desc = "Revert todo to pending (not started)" },
@@ -40,7 +41,6 @@ M.keymaps = {
 			{ key = "S", desc = "Set or clear sequence (run order across priorities)" },
 			{ key = "T", desc = "Add time estimation" },
 			{ key = "R", desc = "Remove time estimation" },
-			{ key = "K", desc = "View todo detail (full text + description, including the item id)" },
 			{ key = "y", desc = "Copy the item id (the doit MCP resolves it across lists)" },
 			{ key = "o", desc = "Open linked note" },
 			{ key = "<leader>p", desc = "Open scratchpad for todo" },
@@ -265,7 +265,7 @@ function M.get_markdown_help()
 	table.insert(lines, "  modules = {")
 	table.insert(lines, "    todos = {")
 	table.insert(lines, "      keymaps = {")
-	table.insert(lines, '        new_todo = "n",  -- Change \'<CR>\' to \'n\' for legacy style')
+	table.insert(lines, '        view_detail = "K",  -- Change \'<CR>\' to \'K\' for legacy style')
 	table.insert(lines, '        toggle_todo = "<Space>",  -- Use space to toggle')
 	table.insert(lines, "        -- etc...")
 	table.insert(lines, "      }")

@@ -22,7 +22,8 @@ Available commands:
 - <leader>dl : Open todo list window
 
 Inside todos window:
-- i : Add new todo
+- <CR> : Open item detail
+- n : Add new todo
 - x : Toggle todo status
 - d : Delete todo
 - H : Add due date
