@@ -101,7 +101,10 @@
 |-----|-------------|
 | `1-9, 0` | Quick select list by number |
 | `j/k` | Navigate up/down |
-| `Enter/Space` | Switch to selected list |
+| `Enter/Space` | Open selected list (links unchanged) |
+| `l` | Link this tmux window to selected list (+ global) |
+| `g` | Set global list pointer only |
+| `u` | Unlink this tmux window |
 | `n` | Create new list |
 | `d` | Delete selected list |
 | `r` | Rename selected list |

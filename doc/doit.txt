@@ -472,7 +472,11 @@ Features:
 Managing Lists:~
 Press L in the main todo window to open the list manager where you can:
 - Create new lists
-- Switch to a different list (automatically opens that list)
+- Open a list with Enter/Space (no link changes); inside tmux, l links the
+  current window to it (and sets the global pointer), g sets the global
+  pointer only, u unlinks the window
+- See which tmux windows link each list: [here] marks the list this window
+  links, [sess:win, ...] lists linked windows, dead ones dimmed
 - Rename existing lists
 - Delete lists (except the active one)
 - Preview list contents and statistics

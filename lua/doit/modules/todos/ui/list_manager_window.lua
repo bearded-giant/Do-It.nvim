@@ -2,6 +2,7 @@ local sorting = require("doit.modules.todos.state.sorting")
 local due_dates = require("doit.modules.todos.state.due_dates")
 local PERMANENT_LIST = require("doit.modules.todos.state.storage").PERMANENT_LIST
 local source = require("doit.modules.todos.state.source")
+local session = require("doit.modules.todos.state.session")
 
 -- badge sits left of the name so it survives truncation in a narrow panel
 local function overdue_badge(metadata)
@@ -13,6 +14,31 @@ local function overdue_badge(metadata)
 end
 
 local M = {}
+
+-- " [here] [sess:win, ...]" from session.links_by_list(), and its highlight
+-- spans { start, end, group } as byte offsets into that text; dead windows dim
+function M.link_tags(list_name, links, here)
+    local text, spans = "", {}
+    if not links then
+        return text, spans
+    end
+    if list_name == here then
+        text = " [here]"
+        table.insert(spans, { 1, #text, "DiagnosticWarn" })
+    end
+    local entries = links[list_name]
+    if entries and #entries > 0 then
+        local keys = {}
+        local col = #text + 2
+        for _, link in ipairs(entries) do
+            table.insert(spans, { col, col + #link.key, link.live and "DiagnosticWarn" or "Comment" })
+            table.insert(keys, link.key)
+            col = col + #link.key + 2
+        end
+        text = text .. " [" .. table.concat(keys, ", ") .. "]"
+    end
+    return text, spans
+end
 
 -- daily, the owed inbox, shows only items completed today; older ones stay on disk
 function M.visible_todos(list_name, todos)
@@ -35,6 +61,12 @@ function M.setup(parent_module)
     local selected_index = 1
     local search_query = ""
     local displayed_lists = {}
+    -- tmux is asked on open and after l/u, not on every j/k render
+    local links, linked_here = nil, nil
+
+    local function refresh_links()
+        links, linked_here = session.links_by_list()
+    end
 
     local todo_module = parent_module
     local config = todo_module.config
@@ -74,7 +106,7 @@ function M.setup(parent_module)
             -- grow the panel so the longest list name plus its badges still fit
             local longest = 0
             for _, list in ipairs(todo_module.state.get_available_lists() or {}) do
-                longest = math.max(longest, #list.name)
+                longest = math.max(longest, #list.name + #M.link_tags(list.name, links, linked_here))
             end
             list_width = math.max(list_width, math.min(longest + 26, total_width - 34))
         end
@@ -325,6 +357,7 @@ function M.setup(parent_module)
         
         local lines = {}
         local mine_cols = {}
+        local link_spans = {}
         local rule_width = math.max(20, api.nvim_win_get_width(win_id) - 4)
         
         -- Start with Available Lists at the top
@@ -355,30 +388,38 @@ function M.setup(parent_module)
                 return " mine"
             end
 
+            local function with_links(row, name, line_nr)
+                local text, spans = M.link_tags(name, links, linked_here)
+                for _, span in ipairs(spans) do
+                    table.insert(link_spans, { line_nr, #row + span[1], #row + span[2], span[3] })
+                end
+                return row .. text
+            end
+
             -- Add numbered lists
             for i, list in ipairs(displayed_lists) do
                 if i <= 10 then
                     local num = i == 10 and "0" or tostring(i)
-                    local active_marker = list.name == active_list and "[active]" or ""
+                    local active_marker = list.name == active_list and " [active]" or ""
                     local selection_marker = i == selected_index and "▶ " or "  "
-                    
+
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
-                    
+
                     local prefix = string.format("%s[%s] %s%s", selection_marker, num, overdue_badge(metadata), list.name)
-                    table.insert(lines, prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
-                        .. string.format(" (%d todos) %s", todo_count, active_marker))
+                    table.insert(lines, with_links(prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
+                        .. string.format(" (%d todos)%s", todo_count, active_marker), list.name, #lines + 1))
                 else
                     -- Lists beyond 10
-                    local active_marker = list.name == active_list and "[active]" or ""
+                    local active_marker = list.name == active_list and " [active]" or ""
                     local selection_marker = i == selected_index and "▶ " or "  "
-                    
+
                     local metadata = list.metadata or {}
                     local todo_count = metadata.todo_count or 0
-                    
+
                     local prefix = string.format("%s    %s%s", selection_marker, overdue_badge(metadata), list.name)
-                    table.insert(lines, prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
-                        .. string.format(" (%d todos) %s", todo_count, active_marker))
+                    table.insert(lines, with_links(prefix .. mine_tag(list.name, metadata, #lines + 1, #prefix)
+                        .. string.format(" (%d todos)%s", todo_count, active_marker), list.name, #lines + 1))
                 end
             end
         end
@@ -390,7 +431,9 @@ function M.setup(parent_module)
         table.insert(lines, "  " .. string.rep("─", rule_width))
         local keys_line = #lines + 1
         table.insert(lines, "  Keys:")
-        table.insert(lines, "  [1-9/0] Select   [Enter] Switch & Open")
+        table.insert(lines, "  [1-9/0] Select   [Enter] Open")
+        table.insert(lines, "  [l] Link window  [g] Set global")
+        table.insert(lines, "  [u] Unlink window")
         table.insert(lines, "  [n] New          [d] Delete")
         table.insert(lines, "  [r] Rename       [e] Export")
         table.insert(lines, "  [i] Import       [/] Search")
@@ -457,7 +500,11 @@ function M.setup(parent_module)
                 end
             end
         end
-        
+
+        for _, span in ipairs(link_spans) do
+            api.nvim_buf_add_highlight(buf_id, namespace, span[4], span[1] - 1, span[2], span[3])
+        end
+
         -- Update preview for selected list
         if preview_enabled and #displayed_lists > 0 and selected_index <= #displayed_lists then
             render_preview(displayed_lists[selected_index].name)
@@ -472,9 +519,10 @@ function M.setup(parent_module)
         end
     end
     
-    local function switch_to_list(list_name)
-        -- Load the list and get feedback
-        local success, msg = todo_module.state.switch_list(list_name)
+    -- link: also link this tmux window and move the global pointer (switch_list); else view only
+    local function open_list(list_name, link)
+        local load = link and todo_module.state.switch_list or todo_module.state.load_list
+        local success, msg = load(list_name)
 
         if success then
             -- Close windows after successful switch
@@ -516,9 +564,10 @@ function M.setup(parent_module)
                     end
                 end
             end
-            vim.notify(string.format("Switched to list '%s' (%d active todos)", list_name, todo_count), vim.log.levels.INFO)
+            local verb = link and "Linked window to" or "Opened"
+            vim.notify(string.format("%s list '%s' (%d active todos)", verb, list_name, todo_count), vim.log.levels.INFO)
         else
-            vim.notify("Failed to switch list: " .. (msg or "unknown error"), vim.log.levels.ERROR)
+            vim.notify("Failed to open list: " .. (msg or "unknown error"), vim.log.levels.ERROR)
         end
     end
     
@@ -583,20 +632,19 @@ function M.setup(parent_module)
         set_keymap("k", move_up)
         set_keymap("<Up>", move_up)
         
-        -- Confirm selection with space
-        set_keymap("<Space>", function()
+        -- Enter/Space open the list without touching any link (tmux "view")
+        local function view_selected()
             if selected_index <= #displayed_lists then
-                switch_to_list(displayed_lists[selected_index].name)
+                open_list(displayed_lists[selected_index].name, false)
             end
-        end)
+        end
+        set_keymap("<Space>", view_selected)
+        set_keymap("<CR>", view_selected)
 
-        -- Switch immediately with enter
-        set_keymap("<CR>", function()
-            if selected_index <= #displayed_lists then
-                switch_to_list(displayed_lists[selected_index].name)
-            end
-        end)
-        
+        set_keymap("l", function() M.link_window() end)
+        set_keymap("g", function() M.set_global() end)
+        set_keymap("u", function() M.unlink_window() end)
+
         -- Actions
         set_keymap("n", function() M.create_new_list() end)
         set_keymap("d", function() M.delete_list() end)
@@ -689,6 +737,35 @@ function M.setup(parent_module)
         end
         render_lists()
         vim.notify(list_name .. ": " .. source.label(new_source), vim.log.levels.INFO)
+    end
+
+    function M.link_window()
+        if selected_index > #displayed_lists then return end
+
+        if not session.window_key() then
+            vim.notify("Not in a tmux window; nothing to link", vim.log.levels.WARN)
+            return
+        end
+        open_list(displayed_lists[selected_index].name, true)
+    end
+
+    function M.set_global()
+        if selected_index > #displayed_lists then return end
+
+        local list_name = displayed_lists[selected_index].name
+        session.set_global(list_name)
+        vim.notify("Global list set: " .. list_name, vim.log.levels.INFO)
+    end
+
+    function M.unlink_window()
+        local key = session.unlink_window()
+        if not key then
+            vim.notify("Not in a tmux window; nothing to unlink", vim.log.levels.WARN)
+            return
+        end
+        refresh_links()
+        render_lists()
+        vim.notify("Unlinked window '" .. key .. "'", vim.log.levels.INFO)
     end
 
     function M.delete_list()
@@ -842,6 +919,7 @@ function M.setup(parent_module)
         else
             search_query = ""
             selected_index = 1
+            refresh_links()
             create_windows()
             set_keymaps()
             render_lists()

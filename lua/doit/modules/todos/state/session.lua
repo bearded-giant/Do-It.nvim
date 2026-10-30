@@ -165,6 +165,20 @@ function M.relink_list(old_name, new_name)
     end
 end
 
+local function window_link(win, data)
+    if win.live then
+        return win.live
+    end
+    -- a tmux restart drops window options: the link persisted under this
+    -- window's name comes back, unless a same-named live window holds it
+    local link = type(data.sessions) == "table" and data.sessions[win.key] or nil
+    if link and not key_claimed_elsewhere(win) then
+        set_window_link(win, link)
+        return link
+    end
+    return nil
+end
+
 -- Load last selected list. Returns (list_name, from_link). Inside tmux only
 -- the window link counts: an unlinked window gets nil (the caller's default
 -- list), never the global pointer, which is the outside-tmux default. from_link
@@ -174,20 +188,73 @@ function M.load_session()
 
     local win = tmux_window()
     if win then
-        if win.live then
-            return win.live, true
-        end
-        -- a tmux restart drops window options: the link persisted under this
-        -- window's name comes back, unless a same-named live window holds it
-        local link = type(data.sessions) == "table" and data.sessions[win.key] or nil
-        if link and not key_claimed_elsewhere(win) then
-            set_window_link(win, link)
-            return link, true
-        end
-        return nil, false
+        local link = window_link(win, data)
+        return link, link ~= nil
     end
 
     return data.active_list, false
+end
+
+function M.window_key()
+    local win = tmux_window()
+    return win and win.key
+end
+
+-- Persisted links grouped by list: { [list] = { { key = "<session>:<window>", live = bool }, ... } },
+-- plus the list this window links. nil outside tmux.
+function M.links_by_list()
+    local win = tmux_window()
+    if not win then
+        return nil
+    end
+    local data = read_session()
+
+    local live = {}
+    for key in (tmux({ "list-windows", "-a", "-F", "#S:#W" }) or ""):gmatch("[^\n]+") do
+        live[key] = true
+    end
+
+    local by_list = {}
+    for key, list in pairs(type(data.sessions) == "table" and data.sessions or {}) do
+        by_list[list] = by_list[list] or {}
+        table.insert(by_list[list], { key = key, live = live[key] == true })
+    end
+    for _, links in pairs(by_list) do
+        table.sort(links, function(a, b)
+            return a.key < b.key
+        end)
+    end
+
+    return by_list, window_link(win, data)
+end
+
+-- Global pointer only; window links stay as they are.
+function M.set_global(list_name)
+    if not list_name then
+        return
+    end
+    M.update(function(data)
+        data.active_list = list_name
+    end)
+end
+
+-- Unlink this window, live and persisted. Returns its key, nil outside tmux.
+function M.unlink_window()
+    local win = tmux_window()
+    if not win then
+        return nil
+    end
+    tmux({ "set-option", "-wqu", "-t", win.id, "@doit-window-list" })
+    tmux({ "set-option", "-wqu", "-t", win.id, "@doit-window-key" })
+    -- a same-named window may hold the persisted link; leave it to that window
+    if not key_claimed_elsewhere(win) then
+        M.update(function(data)
+            if type(data.sessions) == "table" then
+                data.sessions[win.key] = nil
+            end
+        end)
+    end
+    return win.key
 end
 
 -- Clean old sessions (optional)

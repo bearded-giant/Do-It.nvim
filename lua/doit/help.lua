@@ -69,7 +69,10 @@ M.keymaps = {
 	list_manager = {
 		{ key = "1-9, 0", desc = "Quick select list by number" },
 		{ key = "j/k", desc = "Navigate up/down" },
-		{ key = "Enter/Space", desc = "Switch to selected list" },
+		{ key = "Enter/Space", desc = "Open selected list (links unchanged)" },
+		{ key = "l", desc = "Link this tmux window to selected list (+ global)" },
+		{ key = "g", desc = "Set global list pointer only" },
+		{ key = "u", desc = "Unlink this tmux window" },
 		{ key = "n", desc = "Create new list" },
 		{ key = "d", desc = "Delete selected list" },
 		{ key = "r", desc = "Rename selected list" },

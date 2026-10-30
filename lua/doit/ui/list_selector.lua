@@ -1,4 +1,6 @@
 local source = require("doit.modules.todos.state.source")
+local session = require("doit.modules.todos.state.session")
+local link_tags = require("doit.modules.todos.ui.list_manager_window").link_tags
 
 local M = {}
 
@@ -21,6 +23,8 @@ local function create_list_selector_window(lists, current_list, callback)
 
     local available_lists = {}
     local selected_index = 1
+    local links, linked_here = session.links_by_list()
+    local namespace = api.nvim_create_namespace("DoitListSelector")
     local buf_id = api.nvim_create_buf(false, true)
     api.nvim_buf_set_option(buf_id, "bufhidden", "wipe")
     api.nvim_buf_set_option(buf_id, "modifiable", false)
@@ -55,6 +59,7 @@ local function create_list_selector_window(lists, current_list, callback)
         available_lists = source.filter_lists(candidates, filter)
         selected_index = math.max(1, math.min(selected_index, #available_lists))
         local lines = { "  view: " .. filter }
+        local link_spans = {}
 
         for i, list in ipairs(available_lists) do
             local prefix = (i == selected_index) and "> " or "  "
@@ -63,7 +68,12 @@ local function create_list_selector_window(lists, current_list, callback)
                 todo_count_str = string.format(" (%d)", list.metadata.todo_count)
             end
             local mine_tag = source.is_mine(list.name, list.metadata) and " mine" or ""
-            table.insert(lines, prefix .. list.name .. mine_tag .. todo_count_str)
+            local row = prefix .. list.name .. mine_tag .. todo_count_str
+            local link_text, spans = link_tags(list.name, links, linked_here)
+            for _, span in ipairs(spans) do
+                table.insert(link_spans, { #lines, #row + span[1], #row + span[2], span[3] })
+            end
+            table.insert(lines, row .. link_text)
         end
         if #available_lists == 0 then
             table.insert(lines, "  No lists in view: " .. filter .. " (s cycles)")
@@ -74,6 +84,11 @@ local function create_list_selector_window(lists, current_list, callback)
         api.nvim_buf_set_option(buf_id, "modifiable", true)
         api.nvim_buf_set_lines(buf_id, 0, -1, false, lines)
         api.nvim_buf_set_option(buf_id, "modifiable", false)
+
+        api.nvim_buf_clear_namespace(buf_id, namespace, 0, -1)
+        for _, span in ipairs(link_spans) do
+            api.nvim_buf_add_highlight(buf_id, namespace, span[4], span[1], span[2], span[3])
+        end
 
         -- Set cursor position
         pcall(api.nvim_win_set_cursor, win_id, { selected_index + 1, 0 })
