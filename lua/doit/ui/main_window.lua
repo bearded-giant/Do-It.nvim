@@ -795,74 +795,18 @@ function M.get_todo_at_cursor()
 	return nil
 end
 
--- On-demand detail popup: full text + description + status/priority/obsidian.
--- Mirrors the tmux preview_todo pane (do-it.nvim shows it on a key instead of a split).
+-- Opens the todo under the cursor in the details editor (text + details, like tmux Enter).
 function M.open_todo_details()
 	local todo = M.get_todo_at_cursor()
 	if not todo then
 		vim.notify("No todo under cursor", vim.log.levels.WARN)
 		return
 	end
-
-	local status = todo.in_progress and "In Progress" or (todo.done and "Done" or "Pending")
-	local priority = todo_priority_name(todo) or "none"
-
-	local lines = {}
-	lines[#lines + 1] = "Status:   " .. status
-	lines[#lines + 1] = "Priority: " .. priority
-	if todo.id then
-		lines[#lines + 1] = "ID:       " .. todo.id
-	end
-	if todo.obsidian_ref then
-		lines[#lines + 1] = "Obsidian: " .. ((todo.obsidian_ref.date) or "linked")
-	end
-	lines[#lines + 1] = string.rep("─", 40)
-	for _, l in ipairs(vim.split(todo.text or "", "\n", { plain = true })) do
-		lines[#lines + 1] = l
-	end
-	if todo.description and todo.description ~= "" then
-		lines[#lines + 1] = ""
-		lines[#lines + 1] = "Description:"
-		for _, l in ipairs(vim.split(todo.description, "\n", { plain = true })) do
-			lines[#lines + 1] = l
-		end
-	end
-
-	local width = 0
-	for _, l in ipairs(lines) do
-		width = math.max(width, vim.fn.strdisplaywidth(l))
-	end
-	width = math.min(math.max(width + 2, 40), math.floor(vim.o.columns * 0.8))
-	local height = math.min(#lines, math.floor(vim.o.lines * 0.8))
-
-	local pbuf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
-	vim.api.nvim_buf_set_option(pbuf, "modifiable", false)
-	vim.api.nvim_buf_set_option(pbuf, "bufhidden", "wipe")
-
-	local pwin = vim.api.nvim_open_win(pbuf, true, {
-		relative = "editor",
-		row = math.floor((vim.o.lines - height) / 2),
-		col = math.floor((vim.o.columns - width) / 2),
-		width = width,
-		height = height,
-		style = "minimal",
-		border = "rounded",
-		title = " detail ",
-		title_pos = "center",
+	require("doit.ui.editor").edit_todo(todo, {
+		on_saved = function()
+			M.render_todos()
+		end,
 	})
-
-	for _, key in ipairs({ "q", "<Esc>" }) do
-		vim.keymap.set("n", key, function()
-			if vim.api.nvim_win_is_valid(pwin) then
-				vim.api.nvim_win_close(pwin, true)
-			end
-		end, { buffer = pbuf, nowait = true })
-	end
-
-	vim.keymap.set("n", "y", function()
-		M.copy_todo_id(todo)
-	end, { buffer = pbuf, nowait = true, desc = "Copy todo id" })
 end
 
 -- Enter mirrors tmux: a note row opens the note, the Notes header adds one, a todo row shows its detail.
@@ -881,7 +825,7 @@ function M.open_at_cursor()
 		todo_actions.new_note(function()
 			M.render_todos()
 		end)
-	else
+	elseif row and row.todo then
 		M.open_todo_details()
 	end
 end

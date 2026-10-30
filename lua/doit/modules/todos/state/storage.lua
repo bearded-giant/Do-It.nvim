@@ -698,7 +698,7 @@ function storage.setup(M)
         return M.todo_lists.notes
     end
 
-    storage.add_note = function(title, body)
+    storage.add_note = function(title, body, todo_ids)
         local notes = storage.get_notes()
         local now = os.time()
         local note = {
@@ -708,6 +708,9 @@ function storage.setup(M)
             created_at = now,
             updated_at = now,
         }
+        if todo_ids and #todo_ids > 0 then
+            note.todo_ids = todo_ids
+        end
         table.insert(notes, note)
         storage.save_to_disk()
         return note

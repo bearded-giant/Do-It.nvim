@@ -4,7 +4,6 @@ local config = require("doit.config")
 local calendar = require("doit.calendar")
 local multiline_input = require("doit.core.ui.multiline_input")
 
-local footer = require("doit.core.utils.footer")
 local tags_util = require("doit.modules.todos.state.tags")
 local sorting = require("doit.modules.todos.state.sorting")
 
@@ -367,36 +366,9 @@ end
 
 -- List-scoped scratch notes ------------------------------------------------
 
-local function prompt_note(title_default, body_default, on_done)
-	vim.ui.input({ prompt = "Note title: ", default = title_default or "" }, function(title)
-		if title == nil then
-			return
-		end
-		multiline_input.create({
-			prompt = "Note body",
-			default = body_default or "",
-			on_submit = function(body)
-				vim.cmd("echo ''")
-				on_done(title, body or "")
-			end,
-			on_cancel = function()
-				vim.cmd("echo ''")
-			end,
-		})
-	end)
-end
-
-function M.new_note(on_render)
+function M.new_note(on_render, todo_ids)
 	ensure_state_loaded()
-	prompt_note(nil, nil, function(title, body)
-		if (title == "" or not title) and (body == "" or not body) then
-			return
-		end
-		if state.add_note then
-			state.add_note(title, body)
-		end
-		maybe_render(on_render)
-	end)
+	require("doit.ui.editor").edit_note(nil, { todo_ids = todo_ids, on_saved = on_render })
 end
 
 function M.edit_note(win_id, on_render)
@@ -405,12 +377,7 @@ function M.edit_note(win_id, on_render)
 	if not note then
 		return
 	end
-	prompt_note(note.title, note.body, function(title, body)
-		if state.update_note then
-			state.update_note(note.id, title, body)
-		end
-		maybe_render(on_render)
-	end)
+	require("doit.ui.editor").edit_note(note, { on_saved = on_render })
 end
 
 function M.delete_note(win_id, on_render)
@@ -829,25 +796,10 @@ function M.edit_description(win_id, on_render)
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
 		return
 	end
-
-	local cursor = vim.api.nvim_win_get_cursor(win_id)
-	local line_num = cursor[1]
-	local buf_id = vim.api.nvim_win_get_buf(win_id)
-
-	local bullet_line = find_bullet_line_for_cursor(buf_id, line_num)
-	if not bullet_line then
-		return
-	end
-
-	local todo_index = get_real_todo_index(bullet_line, state.active_filter)
-	if todo_index then
-		local current_desc = footer.strip(state.todos[todo_index].description or "")
-		vim.ui.input({ prompt = "Description: ", default = current_desc }, function(input)
-			if input == nil then return end
-			state.todos[todo_index].description = footer.stamp(input)
-			state.save_to_disk()
-			maybe_render(on_render)
-		end)
+	local todo_index = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
+	local todo = todo_index and state.todos[todo_index]
+	if todo then
+		require("doit.ui.editor").edit_todo(todo, { on_saved = on_render })
 	end
 end
 
