@@ -122,22 +122,6 @@ local config = {
 				auto_create_default = true,
 				save_path = "/data/doit/lists",
 			},
-			keymaps = {
-				new_todo = "i",
-				toggle_todo = "x",
-				delete_todo = "d",
-				close_window = "q",
-				undo_delete = "u",
-				toggle_help = "?",
-				toggle_tags = "t",
-				toggle_categories = "C",
-				toggle_list_manager = "L",
-				add_due_date = "H",
-				edit_todo = "e",
-				reorder_todo = "r",
-				search_todos = "/",
-				clear_filter = "c",
-			},
 		},
 		
 		-- Calendar module (with mock data in Docker)
@@ -191,24 +175,9 @@ local config = {
 		},
 	},
 	
-	-- Legacy keymaps for backward compatibility
 	keymaps = {
 		toggle_window = "<leader>do",
 		toggle_list_window = "<leader>dl",
-		new_todo = "i",
-		toggle_todo = "x",
-		delete_todo = "d",
-		close_window = "q",
-		undo_delete = "u",
-		toggle_help = "?",
-		toggle_tags = "t",
-		toggle_categories = "C",
-		add_due_date = "H",
-		edit_todo = "e",
-		reorder_todo = "r",
-		search_todos = "/",
-		clear_filter = "c",
-		toggle_list_manager = "L",
 	},
 }
 
@@ -251,8 +220,8 @@ local function show_welcome()
 		print("  :DoItCalendar - Open calendar view")
 		print("")
 		print("BASIC KEYS in todo window:")
-		print("  i - Add    x - Toggle    d - Delete    ? - Help")
-		print("  L - Lists  t - Tags      q - Close")
+		print("  n - Add    s - Start     x - Complete  d - Delete  ? - Help")
+		print("  <CR> - Open  g - Notes  l - Switch list  L - Lists  q - Close")
 		file:close()
 	else
 		-- Fallback if help file not found

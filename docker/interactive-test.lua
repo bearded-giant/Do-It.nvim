@@ -22,13 +22,13 @@ Available commands:
 - <leader>dl : Open todo list window
 
 Inside todos window:
-- <CR> : Open item detail
+- <CR> : Open text + details in the editor
 - n : Add new todo
-- x : Toggle todo status
-- d : Delete todo
-- H : Add due date
-- t : Toggle tags
-- p : Edit priorities
+- s / x / X : Start / complete / revert
+- g : Notes picker
+- h : Set due date
+- t : Filter by tag
+- P : Set priority
 - ? : Show help
 - q : Close window
 

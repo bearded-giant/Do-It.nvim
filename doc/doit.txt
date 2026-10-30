@@ -270,42 +270,69 @@ Main Window~
     <leader>do   Toggle to-do window
     <leader>dl   Toggle active to-dos list window
     <leader>dn   Toggle project notes window
-    <CR>        Open to-do detail (note row: open the note; Notes: add one)
-    n           Add new to-do
-    [ / ]       Jump section down / up (priority groups, Notes)
-    a           Add a child to-do under the current one
-    c           Toggle to-do status
+    The keys below match the tmux manager (|doit-tmux-interactive|).
+    n           New to-do (in the Notes section: new note)
+    <CR>        Open text + details in the editor (note row: the note;
+                Notes header: new note)
+    s           Start (one in progress per list)
+    x           Complete
     X           Revert to-do to pending
+    e           Edit to-do text (or the note, on a note row)
+    N           Edit details in the editor
+    P           Set priority
+    p           New to-do from the clipboard
     d           Delete current to-do (or list note, on a note row)
     D           Delete all completed
-    gn          Add a list note (scratch note in the Notes section)
-    q           Close window
-    H           Add due date (calendar picker)
-    h           Remove due date
-    T           Add time estimation
-    R           Remove time estimation
-    ?           Toggle help window
-    L           Open list manager (switch lists)
+    u           Undo the last start/complete/revert or delete
+    h           Set or clear due date (YYYY-MM-DD)
+    S           Set or clear sequence (see |doit-sequence|)
+    K / J       Move to-do up / down within its group
+    [ / ]       Jump section down / up (priority groups, Notes)
+    g           Notes picker (on a to-do row: that to-do's notes)
+    t           Filter by #tag
+    c           Clear the tag filter
+    /           Search and jump to a to-do
     m           Move to-do to another list
-    t           Toggle tags window
-    f           Clear active tag filter
-    e           Edit to-do (or list note, on a note row)
-    p           Edit priorities
-    u           Undo deletion
-    /           Search to-dos
-    I           Import to-dos (JSON)
+    l           Switch list (links the tmux window)
+    L           Open list manager
+    y           Copy to-do text (note row: note body)
+    <C-y>       Copy details without the footer
+    i           Copy item id
+    Y           Copy list name
+    r           Refresh from disk
+    O           Send to-do to the Obsidian daily note
     E           Export pending to-dos to markdown
+    B           Back up all lists
+    ?           Toggle help window
+    q           Close window
+    nvim only:
+    a           Add a child to-do under the current one
+    <Space>     Cycle status (pending, in progress, done)
+    H           Due date from the calendar
+    T / R       Add / remove time estimation
+    I           Import to-dos (JSON)
     <leader>E   Export to-dos (JSON)
     <leader>D   Remove duplicates (confirms first; undo with u)
-    <Space>     Toggle priority
-    <leader>p   Open scratchpad
-    r           Enter reordering mode
-    S           Set or clear sequence (see |doit-sequence|)
+
+Editor~
+    <CR> and N open a buffer: the to-do text (or note title), a marker
+    line, then the details (or note body). :w saves, q saves and closes,
+    :q! discards. In a to-do's editor gN opens that to-do's notes.
+
+Notes picker~
+    g opens the list's notes with a preview. On a to-do row it shows the
+    notes linked to that to-do.
+    <CR>        Open the note in the editor
+    n           New note (linked to the to-do when scoped)
+    l           Link or unlink the note and the to-do
+    a           Toggle linked-only / all notes
+    d           Delete the note
+    /           Filter by title and body
+    q           Close
 
 Reordering to-dos~
-    k           Move to-do up
-    j           Move to-do down
-    r           Save and exit reordering
+    K and J move one step. A reordering mode (j/k until the key again) is
+    still available by mapping `reorder_todo` in your config.
 
 Moving to-dos between lists~
     m           Open list selector

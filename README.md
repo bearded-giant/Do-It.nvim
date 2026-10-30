@@ -133,17 +133,26 @@ _Calendar (macOS only):_
 - `:DoItCalendar3Day` - Open in 3-day view
 - `:DoItCalendarWeek` - Open in week view
 
-**Basic Keys (in todo window):**
+**Keys in the todo window** match the tmux manager, so the same habits work in both:
 
-- `<CR>` - Open item detail (on a note row: open the note)
-- `n` - Add new todo
-- `[` / `]` - Jump section down / up (lands on Notes too)
-- `a` - Add a child todo under the current one
-- `c` - Toggle status (pending → in-progress → done)
-- `d` - Delete todo
-- `?` - Show full help
-- `L` - List manager
-- `q` - Close window
+| Key | Action |
+|-----|--------|
+| `n` | New todo (in the Notes section: new note) |
+| `<CR>` | Open the todo's text and details in an editor buffer; on a note row, the note |
+| `s` / `x` / `X` | Start / complete / revert to pending |
+| `e` / `N` / `P` | Edit text / edit details / set priority |
+| `g` | Notes picker; on a todo row it shows that todo's notes, and `n` there adds a linked one |
+| `d` / `D` / `u` | Delete / clear completed / undo the last status change or delete |
+| `K` / `J` | Move up / down within the group |
+| `[` / `]` | Jump section down / up (lands on Notes too) |
+| `h` / `S` | Due date / sequence |
+| `t` / `c` / `/` | Tag filter / clear it / search and jump |
+| `l` / `L` / `m` | Switch list / list manager / move todo to another list |
+| `y` / `<C-y>` / `i` / `Y` | Copy text / details / id / list name |
+| `a` | Child todo under the current one (nvim only) |
+| `?` / `q` | Full help / close |
+
+In the editor, `:w` saves and `q` saves and closes. The first lines hold the todo text (or the note title), then a marker line, then the details (or note body).
 
 The keybindings documentation is auto-generated from a central source to ensure consistency. Run `make update-help` to regenerate after changes.
 

@@ -131,21 +131,22 @@ local function create_small_keys_window(main_win_pos)
 	local lines_1 = {
 		"",
 		string.format("  %-6s - New to-do", get_effective_key("new_todo", "n")),
-		string.format("  %-6s - Toggle status", get_effective_key("toggle_todo", "x")),
+		string.format("  %-6s - Open / edit details", "<CR>"),
+		string.format("  %-6s - Start", get_effective_key("start_todo", "s")),
+		string.format("  %-6s - Complete", get_effective_key("complete_todo", "x")),
 		string.format("  %-6s - Delete to-do", get_effective_key("delete_todo", "d")),
-		string.format("  %-6s - Undo delete", get_effective_key("undo_delete", "u")),
-		string.format("  %-6s - Add due date", get_effective_key("add_due_date", "H")),
-		string.format("  %-6s - Backup all", get_effective_key("backup_todos", "B")),
+		string.format("  %-6s - Undo", get_effective_key("undo_delete", "u")),
 		"",
 	}
 
 	local lines_2 = {
 		"",
-		string.format("  %-6s - Reorder to-do", get_effective_key("reorder_todo", "r")),
-		string.format("  %-6s - Move to list", get_effective_key("move_todo_to_list", "m")),
+		string.format("  %-6s - Notes", get_effective_key("notes_picker", "g")),
+		string.format("  %-6s - Move up / down", get_effective_key("move_up", "K") .. "/" .. get_effective_key("move_down", "J")),
+		string.format("  %-6s - Switch list", get_effective_key("switch_list", "l")),
 		string.format("  %-6s - List manager", get_effective_key("toggle_list_manager", "L")),
-		string.format("  %-6s - Tags", get_effective_key("toggle_tags", "t")),
 		string.format("  %-6s - Search", get_effective_key("search_todos", "/")),
+		string.format("  %-6s - Help", get_effective_key("toggle_help", "?")),
 		"",
 	}
 
@@ -856,6 +857,42 @@ function M.open_at_cursor()
 	end
 end
 
+-- /: pick from matching todos and land the cursor on the one chosen
+function M.search_and_jump()
+	vim.ui.input({ prompt = "Search to-dos: " }, function(query)
+		if not query or vim.trim(query) == "" then
+			return
+		end
+		state = ensure_state_loaded()
+		local matches = state.search_todos(vim.trim(query))
+		local function land(todo)
+			for line, row in ipairs(M._rendered_rows or {}) do
+				if row.todo == todo then
+					pcall(vim.api.nvim_win_set_cursor, win_id, { line, 0 })
+					return
+				end
+			end
+			vim.notify("Match is hidden by the active filter", vim.log.levels.INFO)
+		end
+		if #matches == 0 then
+			vim.notify("No to-dos match '" .. query .. "'", vim.log.levels.INFO)
+		elseif #matches == 1 then
+			land(matches[1])
+		else
+			vim.ui.select(matches, {
+				prompt = "Jump to:",
+				format_item = function(todo)
+					return (todo.done and "✓ " or "  ") .. vim.split(todo.text or "", "\n", { plain = true })[1]
+				end,
+			}, function(todo)
+				if todo then
+					land(todo)
+				end
+			end)
+		end
+	end)
+end
+
 local SECTION_KINDS = { priority_header = true, note_header = true, origin_header = true }
 
 -- Mirrors tmux section-jump.sh: next/previous section header, wrapping at either end.
@@ -1076,7 +1113,7 @@ local function create_window()
 	-- Calculate Quick Keys window height if enabled
 	local quick_keys_height = 0
 	if config.options.quick_keys then
-		quick_keys_height = 7 + 2  -- 7 lines + 2 for borders
+		quick_keys_height = 9 + 2  -- 9 lines + 2 for borders
 	end
 	
 	-- Check if relative sizing is enabled (default to true now)
@@ -1311,11 +1348,9 @@ local function create_window()
 	end)
 
 	setup_keymap("undo_delete", function()
-		state = ensure_state_loaded()
-		if state and state.undo_delete and state.undo_delete() then
+		todo_actions.undo(function()
 			M.render_todos()
-			vim.notify("Todo restored", vim.log.levels.INFO)
-		end
+		end)
 	end)
 
 	setup_keymap("remove_duplicates", function()
@@ -1418,7 +1453,78 @@ local function create_window()
 	end)
 
 	setup_keymap("copy_todo_id", function()
+		local note = todo_actions.get_note_at_cursor(win_id)
+		if note then
+			vim.fn.setreg("+", note.id)
+			vim.fn.setreg('"', note.id)
+			vim.notify("Copied id: " .. note.id, vim.log.levels.INFO)
+			return
+		end
 		M.copy_todo_id()
+	end)
+
+	local function render()
+		M.render_todos()
+	end
+
+	setup_keymap("start_todo", function()
+		todo_actions.start_todo(win_id, render)
+	end)
+
+	setup_keymap("complete_todo", function()
+		todo_actions.complete_todo(win_id, render)
+	end)
+
+	setup_keymap("set_due_date", function()
+		todo_actions.set_due_date(win_id, render)
+	end)
+
+	setup_keymap("move_up", function()
+		todo_actions.move_todo(win_id, "up", render)
+	end)
+
+	setup_keymap("move_down", function()
+		todo_actions.move_todo(win_id, "down", render)
+	end)
+
+	setup_keymap("paste_todo", function()
+		todo_actions.paste_todo(render)
+	end)
+
+	setup_keymap("copy_text", function()
+		todo_actions.copy_text(win_id)
+	end)
+
+	setup_keymap("copy_details", function()
+		todo_actions.copy_details(win_id)
+	end)
+
+	setup_keymap("copy_list_name", function()
+		todo_actions.copy_list_name()
+	end)
+
+	setup_keymap("search_todos", function()
+		M.search_and_jump()
+	end)
+
+	setup_keymap("switch_list", function()
+		local current_list = state.todo_lists and state.todo_lists.active or "daily"
+		list_selector.show_list_selector(current_list, function(list_name)
+			state = ensure_state_loaded()
+			local ok, msg = state.switch_list(list_name)
+			if not ok then
+				vim.notify(msg, vim.log.levels.ERROR)
+			end
+			M.render_todos()
+		end)
+	end)
+
+	setup_keymap("refresh", function()
+		state = ensure_state_loaded()
+		local anchor = cursor_anchor()
+		state.load_list(state.todo_lists.active)
+		M.render_todos()
+		restore_anchor(anchor)
 	end)
 	
 	setup_keymap("open_todo_scratchpad", function()
@@ -1497,9 +1603,8 @@ local function create_window()
 		end)
 	end)
 
-	-- export to obsidian daily note
-	vim.keymap.set("n", "O", function()
-		local todo = todo_actions.get_todo_at_cursor(win_id)
+	setup_keymap("export_to_daily", function()
+		local todo = M.get_todo_at_cursor()
 		if not todo then
 			vim.notify("No todo selected", vim.log.levels.WARN)
 			return
@@ -1512,7 +1617,7 @@ local function create_window()
 		else
 			vim.notify("Obsidian sync module not available", vim.log.levels.WARN)
 		end
-	end, { buffer = buf_id, nowait = true, desc = "Export to Obsidian daily note" })
+	end)
 
 	-- Always allow Esc to close the window, in addition to the configured close key
 	vim.keymap.set("n", "<Esc>", function()

@@ -938,6 +938,51 @@ function M.remove_due_date(win_id, on_render)
 	end
 end
 
+-- group key mirrors the rendered grouping: origin + in-progress flag + priority name,
+-- so a move only swaps within what the user sees as one group
+local function group_key(todo)
+	local origin = sorting.origin(todo)
+	if sorting.sequenced(todo) then
+		return origin .. ":sequence"
+	end
+	return origin .. ":" .. tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
+end
+
+-- Swaps the todo at idx with its nearest visible sibling in `direction`; returns it, or nil.
+-- Non-siblings are skipped, not swapped with: a subtree rides with its parent, so
+-- swapping order_index with another parent's child moves nothing.
+local function swap_with_sibling(idx, direction)
+	local me = state.todos[idx]
+	if not me or me.done then
+		return nil
+	end
+	local step = (direction == "down") and 1 or -1
+	local target
+	local i = idx + step
+	while i >= 1 and i <= #state.todos do
+		local cand = state.todos[i]
+		if cand and not cand.done and tags_util.has_tag(cand.text, state.active_filter) and cand.parent_id == me.parent_id then
+			if group_key(cand) == group_key(me) then
+				target = i
+			end
+			break
+		end
+		i = i + step
+	end
+	if not target then
+		return nil
+	end
+	local other = state.todos[target]
+	if sorting.sequenced(me) then
+		me.sequence, other.sequence = other.sequence, me.sequence
+	else
+		me.order_index, other.order_index = (other.order_index or target), (me.order_index or idx)
+	end
+	state.sort_todos()
+	state.save_to_disk()
+	return me
+end
+
 function M.reorder_todo(win_id, on_render)
 	ensure_state_loaded()
 	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
@@ -953,21 +998,6 @@ function M.reorder_todo(win_id, on_render)
 
 	local ns_id = vim.api.nvim_create_namespace("doit_reorder")
 	local reorder_key = resolve_key("reorder_todo")
-
-	-- group key mirrors the rendered grouping: origin + in-progress flag + priority name.
-	-- reorder only swaps within a group so it matches "set rank within a grouping".
-	local function group_key(todo)
-		local origin = sorting.origin(todo)
-		if sorting.sequenced(todo) then
-			return origin .. ":sequence"
-		end
-		return origin .. ":" .. tostring(todo.in_progress and true or false) .. ":" .. (priority_name(todo) or "default")
-	end
-
-	-- passes the active tag filter (mirrors resolve_at_line)
-	local function is_visible(todo)
-		return tags_util.has_tag(todo.text, state.active_filter)
-	end
 
 	-- buffer line (1-based) of a todo's first row in the current render.
 	-- ponytail: O(lines) scan per call via resolve_at_line; lists are small.
@@ -992,42 +1022,10 @@ function M.reorder_todo(win_id, on_render)
 
 	local function do_move(direction)
 		local idx = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
-		if not idx then
+		local me = idx and swap_with_sibling(idx, direction)
+		if not me then
 			return
 		end
-		local me = state.todos[idx]
-		if not me or me.done then
-			return
-		end
-
-		-- nearest visible sibling in `direction`; only swap if it shares the group.
-		-- non-siblings are skipped, not swapped with: a subtree rides with its
-		-- parent, so swapping order_index with another parent's child moves nothing
-		local step = (direction == "down") and 1 or -1
-		local target
-		local i = idx + step
-		while i >= 1 and i <= #state.todos do
-			local cand = state.todos[i]
-			if cand and not cand.done and is_visible(cand) and cand.parent_id == me.parent_id then
-				if group_key(cand) == group_key(me) then
-					target = i
-				end
-				break
-			end
-			i = i + step
-		end
-		if not target then
-			return
-		end
-
-		local other = state.todos[target]
-		if sorting.sequenced(me) then
-			me.sequence, other.sequence = other.sequence, me.sequence
-		else
-			me.order_index, other.order_index = (other.order_index or target), (me.order_index or idx)
-		end
-		state.sort_todos()
-		state.save_to_disk()
 
 		local new_index
 		for k, t in ipairs(state.todos) do
@@ -1115,6 +1113,147 @@ M.get_todo_at_cursor = function(win_id)
 	end
 
 	return nil
+end
+
+local function todo_at_cursor(win_id)
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return nil
+	end
+	local idx = get_real_todo_index(vim.api.nvim_win_get_cursor(win_id)[1])
+	return idx, idx and state.todos[idx]
+end
+
+local function index_of(todo)
+	for i, t in ipairs(state.todos) do
+		if t == todo then
+			return i
+		end
+	end
+end
+
+function M.start_todo(win_id, on_render)
+	ensure_state_loaded()
+	local idx = todo_at_cursor(win_id)
+	if idx then
+		state.start_todo(idx)
+		maybe_render(on_render)
+	end
+end
+
+function M.complete_todo(win_id, on_render)
+	ensure_state_loaded()
+	local idx = todo_at_cursor(win_id)
+	if idx then
+		state.complete_todo(idx)
+		maybe_render(on_render)
+	end
+end
+
+function M.undo(on_render)
+	ensure_state_loaded()
+	if state.undo_last() then
+		maybe_render(on_render)
+	else
+		vim.notify("Nothing to undo", vim.log.levels.INFO)
+	end
+end
+
+-- K / J: one step within the group, like tmux; the cursor follows the todo
+function M.move_todo(win_id, direction, on_render)
+	ensure_state_loaded()
+	local idx = todo_at_cursor(win_id)
+	local me = idx and swap_with_sibling(idx, direction)
+	if not me then
+		return
+	end
+	maybe_render(on_render)
+	for line, row in ipairs(require("doit.ui.main_window")._rendered_rows or {}) do
+		if row.todo == me then
+			pcall(vim.api.nvim_win_set_cursor, win_id, { line, 0 })
+			return
+		end
+	end
+end
+
+-- h: typed due date like tmux; empty clears
+function M.set_due_date(win_id, on_render)
+	ensure_state_loaded()
+	local _, todo = todo_at_cursor(win_id)
+	if not todo then
+		return
+	end
+	vim.ui.input({ prompt = "Due date YYYY-MM-DD (empty clears): ", default = todo.due_date or "" }, function(input)
+		local idx = input ~= nil and index_of(todo)
+		if not idx then
+			return
+		end
+		input = vim.trim(input)
+		if input == "" then
+			state.remove_due_date(idx)
+		else
+			local ok, msg = state.set_due_date(idx, input)
+			if not ok then
+				vim.notify(msg, vim.log.levels.WARN)
+				return
+			end
+		end
+		maybe_render(on_render)
+	end)
+end
+
+function M.paste_todo(on_render)
+	ensure_state_loaded()
+	local clip = vim.trim(vim.fn.getreg("+") or "")
+	if clip == "" then
+		vim.notify("Clipboard is empty", vim.log.levels.WARN)
+		return
+	end
+	vim.ui.input({ prompt = "New to-do: ", default = (clip:gsub("\n.*", "")) }, function(text)
+		text = text and vim.trim(text) or ""
+		if text ~= "" then
+			state.add_todo(text)
+			maybe_render(on_render)
+		end
+	end)
+end
+
+local function copy(value, label)
+	vim.fn.setreg("+", value)
+	vim.fn.setreg('"', value)
+	vim.notify("Copied " .. label, vim.log.levels.INFO)
+end
+
+-- y: todo text, or the note body (title when the body is empty)
+function M.copy_text(win_id)
+	ensure_state_loaded()
+	local note = M.get_note_at_cursor(win_id)
+	if note then
+		copy((note.body or "") ~= "" and note.body or (note.title or ""), "note")
+		return
+	end
+	local _, todo = todo_at_cursor(win_id)
+	if todo then
+		copy(todo.text or "", "text")
+	end
+end
+
+-- C-y: details without the machine footer, or the note body
+function M.copy_details(win_id)
+	ensure_state_loaded()
+	local note = M.get_note_at_cursor(win_id)
+	if note then
+		copy(note.body or "", "note body")
+		return
+	end
+	local _, todo = todo_at_cursor(win_id)
+	if todo then
+		copy(vim.trim(require("doit.core.utils.footer").strip(todo.description or "")), "details")
+	end
+end
+
+function M.copy_list_name()
+	ensure_state_loaded()
+	copy(state.todo_lists and state.todo_lists.active or "", "list name")
 end
 
 return M

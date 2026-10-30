@@ -133,9 +133,75 @@ function M.setup(state)
         return true, "Moved todo to '" .. target_list_name .. "'"
     end
     
+    -- one level, like tmux u: the last status change, else the last delete
+    local function remember_status(todo)
+        state.last_undo = {
+            kind = "status",
+            id = todo.id,
+            done = todo.done == true,
+            in_progress = todo.in_progress == true,
+            completed_at = todo.completed_at,
+        }
+    end
+
+    function M.start_todo(index)
+        local todo = state.todos[index]
+        if not todo then
+            return
+        end
+        remember_status(todo)
+        local was_done = todo.done
+        -- one item in progress per list, as tmux and the MCP enforce
+        for _, other in ipairs(state.todos) do
+            if other ~= todo and other.in_progress then
+                other.in_progress = false
+            end
+        end
+        todo.in_progress = true
+        todo.done = false
+        todo.completed_at = nil
+        state.save_todos()
+        if was_done then
+            twin.sync(todo, "revert")
+        end
+    end
+
+    function M.complete_todo(index)
+        local todo = state.todos[index]
+        if not todo or todo.done then
+            return
+        end
+        remember_status(todo)
+        todo.done = true
+        todo.in_progress = false
+        todo.completed_at = os.time()
+        state.save_todos()
+        twin.sync(todo, "complete", todo.completed_at)
+    end
+
+    function M.undo_last()
+        local last = state.last_undo
+        state.last_undo = nil
+        if last and last.kind == "status" then
+            local todo = M.get_todo_by_id(last.id)
+            if not todo then
+                return false
+            end
+            local was_done = todo.done == true
+            todo.done, todo.in_progress, todo.completed_at = last.done, last.in_progress, last.completed_at
+            state.save_todos()
+            if todo.done ~= was_done then
+                twin.sync(todo, todo.done and "complete" or "revert", todo.completed_at)
+            end
+            return true
+        end
+        return M.undo_delete()
+    end
+
     function M.toggle_todo(index)
         if state.todos[index] then
             local todo = state.todos[index]
+            remember_status(todo)
             local was_done = todo.done
             
             -- Cycle through states: pending -> in_progress -> done -> pending
@@ -172,6 +238,7 @@ function M.setup(state)
 
     function M.revert_to_pending(index)
         if state.todos[index] then
+            remember_status(state.todos[index])
             state.todos[index].in_progress = false
             state.todos[index].done = false
             state.todos[index].completed_at = nil
@@ -189,6 +256,7 @@ function M.setup(state)
 
             table.insert(state.deleted_todos, 1, todo)
             table.remove(state.todos, index)
+            state.last_undo = { kind = "delete" }
             
             if #state.deleted_todos > state.MAX_UNDO_HISTORY then
                 state.deleted_todos[state.MAX_UNDO_HISTORY + 1] = nil

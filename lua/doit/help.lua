@@ -12,45 +12,58 @@ M.keymaps = {
 	},
 	todo_window = {
 		basic = {
-			{ key = "<CR>", desc = "Open item detail (on a note row: open the note; on Notes: add one)" },
-			{ key = "n", desc = "Add new todo" },
-			{ key = "a", desc = "Add a child todo nested under the current one" },
-			{ key = "c", desc = "Toggle todo status (pending→in-progress→done)" },
-		{ key = "X", desc = "Revert todo to pending (not started)" },
-			{ key = "p", desc = "Set/change priority (critical/urgent/important)" },
-			{ key = "d", desc = "Delete current todo (or note, when on a note row)" },
+			{ key = "n", desc = "New todo (in the Notes section: new note)" },
+			{ key = "<CR>", desc = "Open todo text + details in the editor (note row: the note; Notes header: new note)" },
+			{ key = "s", desc = "Start (in progress; one per list)" },
+			{ key = "x", desc = "Complete" },
+			{ key = "X", desc = "Revert to pending" },
+			{ key = "e", desc = "Edit todo text (note row: edit the note)" },
+			{ key = "N", desc = "Edit details in the editor" },
+			{ key = "P", desc = "Set priority (critical/urgent/important)" },
+			{ key = "p", desc = "New todo from the clipboard" },
+			{ key = "d", desc = "Delete todo (or note, on a note row)" },
 			{ key = "D", desc = "Delete all completed todos" },
-			{ key = "u", desc = "Undo last delete" },
-			{ key = "<leader>D", desc = "Remove duplicate todos (confirms first, undoable with u)" },
-			{ key = "e", desc = "Edit current todo (or note, when on a note row)" },
-			{ key = "gn", desc = "Add a list note (scratch note in the Notes section)" },
+			{ key = "u", desc = "Undo the last start/complete/revert or delete" },
 			{ key = "q/<Esc>", desc = "Close window" },
 			{ key = "?", desc = "Show help (with ALL keybindings)" },
 		},
-		organization = {
-			{ key = "t", desc = "Toggle tags window (filter by #tag)" },
-			{ key = "L", desc = "List manager - switch lists, create new lists" },
-			{ key = "m", desc = "Move current todo to another list (s cycles view, m mine/claude, S flips list)" },
-			{ key = "f", desc = "Clear active filter" },
-			{ key = "/", desc = "Search todos" },
-			{ key = "[ / ]", desc = "Jump section down / up (priority groups, Mine/Claude, Notes)" },
+		notes = {
+			{ key = "g", desc = "Notes picker (on a todo row: that todo's notes; n new linked note, l link, a all)" },
+			{ key = "gN", desc = "In the todo editor: open that todo's notes" },
+			{ key = "q / :w", desc = "In the editor: save and close / save" },
 		},
-		advanced = {
-			{ key = "h", desc = "Remove due date" },
-			{ key = "H", desc = "Add/edit due date (calendar)" },
-			{ key = "r", desc = "Reorder current todo (use j/k to move)" },
+		organization = {
+			{ key = "K / J", desc = "Move todo up / down within its group" },
+			{ key = "[ / ]", desc = "Jump section down / up (priority groups, Mine/Claude, Notes)" },
+			{ key = "h", desc = "Set or clear due date (YYYY-MM-DD)" },
 			{ key = "S", desc = "Set or clear sequence (run order across priorities)" },
-			{ key = "T", desc = "Add time estimation" },
-			{ key = "R", desc = "Remove time estimation" },
-			{ key = "y", desc = "Copy the item id (the doit MCP resolves it across lists)" },
-			{ key = "o", desc = "Open linked note" },
-			{ key = "<leader>p", desc = "Open scratchpad for todo" },
+			{ key = "t", desc = "Filter by #tag" },
+			{ key = "c", desc = "Clear the tag filter" },
+			{ key = "/", desc = "Search and jump to a todo" },
+			{ key = "m", desc = "Move todo to another list (s cycles view, m mine/claude, S flips list)" },
+			{ key = "l", desc = "Switch list (links this tmux window)" },
+			{ key = "L", desc = "List manager" },
+			{ key = "r", desc = "Refresh from disk" },
+		},
+		copy = {
+			{ key = "y", desc = "Copy todo text (note row: note body)" },
+			{ key = "<C-y>", desc = "Copy details without the footer (note row: note body)" },
+			{ key = "i", desc = "Copy the item id (the doit MCP resolves it across lists)" },
+			{ key = "Y", desc = "Copy the list name" },
+		},
+		nvim_only = {
+			{ key = "a", desc = "Add a child todo nested under the current one" },
+			{ key = "<Space>", desc = "Cycle status (pending, in progress, done)" },
+			{ key = "H", desc = "Due date from the calendar" },
+			{ key = "T / R", desc = "Add / remove time estimation" },
+			{ key = "<leader>D", desc = "Remove duplicate todos (confirms first, undoable with u)" },
 		},
 		import_export = {
 			{ key = "I", desc = "Import todos from file" },
 			{ key = "E", desc = "Export pending todos to markdown" },
 			{ key = "<leader>E", desc = "Export todos to JSON file" },
-			{ key = "O", desc = "Export todo to Obsidian daily note" },
+			{ key = "O", desc = "Send todo to the Obsidian daily note" },
+			{ key = "B", desc = "Back up all lists" },
 		},
 	},
 	list_manager = {
@@ -92,6 +105,15 @@ M.features = {
 }
 
 -- Function to get formatted help text
+M.todo_window_sections = {
+	{ name = "basic", title = "Basic" },
+	{ name = "notes", title = "Notes and editor" },
+	{ name = "organization", title = "Organization" },
+	{ name = "copy", title = "Copy" },
+	{ name = "nvim_only", title = "nvim only" },
+	{ name = "import_export", title = "Import/Export" },
+}
+
 function M.get_help_text()
 	local lines = {}
 	
@@ -110,27 +132,14 @@ function M.get_help_text()
 	-- Todo window keymaps
 	table.insert(lines, "")
 	table.insert(lines, "TODO WINDOW KEYMAPS:")
-	table.insert(lines, "  Basic:")
-	for _, km in ipairs(M.keymaps.todo_window.basic) do
-		table.insert(lines, string.format("    %-12s - %s", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "  Organization:")
-	for _, km in ipairs(M.keymaps.todo_window.organization) do
-		table.insert(lines, string.format("    %-12s - %s", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "  Advanced:")
-	for _, km in ipairs(M.keymaps.todo_window.advanced) do
-		table.insert(lines, string.format("    %-12s - %s", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "  Import/Export:")
-	for _, km in ipairs(M.keymaps.todo_window.import_export) do
-		table.insert(lines, string.format("    %-12s - %s", km.key, km.desc))
+	for i, section in ipairs(M.todo_window_sections) do
+		if i > 1 then
+			table.insert(lines, "")
+		end
+		table.insert(lines, "  " .. section.title .. ":")
+		for _, km in ipairs(M.keymaps.todo_window[section.name]) do
+			table.insert(lines, string.format("    %-12s - %s", km.key, km.desc))
+		end
 	end
 	
 	-- List manager
@@ -191,39 +200,17 @@ function M.get_markdown_help()
 	table.insert(lines, "")
 	table.insert(lines, "## Todo Window Keymaps")
 	table.insert(lines, "")
-	table.insert(lines, "### Basic Operations")
-	table.insert(lines, "")
-	table.insert(lines, "| Key | Description |")
-	table.insert(lines, "|-----|-------------|")
-	for _, km in ipairs(M.keymaps.todo_window.basic) do
-		table.insert(lines, string.format("| `%s` | %s |", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "### Organization")
-	table.insert(lines, "")
-	table.insert(lines, "| Key | Description |")
-	table.insert(lines, "|-----|-------------|")
-	for _, km in ipairs(M.keymaps.todo_window.organization) do
-		table.insert(lines, string.format("| `%s` | %s |", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "### Advanced Features")
-	table.insert(lines, "")
-	table.insert(lines, "| Key | Description |")
-	table.insert(lines, "|-----|-------------|")
-	for _, km in ipairs(M.keymaps.todo_window.advanced) do
-		table.insert(lines, string.format("| `%s` | %s |", km.key, km.desc))
-	end
-	
-	table.insert(lines, "")
-	table.insert(lines, "### Import/Export")
-	table.insert(lines, "")
-	table.insert(lines, "| Key | Description |")
-	table.insert(lines, "|-----|-------------|")
-	for _, km in ipairs(M.keymaps.todo_window.import_export) do
-		table.insert(lines, string.format("| `%s` | %s |", km.key, km.desc))
+	for i, section in ipairs(M.todo_window_sections) do
+		if i > 1 then
+			table.insert(lines, "")
+		end
+		table.insert(lines, "### " .. section.title)
+		table.insert(lines, "")
+		table.insert(lines, "| Key | Description |")
+		table.insert(lines, "|-----|-------------|")
+		for _, km in ipairs(M.keymaps.todo_window[section.name]) do
+			table.insert(lines, string.format("| `%s` | %s |", km.key, km.desc))
+		end
 	end
 	
 	-- List manager
@@ -266,7 +253,7 @@ function M.get_markdown_help()
 	table.insert(lines, "  modules = {")
 	table.insert(lines, "    todos = {")
 	table.insert(lines, "      keymaps = {")
-	table.insert(lines, '        view_detail = "K",  -- Change \'<CR>\' to \'K\' for legacy style')
+	table.insert(lines, '        complete_todo = "x",')
 	table.insert(lines, '        toggle_todo = "<Space>",  -- Use space to toggle')
 	table.insert(lines, "        -- etc...")
 	table.insert(lines, "      }")

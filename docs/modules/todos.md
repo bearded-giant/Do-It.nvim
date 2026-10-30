@@ -27,17 +27,18 @@ The todos module provides comprehensive task management functionality within Neo
 
 | Key | Action |
 |-----|--------|
-| `<CR>` | Open item detail |
 | `n` | Add new todo |
-| `x` | Toggle todo status |
-| `d` | Delete current todo |
-| `H` | Add due date |
-| `t` | Toggle tags window |
-| `p` | Edit priorities |
-| `/` | Search todos |
-| `r` | Enter reordering mode |
-| `<Tab>` | Cycle through status states |
-| `<CR>` | Edit todo text |
+| `<CR>` | Open text and details in the editor |
+| `s` / `x` / `X` | Start / complete / revert |
+| `N` | Edit details |
+| `P` | Edit priority |
+| `h` / `H` | Due date (typed / calendar) |
+| `t` / `c` | Tag filter / clear |
+| `/` | Search and jump |
+| `K` / `J` | Move up / down |
+| `g` | Notes picker |
+
+The full table lives in `docs/KEYBINDINGS.md`.
 
 ## Configuration
 

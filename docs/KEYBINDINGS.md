@@ -23,49 +23,67 @@
 
 ## Todo Window Keymaps
 
-### Basic Operations
+### Basic
 
 | Key | Description |
 |-----|-------------|
-| `<CR>` | Open item detail (on a note row: open the note; on Notes: add one) |
-| `n` | Add new todo |
-| `a` | Add a child todo nested under the current one |
-| `c` | Toggle todo status (pending→in-progress→done) |
-| `X` | Revert todo to pending (not started) |
-| `p` | Set/change priority (critical/urgent/important) |
-| `d` | Delete current todo (or note, when on a note row) |
+| `n` | New todo (in the Notes section: new note) |
+| `<CR>` | Open todo text + details in the editor (note row: the note; Notes header: new note) |
+| `s` | Start (in progress; one per list) |
+| `x` | Complete |
+| `X` | Revert to pending |
+| `e` | Edit todo text (note row: edit the note) |
+| `N` | Edit details in the editor |
+| `P` | Set priority (critical/urgent/important) |
+| `p` | New todo from the clipboard |
+| `d` | Delete todo (or note, on a note row) |
 | `D` | Delete all completed todos |
-| `u` | Undo last delete |
-| `<leader>D` | Remove duplicate todos (confirms first, undoable with u) |
-| `e` | Edit current todo (or note, when on a note row) |
-| `gn` | Add a list note (scratch note in the Notes section) |
+| `u` | Undo the last start/complete/revert or delete |
 | `q/<Esc>` | Close window |
 | `?` | Show help (with ALL keybindings) |
+
+### Notes and editor
+
+| Key | Description |
+|-----|-------------|
+| `g` | Notes picker (on a todo row: that todo's notes; n new linked note, l link, a all) |
+| `gN` | In the todo editor: open that todo's notes |
+| `q / :w` | In the editor: save and close / save |
 
 ### Organization
 
 | Key | Description |
 |-----|-------------|
-| `t` | Toggle tags window (filter by #tag) |
-| `L` | List manager - switch lists, create new lists |
-| `m` | Move current todo to another list (s cycles view, m mine/claude, S flips list) |
-| `f` | Clear active filter |
-| `/` | Search todos |
+| `K / J` | Move todo up / down within its group |
 | `[ / ]` | Jump section down / up (priority groups, Mine/Claude, Notes) |
+| `h` | Set or clear due date (YYYY-MM-DD) |
+| `S` | Set or clear sequence (run order across priorities) |
+| `t` | Filter by #tag |
+| `c` | Clear the tag filter |
+| `/` | Search and jump to a todo |
+| `m` | Move todo to another list (s cycles view, m mine/claude, S flips list) |
+| `l` | Switch list (links this tmux window) |
+| `L` | List manager |
+| `r` | Refresh from disk |
 
-### Advanced Features
+### Copy
 
 | Key | Description |
 |-----|-------------|
-| `h` | Remove due date |
-| `H` | Add/edit due date (calendar) |
-| `r` | Reorder current todo (use j/k to move) |
-| `S` | Set or clear sequence (run order across priorities) |
-| `T` | Add time estimation |
-| `R` | Remove time estimation |
-| `y` | Copy the item id (the doit MCP resolves it across lists) |
-| `o` | Open linked note |
-| `<leader>p` | Open scratchpad for todo |
+| `y` | Copy todo text (note row: note body) |
+| `<C-y>` | Copy details without the footer (note row: note body) |
+| `i` | Copy the item id (the doit MCP resolves it across lists) |
+| `Y` | Copy the list name |
+
+### nvim only
+
+| Key | Description |
+|-----|-------------|
+| `a` | Add a child todo nested under the current one |
+| `<Space>` | Cycle status (pending, in progress, done) |
+| `H` | Due date from the calendar |
+| `T / R` | Add / remove time estimation |
+| `<leader>D` | Remove duplicate todos (confirms first, undoable with u) |
 
 ### Import/Export
 
@@ -74,7 +92,8 @@
 | `I` | Import todos from file |
 | `E` | Export pending todos to markdown |
 | `<leader>E` | Export todos to JSON file |
-| `O` | Export todo to Obsidian daily note |
+| `O` | Send todo to the Obsidian daily note |
+| `B` | Back up all lists |
 
 ## List Manager Keymaps
 
@@ -120,7 +139,7 @@ require("doit").setup({
   modules = {
     todos = {
       keymaps = {
-        view_detail = "K",  -- Change '<CR>' to 'K' for legacy style
+        complete_todo = "x",
         toggle_todo = "<Space>",  -- Use space to toggle
         -- etc...
       }
