@@ -33,6 +33,7 @@ M.keymaps = {
 			{ key = "m", desc = "Move current todo to another list (s cycles view, m mine/claude, S flips list)" },
 			{ key = "f", desc = "Clear active filter" },
 			{ key = "/", desc = "Search todos" },
+			{ key = "[ / ]", desc = "Jump section down / up (priority groups, Mine/Claude, Notes)" },
 		},
 		advanced = {
 			{ key = "h", desc = "Remove due date" },

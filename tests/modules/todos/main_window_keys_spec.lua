@@ -1,6 +1,6 @@
 -- Enter is the tmux manager's "open item" key, so the nvim main window binds it
 -- to the same thing: detail on a todo row, the note on a note row.
-describe("enter in the main window", function()
+describe("main window keys", function()
 	local main_window, todo_actions, doit_state
 
 	local function line_where(pred)
@@ -69,5 +69,33 @@ describe("enter in the main window", function()
 		todo_actions.edit_note = original
 
 		assert.are.equal("n1", opened and opened.id)
+	end)
+
+	it("walks section headers with [ and ] like tmux, wrapping at the ends", function()
+		doit_state.add_todo("urgent thing", { "critical" })
+		doit_state.add_todo("someday", {})
+		main_window.toggle_todo_window()
+		local win = vim.api.nvim_get_current_win()
+		local heads = {}
+		for i, row in ipairs(main_window.build_render_rows()) do
+			if row.kind == "priority_header" or row.kind == "note_header" then
+				heads[#heads + 1] = i
+			end
+		end
+		assert.are.equal(3, #heads)
+		vim.api.nvim_win_set_cursor(win, { heads[1], 0 })
+
+		local function at()
+			return vim.api.nvim_win_get_cursor(win)[1]
+		end
+		press("[")
+		assert.are.equal(heads[2], at())
+		press("[")
+		assert.are.equal(heads[3], at())
+		assert.are.equal("note_header", main_window.build_render_rows()[at()].kind)
+		press("[")
+		assert.are.equal(heads[1], at())
+		press("]")
+		assert.are.equal(heads[3], at())
 	end)
 end)

@@ -51,6 +51,7 @@
 | `m` | Move current todo to another list (s cycles view, m mine/claude, S flips list) |
 | `f` | Clear active filter |
 | `/` | Search todos |
+| `[ / ]` | Jump section down / up (priority groups, Mine/Claude, Notes) |
 
 ### Advanced Features
 

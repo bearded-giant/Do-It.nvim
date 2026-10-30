@@ -883,6 +883,43 @@ function M.open_at_cursor()
 	end
 end
 
+local SECTION_KINDS = { priority_header = true, note_header = true, origin_header = true }
+
+-- Mirrors tmux section-jump.sh: next/previous section header, wrapping at either end.
+function M.jump_section(dir)
+	if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+		return
+	end
+	local heads = {}
+	for i, row in ipairs(M._rendered_rows or M.build_render_rows()) do
+		if SECTION_KINDS[row.kind] then
+			heads[#heads + 1] = i
+		end
+	end
+	if #heads == 0 then
+		return
+	end
+	local cur = vim.api.nvim_win_get_cursor(win_id)[1]
+	local target
+	if dir == "down" then
+		for _, h in ipairs(heads) do
+			if h > cur then
+				target = h
+				break
+			end
+		end
+		target = target or heads[1]
+	else
+		for _, h in ipairs(heads) do
+			if h < cur then
+				target = h
+			end
+		end
+		target = target or heads[#heads]
+	end
+	vim.api.nvim_win_set_cursor(win_id, { target, 0 })
+end
+
 -- The id is the cross-list handle: the MCP resolves it without a list name.
 function M.copy_todo_id(todo)
 	todo = todo or M.get_todo_at_cursor()
@@ -1285,6 +1322,14 @@ local function create_window()
 
 	setup_keymap("view_detail", function()
 		M.open_at_cursor()
+	end)
+
+	setup_keymap("section_down", function()
+		M.jump_section("down")
+	end)
+
+	setup_keymap("section_up", function()
+		M.jump_section("up")
 	end)
 
 	setup_keymap("copy_todo_id", function()

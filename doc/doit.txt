@@ -272,6 +272,7 @@ Main Window~
     <leader>dn   Toggle project notes window
     <CR>        Open to-do detail (note row: open the note; Notes: add one)
     n           Add new to-do
+    [ / ]       Jump section down / up (priority groups, Notes)
     a           Add a child to-do under the current one
     c           Toggle to-do status
     X           Revert to-do to pending

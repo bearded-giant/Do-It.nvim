@@ -137,6 +137,7 @@ _Calendar (macOS only):_
 
 - `<CR>` - Open item detail (on a note row: open the note)
 - `n` - Add new todo
+- `[` / `]` - Jump section down / up (lands on Notes too)
 - `a` - Add a child todo under the current one
 - `c` - Toggle status (pending → in-progress → done)
 - `d` - Delete todo
