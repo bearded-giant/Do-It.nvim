@@ -512,103 +512,24 @@ const server = new McpServer(
         version: readVersion(),
     },
     {
-        instructions: `Do-it.nvim todo list manager. Data lives at ~/.local/share/nvim/doit/lists/*.json — NOT in any project directory.
+        instructions: `Do-it.nvim todo manager. Data lives at ~/.local/share/nvim/doit/lists/*.json, NOT in any project directory. Always use these tools for todo reads and writes; NEVER bash, grep, find, cat, or python on the JSON files.
 
-IMPORTANT: Always use these MCP tools for todo operations. NEVER use bash, grep, find, cat, or python to read/write todo JSON files directly. The tools handle all data access.
+Default list: "daily", unless the DOIT_ACTIVE_LIST env var names another. Every call without list= goes there. The user's tmux window links and global pointer are view state and never change this default, so pass list= explicitly for project work. switch_list changes the user's views only; call it only when the user asks. When list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)", tell the user: a stale export in the shell that launched this server pins every omitted list= to one list.
 
-There is always an active list: "daily", unless the DOIT_ACTIVE_LIST env var names another. When the user says "show my todos", "what's next", "add a todo", or any todo-related request, use these tools directly — no filesystem discovery needed.
+Priorities: 'priorities' is critical, urgent, important, or absent (default). The user works by priority most days. Priority is criticality, not order: work order is the optional 'sequence' field (sequence_todos), taken before priority.
 
-Window-linked lists: the user's nvim and tmux views can link a tmux window to a list (the 'sessions' map in session.json, keyed "<session>:<window name>"). Those links and the global pointer are the user's view state and do NOT change this server's default list. For project work, always pass list= explicitly.
-- switch_list changes the user's views only: inside tmux it links the current tmux window AND updates the global pointer by default; scope="global" sets only the global pointer, scope="window" only the link. Call it only when the user asks to switch their view.
-- list_lists shows which tmux windows link each list — use it to answer "which window shows what".
-- list_lists marks the active list "(via DOIT_ACTIVE_LIST env override ...)" when that env var decided it. Tell the user: a stale export in the shell that launched this server pins every omitted list= to one list.
-
-Priorities: Items have a 'priorities' field with values: critical, urgent, important, or absent (default/no priority). Priority is a core workflow concept — the user works by priority most days.
-
-Item text convention — MANDATORY for every item you create:
+Item text convention, MANDATORY for every item you create:
 
     claude: [type] N. body (dep on #M, #K)
 
-- [type] — short lowercase work-type tag (decision, gate, loader, bug, spike, chore, research, or a new one you coin). Pass it as add_todo's 'type' param, never hand-write the brackets. A bare list of sentences is unscannable; the tag is what makes it readable at a glance.
-- N. — the item's fixed handle, unique across the list and assigned at creation (add_todo does it, so don't write it into 'text'). Deps and #N references point at it. It is never renumbered, so it is NOT the work order.
-- body — a short label, 40 chars or fewer: verb + object, or for a decision its topic as a short question. It is what the user's tmux chip and board sidebar show. Paths, commands, file lists, sub-steps, options, rationale, and status go in 'description', never in the body.
-- (dep on #M) — pass blocking items as add_todo's 'deps' param, using their rank numbers (not ids). Blocked work must say so in the title, not only in the notes.
-- claude: — keep this leading marker on items the model burns down via /burn; it stays in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work — rewriting 'text' will not remove it, and deleting/recreating the item is never necessary.
+- [type]: short lowercase work-type tag (decision, gate, loader, bug, spike, chore, research, or one you coin). Pass add_todo's 'type' param, never hand-write the brackets. The tag makes a list scannable.
+- N.: the item's fixed handle, unique across the list, assigned by add_todo (never write it into 'text'). Deps and #N references point at it. Never renumbered, so it is NOT the work order.
+- body: a short label, 40 chars or fewer: verb + object, or a decision's topic as a short question. The user's tmux chip and board sidebar show it. Paths, commands, file lists, sub-steps, options, rationale, and status go in 'description', never the body.
+- (dep on #M): pass blockers as the 'deps' param (rank numbers, not ids). Blocked work says so in the title, not only in the notes.
+- claude:: leading marker on items the model burns down via /burn, in front of the type tag. Drop it with update_todo's 'claude' param set to false once the item is no longer model work; rewriting 'text' won't remove it, and never delete and recreate the item.
+Retype or re-dep with update_todo's 'type' / 'deps' params; the rank is kept.
 
-Retype or re-dep an existing item with update_todo's 'type' / 'deps' params; its rank is preserved.
-
-Owed items: "${OWED_LIST}" is the user's cross-project inbox of actions THEY owe, kept to signal. Call add_todo with owe=true and list=<the project list> only when all four hold: (1) only the user can do it: credentials, a console (vault, DNS, IdP, GCP, beta admin), outward comms, or a human call the code can't settle; (2) actionable now: not waiting on another reviewer, a release, a cutover window, or another item; (3) something waits on it: blocked work, or a security/prod risk; (4) not routine flow. Never owe: resuming a session (the handoff carries it), merging or reviewing an MR, tagging or deploying after a merge, watching for a future event, "say ship it", approving a diff proposed in chat, anything the model can run. Conditional asks stay on the project list with deps and no owe; owe them once the dep clears. One console session is one owed item with a checklist. Design decisions (type decision, mirroring a doc's open question) are feature work, not inbox actions: add them to the project list without owe, so they never twin into "${OWED_LIST}". One call writes the project item ("[type] N. owed in ${OWED_LIST} #M: ...") and its "${OWED_LIST}" twin ("[type] M. <project list>: ..."); each carries a 'twin' field and a first description line naming the other. Write the description for the user: why, do (exact command + expected result), links (MR, handoff, vault note, artifact, doc), resume (how to pick the work back up). Owed items never carry 'claude:'. complete_todo, revert_todo, delete_todo, move_todo, and update_todo's done/priority/due apply to both twins; the result says what happened to the twin.
-
-Active item: the in_progress item is what the user's tmux chip and nvim statusline show, one per list. When working a list, start_todo an item before you work it, as its own call, whether or not it lands; when you stop or wait on the user, leave the next item in_progress (the one you are on, else the one waiting on the user, else the top pending one). start_todo never touches a twin, so the user's own "${OWED_LIST}" active item stays theirs.
-
-Sequence (work order): priority is criticality, and the optional 'sequence' field is work order. Pending items with a sequence render in a "Sequence" section above the priority sections, in sequence order across priorities, and list_todos lists them first. When working a list (including /burn), take sequenced items in sequence order before falling back to priority. When items have to run in a specific order (deps, rollout steps), set it with sequence_todos(order: [ranks in run order]). Don't encode order through priority, and don't delete and recreate items to renumber them. To move one item, use update_todo's 'sequence'; 0 clears it.
-
-Behavior:
-- "show todos" / "list todos" / "what's on my list" → list_todos (uses active list automatically)
-- "what's next" / "next todo" → the in_progress item first (list_todos filter="in_progress": the active item a prior turn or session left), then list_todos with filter="pending" (first item is next; sequenced items come first)
-- "do these in order: #3, #8, #10" / "sequence these" → sequence_todos with the ranks in order
-- "critical items" / "show urgent" / "what's important" → list_todos with priority filter
-- "add todo: ..." / "remind me to ..." → add_todo
-- "start the orch todo" / "work on X" → start_todo with query (sets in_progress)
-- "complete current todo" / "done with this" → complete_todo (no args — auto-finds in_progress items)
-- "complete the orch auth todo" → complete_todo with query="orch auth" (fuzzy text match)
-- "revert X to pending" / "un-complete X" → revert_todo with query
-- "add note to X" / "note on the orch todo" → add_note with query
-- "delete the X todo" → delete_todo with query (fuzzy match, or id)
-- "clear done" / "remove completed" → clear_done
-- "move X to work list" → move_todo with query + target list
-- "search for X" → search_todos
-- user pastes or names an id ("work 1757012345_4821", "fetch this todo: <id>") → get_todo — it finds the item in WHICHEVER list holds it and names that list
-- "show my lists" / "which lists" → list_lists
-- "switch to X list" → switch_list (the user's view only; in tmux: links this window + sets global; pass scope to narrow)
-- "set the global list without touching this window" → switch_list with scope="global" (unlinking a window is done in the tmux UI with the u key)
-- "todos for <project>" → list_todos with list=<project-name> (list names often match project names)
-- "create list X" → create_list
-- "rename list X to Y" → rename_list
-- "delete list X" → delete_list
-- "X is my list" / "mark X as claude's" → set_list_source (source "user" or "mcp"); unflagged lists count as claude, daily is always the user's
-- "show only my lists" / "hide claude lists" / "show all lists" → set_source_filter (the user's tmux/nvim views only)
-- "which lists are mine" → list_lists with source="mine"
-- "make a todo from this file" / "take X.md and make a todo" → add_todo with text summarizing the file, and description containing the full file path as a markdown link: [filename](absolute/path/to/file.md). If the file has a title (h1), use that as the todo text. Otherwise use a short summary.
-- "add that as a note to X todo" → add_note with the file path or content as the note
-
-List notes: each list also has scratch notes (title + body), parallel to the todo items and stored outside any todo's description. A note may link to todos on the same list (todo_ids); list_notes / get_note show those links and get_todo shows the notes linked to an item. add_note = note ON a todo item; the note tools below manage list-level notes.
-- "show notes" / "what notes are on X list" → list_notes (list_todos also shows note titles)
-- "read the X note" / "open that note" → get_note with query
-- "save this as a note" / "new note: ..." → create_note with title + body
-- "note this for #3" / "new note about the auth todo" → create_note with todo_ids=[3] (rank numbers or ids)
-- "link the X note to #3 and #5" → update_note with todo_ids=[3, 5]; it REPLACES the set, so pass the existing links too when adding one; [] unlinks all
-- "add this to the X note" → update_note with mode="append"
-- "rewrite the X note" / "rename the note" → update_note (mode="replace" default)
-- "delete the X note" → delete_note with query
-
-Tags: written inline in the todo text as #tag — there is no tag field. Matching is exact, so #labels never matches #labels-web, and a tag may contain letters, digits, _, - and /. An all-digit token like #12 is a rank reference, not a tag.
-- "what tags are on this list" → list_tags (name + how many items carry it)
-- "show the #api todos" → list_todos with tag="api" (omit the '#')
-
-Due dates: the 'due_date' field, "YYYY-MM-DD", shared with the nvim and tmux views.
-- "due X by friday" → add_todo (or update_todo) with due="2026-08-21"
-- "what's overdue" → list_todos with due="overdue"; also "today" and "week" (week spans overdue through the next 7 days)
-- clear a due date with update_todo due=""
-
-Nesting: a todo may hang off another via 'parent'. Ranks stay FLAT — N is still unique across the whole list, and a child gets its own N.
-- "add X as a subtask of 3" → add_todo with parent=3 (a rank number or an id)
-- "move X under Y" → update_todo with parent=<rank or id>; parent="" moves it back to the top level
-- Deleting a parent does NOT delete its children: they are promoted to the top level. Completing a parent does not complete them either.
-
-Duplicates: dedupe_todos removes items whose text matches after normalization (the claude: marker, [type] tag, rank prefix, (dep on #N) suffix, case and whitespace are all ignored, so an item typed in Neovim matches the same item created here). It is a DRY RUN by default — pass dry_run:false to actually delete.
-
-The 'list' parameter is optional on MOST tools — omit it to use the active list, and only pass it when the user names a specific list. The exceptions:
-- search_todos: no list param at all — it always searches every list.
-- move_todo: uses 'from_list' (optional, defaults to active) and 'to_list' (required).
-- switch_list: 'list' is required — it names the list to switch TO, not the one to act in.
-- create_list and delete_list take 'name'; rename_list takes 'old_name' and 'new_name'. create_list and rename_list reject names over 24 chars.
-
-Most tools that act on a single todo accept fuzzy text matching via 'query', so the user does not need the exact text or ID: start_todo, complete_todo, revert_todo, add_note, delete_todo, move_todo, and the note tools get_note / update_note / delete_note.
-
-update_todo is the exception — it REQUIRES an id and has no 'query'. To act on an item the user described rather than identified, either use one of the fuzzy tools above, or call list_todos / search_todos first to get the id.
-
-Ids are global, not per-list: the user copies one out of the tmux item view (i) or the nvim item view (y) to hand you a task from any list. get_todo, start_todo, complete_todo, revert_todo, update_todo, add_note, delete_todo and move_todo resolve a bare id by finding the list that holds it, so never guess a 'list' for a pasted id and never report an id missing because it is not on the active list. A 'claude:' item fetched by id is burned down the same way as one found via list_todos.`,
+Owed items: "${OWED_LIST}" is the user's cross-project inbox of actions THEY owe, kept to signal. Call add_todo with owe=true and list=<the project list> only when all four hold: (1) only the user can do it: credentials, a console (vault, DNS, IdP, GCP, beta admin), outward comms, or a human call the code can't settle; (2) actionable now: not waiting on another reviewer, a release, a cutover window, or another item; (3) something waits on it: blocked work, or a security/prod risk; (4) not routine flow. Never owe: resuming a session (the handoff carries it), merging or reviewing an MR, tagging or deploying after a merge, watching for a future event, "say ship it", approving a diff proposed in chat, anything the model can run. Conditional asks stay on the project list with deps and no owe; owe them once the dep clears. One console session is one owed item with a checklist. Design decisions (type decision) are feature work: project list, no owe, never twinned into "${OWED_LIST}". One owe=true call writes the project item and its "${OWED_LIST}" twin, linked both ways. Write the description for the user: why, do (exact command + expected result), links, resume. Owed items never carry 'claude:'. complete_todo, revert_todo, delete_todo, move_todo, and update_todo's done/priority/due apply to both twins.`,
     }
 );
 
