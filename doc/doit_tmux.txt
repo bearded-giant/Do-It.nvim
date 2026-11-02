@@ -357,9 +357,9 @@ the same name already holds it. doit.tmux sets `window-renamed`,
 `scripts/todo-relink.sh` to keep the copy on each window's current name.
 
 Links from older versions bound whole sessions (a key with no `:`). On plugin
-load, each running window of that session without a link of its own takes the
-session's list and the session key is removed; a session that is not running
-yet keeps its key for a later load.
+load those keys are removed and no window inherits them, since one list on
+every window of a session shows its todo on unrelated windows. Link each
+window to its own list from the list manager.
 
 Every UI surface (tmux scripts, the status bar, and Neovim when it runs
 inside tmux) resolves the active list through the same chain:

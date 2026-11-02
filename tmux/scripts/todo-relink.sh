@@ -6,9 +6,9 @@
 # a tmux restart restores from, so it has to follow. doit.tmux runs this from
 # the window-renamed, session-renamed and window-linked hooks.
 #
-# --migrate (plugin load): a key without ':' is a link from when lists bound to
-# whole sessions. Each live window of that session without a link of its own
-# gets it, then the session key goes, so no window changes list on upgrade.
+# --migrate (plugin load): drops keys without ':', links from when lists bound
+# whole sessions. Copying one onto every window of its session put one list's
+# todo on unrelated windows, so those windows fall back to daily instead.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/get-active-list.sh"
@@ -34,18 +34,5 @@ while IFS="$DOIT_SEP" read -r id list stamped sess key; do
 done <<< "$windows"
 
 [[ "$1" == "--migrate" && -f "$SESSION_FILE" ]] || exit 0
-
-live_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
-while IFS= read -r legacy; do
-    [[ -n "$legacy" ]] || continue
-    # a session that is not running yet (e.g. before a resurrect restore) keeps its key for a later load
-    grep -qxF -- "$legacy" <<< "$live_sessions" || continue
-    list=$(get_window_link "$legacy")
-    while IFS="$DOIT_SEP" read -r id live stamped sess key; do
-        [[ "$sess" == "$legacy" && -z "$live" ]] || continue
-        [[ -n "$(get_window_link "$key")" ]] && continue
-        _set_window_options "$id" "$list" "$key"
-        link_window "$key" "$list"
-    done <<< "$windows"
-    unlink_window "$legacy"
-done < <(jq -r '(.sessions? // {}) | keys[] | select(contains(":") | not)' "$SESSION_FILE" 2>/dev/null)
+jq -e '(.sessions? // {}) | keys | any(contains(":") | not)' "$SESSION_FILE" &>/dev/null || exit 0
+_update_session_file '.sessions |= with_entries(select(.key | contains(":")))'

@@ -15,7 +15,7 @@ tmux set-environment -g DOIT_SCRIPTS_DIR "$SCRIPTS_DIR"
 # per-window links — unset any residue left in a long-running server.
 tmux set-environment -gu DOIT_ACTIVE_LIST 2>/dev/null
 
-# A window's link is its @doit-list option, which follows the window through
+# A window's link is its @doit-window-list option, which follows the window through
 # renames and moves; these keep the session.json copy that a tmux restart
 # restores from on the window's current name. Fixed index 90 so a reload
 # replaces rather than stacks, and user hooks on low indexes stay intact.

@@ -288,19 +288,25 @@ for w in $DUPS; do T kill-window -t "$w"; done
 
 describe "upgrade from per-session links (--migrate)"
 
-it "a session link becomes a link on each of that session's windows"
+it "a session link is not copied onto that session's windows"
 reset '{"active_list": "work", "sessions": {"s": "play", "gone-session": "work"}}'
 in_win "link_current_window work" s:ops
 env TMUX="$TM" bash "$SCRIPTS/todo-relink.sh" --migrate
-assert_eq "play" "$(opt s:edit @doit-window-list)"
-assert_eq "play" "$(persisted s:edit)"
-assert_eq "play" "$(persisted 's:tmux config')"
+assert_eq "" "$(opt s:edit @doit-window-list)"
+assert_eq "null" "$(persisted s:edit)"
+assert_eq "null" "$(persisted 's:tmux config')"
+assert_eq "daily" "$(resolve_in s:edit)"
 it "…a window with its own link keeps it"
 assert_eq "work" "$(opt s:ops @doit-window-list)"
+assert_eq "work" "$(persisted s:ops)"
 it "…the session key is gone"
 assert_eq "null" "$(persisted s)"
-it "…a key for a session that is not running stays for a later load"
-assert_eq "work" "$(persisted gone-session)"
+it "…so is a key for a session that is not running"
+assert_eq "null" "$(persisted gone-session)"
+it "…and a file with no session keys is left untouched"
+touch -t 202001010000 "$DATA/session.json"
+env TMUX="$TM" bash "$SCRIPTS/todo-relink.sh" --migrate
+assert_eq "" "$(find "$DATA/session.json" -newermt 2020-01-02)"
 
 describe "window targeting"
 
