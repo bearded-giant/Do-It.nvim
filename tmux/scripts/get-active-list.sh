@@ -13,6 +13,14 @@ LISTS_DIR="$DOIT_DATA_DIR/lists"
 # field separator for tmux format output; window names can hold tabs and spaces
 DOIT_SEP=$'\x1f'
 
+# tmux 3.5 prints the separator in -p/-F output as the literal text \037
+_doit_tmux() {
+    local out
+    out=$(tmux "$@") || return
+    [[ -n "$out" ]] && printf '%s\n' "${out//\\037/$DOIT_SEP}"
+    return 0
+}
+
 # Mirror of state/project_list.lua's sanitize(). A list name becomes a filename,
 # so keep it to path-safe characters. Dots are KEPT on purpose: repos like
 # "do-it.nvim" would otherwise collapse to "do-itnvim" and resolve to a different
@@ -69,7 +77,7 @@ get_tmux_window_info() {
     local target args=() out
     target=$(_doit_tmux_target) || return 1
     [[ -n "$target" ]] && args=(-t "$target")
-    out=$(tmux display-message -p "${args[@]}" "#{window_id}${DOIT_SEP}#{@doit-window-list}${DOIT_SEP}#S:#W" 2>/dev/null)
+    out=$(_doit_tmux display-message -p "${args[@]}" "#{window_id}${DOIT_SEP}#{@doit-window-list}${DOIT_SEP}#S:#W" 2>/dev/null)
     [[ -n "$out" ]] || return 1
     printf '%s' "$out"
 }
@@ -84,7 +92,7 @@ get_tmux_window_key() {
 
 # True when a live window other than $2 already holds the persisted link for key $1.
 _key_claimed_elsewhere() {
-    tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-key}" 2>/dev/null |
+    _doit_tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-key}" 2>/dev/null |
         K="$1" ID="$2" awk -F"$DOIT_SEP" '$1 != ENVIRON["ID"] && $2 == ENVIRON["K"] {found=1} END {exit !found}'
 }
 
@@ -111,7 +119,7 @@ _retag_live_windows() {
         else
             _unset_window_options "$id"
         fi
-    done < <(tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-list}" 2>/dev/null)
+    done < <(_doit_tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-list}" 2>/dev/null)
 }
 
 # read-modify-write session.json with a jq filter; preserves unrelated keys

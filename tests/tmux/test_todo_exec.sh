@@ -90,6 +90,20 @@ assert_eq "s:renamed: ship the thing" "$(chip s:renamed)"
 it "by hand, a session:window name works as the argument"
 assert_eq "s:marked: [decision] 12. pick the s..." "$(env -u TMUX_PANE TMUX="$TM" bash "$SCRIPTS/todo-exec.sh" 's:marked')"
 
+it "tmux 3.5 prints the separator as the text \\037: the link still resolves"
+ESC_BIN="$TEST_TMPDIR/escbin"
+mkdir -p "$ESC_BIN"
+export REAL_TMUX
+REAL_TMUX=$(command -v tmux)
+cat > "$ESC_BIN/tmux" << 'EOF'
+#!/bin/bash
+out=$("$REAL_TMUX" "$@"); rc=$?
+[[ -n "$out" ]] && printf '%s\n' "${out//$'\x1f'/\\037}"
+exit $rc
+EOF
+chmod +x "$ESC_BIN/tmux"
+assert_eq "s:renamed: ship the thing" "$(PATH="$ESC_BIN:$PATH" chip s:renamed)"
+
 it "outside tmux with no window: list name labels the chip"
 assert_eq "daily: no active" "$(env -u TMUX -u TMUX_PANE -u DOIT_WINDOW PATH="$NOOP_BIN:$PATH" bash "$SCRIPTS/todo-exec.sh")"
 

@@ -20,7 +20,8 @@ local function tmux(args)
     if vim.v.shell_error ~= 0 or not out then
         return nil
     end
-    return (out:gsub("\n$", ""))
+    -- tmux 3.5 prints the separator in -p/-F output as the literal text \037
+    return (out:gsub("\n$", ""):gsub("\\037", SEP))
 end
 
 -- This nvim's tmux window, or nil outside tmux: id, live (its @doit-window-list

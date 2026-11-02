@@ -128,6 +128,24 @@ describe("window links", function()
 			assert.are.equal("s:alpha", session.window_key())
 		end)
 
+		it("tmux 3.5 prints the separator as the text \\037: links still resolve", function()
+			write_session({ active_list = "work", sessions = { ["s:beta"] = "play" } })
+			enter_tmux()
+			T("set-option", "-wq", "-t", "s:alpha", "@doit-window-list", "work")
+			local real = vim.fn.system
+			vim.fn.system = function(...)
+				return (real(...):gsub("\31", "\\037"))
+			end
+			local ok, by_list, here = pcall(session.links_by_list)
+			local key = ok and session.window_key()
+			vim.fn.system = real
+
+			assert.is_true(ok)
+			assert.are.same({ { key = "s:beta", live = true } }, by_list.play)
+			assert.are.equal("work", here)
+			assert.are.equal("s:alpha", key)
+		end)
+
 		it("an unlinked window has no list here", function()
 			write_session({ active_list = "work", sessions = { ["s:beta"] = "play" } })
 			enter_tmux()

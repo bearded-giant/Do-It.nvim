@@ -206,7 +206,7 @@ COLS=40
 
 render() {
     local once=${1:-false}
-    jq -rn --arg panes "$(tmux list-panes -a -F "$FMT" 2>/dev/null)" --arg sep "$S" --arg sel "$SEL" \
+    jq -rn --arg panes "$(_doit_tmux list-panes -a -F "$FMT" 2>/dev/null)" --arg sep "$S" --arg sel "$SEL" \
         --argjson move "$MOVE" --argjson follow "$FOLLOW" --argjson row_off "$ROW_OFF" --argjson col_off "$COL_OFF" \
         --argjson rows "$ROWS" --argjson cols "$COLS" --argjson expanded "$EXPANDED" --argjson once "$once" \
         --arg filter "$FILTER" --argjson typing "$TYPING" --arg view "$(source_filter)" \
@@ -278,7 +278,7 @@ client() {
             jq -r --argjson id "$RIGHT" '.[] | select(.pane_id == $id) | .tty_name // empty')
     fi
     tmux list-clients -F '#{client_tty}' 2>/dev/null | grep -qxF -- "$TTY" ||
-        TTY=$(tmux list-clients -F "#{client_activity}$S#{client_tty}" 2>/dev/null |
+        TTY=$(_doit_tmux list-clients -F "#{client_activity}$S#{client_tty}" 2>/dev/null |
             sort -rn | head -1 | cut -d "$S" -f2)
     [[ -n "$TTY" ]]
 }

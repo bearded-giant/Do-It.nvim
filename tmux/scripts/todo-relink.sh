@@ -17,7 +17,7 @@ source "$SCRIPT_DIR/get-active-list.sh"
 command -v jq &>/dev/null || exit 0
 command -v tmux &>/dev/null || exit 0
 
-windows=$(tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-list}${DOIT_SEP}#{@doit-window-key}${DOIT_SEP}#{session_name}${DOIT_SEP}#S:#W" 2>/dev/null)
+windows=$(_doit_tmux list-windows -a -F "#{window_id}${DOIT_SEP}#{@doit-window-list}${DOIT_SEP}#{@doit-window-key}${DOIT_SEP}#{session_name}${DOIT_SEP}#S:#W" 2>/dev/null)
 [[ -n "$windows" ]] || exit 0
 live_keys=$(printf '%s\n' "$windows" | awk -F"$DOIT_SEP" '{print $5}')
 
