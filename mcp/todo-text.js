@@ -3,7 +3,7 @@
 // the bucket, N gives the order inside it — and it is what deps reference.
 
 const TEXT_SHAPE =
-    /^(?<claude>claude:\s*)?(?:\[(?<type>[^\]]+)\]\s*)?(?:(?<rank>\d+)(?<suffix>[a-z]*)\.\s+)?(?<body>[\s\S]*)$/i;
+    /^(?<claude>claude:\s*)?(?:\[(?<type>[^\][]+)\]\s*)?(?:(?<rank>\d+)(?<suffix>[a-z]*)\.\s+)?(?<body>[\s\S]*)$/i;
 
 const DEP_SUFFIX = /\s*\(dep on [^)]*\)\s*$/i;
 
@@ -52,7 +52,7 @@ export function parseTodoText(text) {
     };
 }
 
-const LABEL_PREFIX = /^(?:claude:\s*)?(?:\[[^\]]+\]\s*)?(?:\d+[a-z]*\.\s+)?/i;
+const LABEL_PREFIX = /^(?:claude:\s*)?(?:\[[^\][]+\]\s*)?(?:\d+[a-z]*\.\s+)?/i;
 
 // an owed twin names its project list ("[gate] 4. proj: body", "from: proj #4"), so a relink renames that label
 export function relabelTwin(todo, oldList, newList) {

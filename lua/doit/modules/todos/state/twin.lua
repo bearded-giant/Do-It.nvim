@@ -52,7 +52,7 @@ local function relabel(twin, old_list, new_list)
     end
     local text = twin.text or ""
     local pos = 1
-    for _, pat in ipairs({ "^claude:%s*", "^%[[^%]]+%]%s*", "^%d+%l*%.%s+" }) do
+    for _, pat in ipairs({ "^claude:%s*", "^%[[^%[%]]+%]%s*", "^%d+%l*%.%s+" }) do
         local _, e = text:find(pat, pos)
         if e then
             pos = e + 1

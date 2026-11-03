@@ -16,6 +16,12 @@ assert.deepEqual(parseTodoText("logic port"), {
 });
 // a decimal is not a rank
 assert.equal(parseTodoText("1.5x throughput fix").rank, null);
+// a [[note link]] is body, so re-composing an edited title leaves it intact
+assert.deepEqual(parseTodoText("[[note link]] foo"), {
+    claude: false, type: null, rank: null, rankLabel: null, body: "[[note link]] foo",
+});
+assert.equal(composeTodoText("[[note link]] bar", { inherit: "[[note link]] foo" }), "[[note link]] bar");
+assert.equal(composeTodoText("[[note link]] foo", { type: "chore", inherit: "[[note link]] foo" }), "[chore] [[note link]] foo");
 
 // next rank ignores untagged items and honors letter suffixes
 assert.equal(nextRank([{ text: "1. a" }, { text: "[gate] 30. b" }, { text: "12b. c" }]), 31);
