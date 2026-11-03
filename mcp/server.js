@@ -826,6 +826,7 @@ server.tool(
         }
 
         data.todos = data.todos || [];
+        if (start) for (const t of data.todos) t.in_progress = false;
         data.todos.push(newTodo);
         if (sequence) setSequence(data.todos, newTodo, sequence);
         saveList(filepath, data);

@@ -108,6 +108,12 @@ assert.match(r.text, /^proj /m);
 r = await call("add_todo", { list: "proj", text: "claude can still write here", type: "chore" });
 assert.ok(!r.isError, "any session can use a list whatever its source");
 
+// add_todo start follows start_todo: one item in progress per list
+await call("add_todo", { list: "proj", text: "first running", start: true });
+await call("add_todo", { list: "proj", text: "second running", start: true });
+const running = JSON.parse(fs.readFileSync(path.join(listsDir, "proj.json"), "utf-8")).todos.filter(t => t.in_progress);
+assert.deepEqual(running.map(t => t.text.replace(/^\d+\. /, "")), ["second running"]);
+
 // a list name becomes a filename, so path characters are refused
 for (const bad of ["../escape", "a/b", "..", "has space"]) {
     r = await call("create_list", { name: bad });
