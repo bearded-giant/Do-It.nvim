@@ -584,7 +584,9 @@ every project and each project list still shows it. `complete_todo`,
 done / priority / due keep both twins in step. The tmux and nvim UIs do the
 same for done, priority, due, delete (undo brings the twin back too), move, and
 list rename. Since `daily` holds every twin, none of the three will delete or
-rename it. The tmux and nvim views of `daily` show only items checked off
+rename it. Deleting a project list from any of the three keeps each owed item's
+`daily` twin: the link is dropped, notes the project copy had pick up a
+`notes from "<list>"` block on the twin, and a line records the deletion. The tmux and nvim views of `daily` show only items checked off
 today; older done items stay in the file (and in `list_todos`), just hidden.
 Other lists show every done item.
 
@@ -609,7 +611,7 @@ Lists:
 | `switch_list` | Change the active list. Inside tmux it links the current window and updates the global pointer; `scope` narrows the write to `window` (or its older name `session`) or `global` |
 | `create_list` | Create a new empty list. It links nothing; `switch_list` does that |
 | `rename_list` | Rename a list. Switch away from it first |
-| `delete_list` | Delete a list. Switch away from it first |
+| `delete_list` | Delete a list. Switch away from it first. The file moves to `deleted/<list>-<epoch>.json` in the data dir, and owed twins on other lists stay, unlinked |
 
 ### Item Text Convention
 

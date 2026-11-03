@@ -204,6 +204,35 @@ describe("owed twin sync", function()
 		assert.are.equal("proj2", item("daily", "D1").twin.list)
 	end)
 
+	it("delete_list archives the file and keeps each daily twin, unlinked, with notes that never synced", function()
+		write_list("gone", {
+			{ id = "G1", text = "rotate creds", done = false, order_index = 1, twin = { list = "daily", id = "D2" },
+				description = "daily: D2\n\ndo: rotate\nDONE half\n\n\n----------\nlast modified: 2026-01-01: 00:00" },
+			{ id = "G2", text = "same", done = false, order_index = 2, twin = { list = "daily", id = "D3" },
+				description = "daily: D3\n\ndo: same" },
+		})
+		local daily = read_list("daily")
+		table.insert(daily.todos, { id = "D2", text = "gone: rotate creds", done = false, order_index = 2,
+			twin = { list = "gone", id = "G1" }, description = "from: gone #1 (id G1)\n\ndo: rotate" })
+		table.insert(daily.todos, { id = "D3", text = "gone: same", done = false, order_index = 3,
+			twin = { list = "gone", id = "G2" }, description = "from: gone #2 (id G2)\n\ndo: same" })
+		write_list("daily", daily.todos, daily._metadata)
+
+		assert.is_true(state.delete_list("gone"))
+		assert.are.equal(0, vim.fn.filereadable(list_path("gone")))
+		assert.are.equal(1, #vim.fn.glob(tmpdir .. "/doit/deleted/gone-*.json", false, true))
+		local d2 = item("daily", "D2")
+		assert.is_nil(d2.twin)
+		assert.truthy(d2.description:find("^from: gone #1"))
+		assert.truthy(d2.description:find('notes from "gone":\ndo: rotate\nDONE half', 1, true))
+		assert.truthy(d2.description:find('list "gone" deleted %d%d%d%d%-%d%d%-%d%d; twin link dropped'))
+		assert.truthy(d2.description:find("last modified: ", 1, true))
+		local d3 = item("daily", "D3")
+		assert.is_nil(d3.twin)
+		assert.falsy(d3.description:find("notes from", 1, true))
+		assert.are.same({}, warnings)
+	end)
+
 	it("missing twin id warns and changes nothing", function()
 		write_list("proj", {
 			{ id = "P1", text = "x", done = false, order_index = 1, twin = { list = "daily", id = "GONE" } },

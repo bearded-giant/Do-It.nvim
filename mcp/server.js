@@ -219,6 +219,23 @@ function syncTwin(todo, mutate) {
     return `\nTwin in "${todo.twin.list}" ${what}: ${twin.text}`;
 }
 
+// notes never sync between twins, so the deleted side's notes move onto the survivor
+function detachTwin(todo, deletedList) {
+    if (!todo.twin || todo.twin.list === deletedList) return "";
+    const header = `${todo.twin.list}: ${todo.twin.id}`;
+    return syncTwin(todo, (_, twin) => {
+        let notes = stripFooter(todo.description).trim();
+        if (notes.startsWith(header)) notes = notes.slice(header.length).trim();
+        const body = stripFooter(twin.description).trimEnd();
+        const parts = [body];
+        if (notes && !body.includes(notes)) parts.push(`notes from "${deletedList}":\n${notes}`);
+        parts.push(`list "${deletedList}" deleted ${new Date().toLocaleDateString("en-CA")}; twin link dropped`);
+        twin.description = stampDescription(parts.filter(Boolean).join("\n\n"));
+        delete twin.twin;
+        return "detached";
+    });
+}
+
 function removeTodo(data, id) {
     const idx = data.todos.findIndex(t => t.id === id);
     // incomplete children outlive their parent (no completion cascade)
@@ -1695,7 +1712,7 @@ server.tool(
 
 server.tool(
     "delete_list",
-    "Delete an entire do-it todo list. Cannot delete the active list or \"daily\".",
+    "Delete an entire do-it todo list. Cannot delete the active list or \"daily\". The file moves to deleted/ under the data dir; each owed item's twin on another list stays, unlinked, with the deleted copy's notes.",
     {
         name: z.string().describe("List name to delete"),
     },
@@ -1713,7 +1730,10 @@ server.tool(
 
         const data = readJSON(filepath);
         const count = (data.todos || []).length;
-        fs.unlinkSync(filepath);
+        const twinNotes = (data.todos || []).map(t => detachTwin(t, name)).join("");
+        const archived = path.join(DATA_DIR, "deleted", `${name}-${Math.floor(Date.now() / 1000)}.json`);
+        fs.mkdirSync(path.dirname(archived), { recursive: true });
+        fs.renameSync(filepath, archived);
 
         updateSession(session => {
             for (const [sess, list] of Object.entries(session.sessions || {})) {
@@ -1725,7 +1745,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Deleted list "${name}" (had ${count} items)`,
+                text: `Deleted list "${name}" (had ${count} items), archived to ${archived}${twinNotes}`,
             }],
         };
     }

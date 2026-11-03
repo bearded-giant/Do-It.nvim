@@ -275,4 +275,29 @@ it "delete refuses daily"
 assert_contains "$(delete_list daily <<< "yes")" "daily is permanent"
 assert_eq "yes" "$([[ -f "$DAILY" ]] && echo yes)" "daily.json is gone"
 
+describe "todo-list-manager.sh delete_list detaches twins and archives"
+
+reset_fixture
+CURRENT_LIST=daily
+prune_links_for_list() { :; }
+jq '.todos[0].description = "daily: D1\n\ndo: merge\n  DONE half\n\n\n----------\nlast modified: 2026-01-01: 00:00"' \
+    "$PROJ" > "$PROJ.tmp" && mv "$PROJ.tmp" "$PROJ"
+jq '.todos[0].description = "from: proj #1 (id P1)\n\ndo: merge" | .todos += [{"id":"D9","text":"x","twin":{"list":"other","id":"O1"}}]' \
+    "$DAILY" > "$DAILY.tmp" && mv "$DAILY.tmp" "$DAILY"
+out=$(delete_list proj <<< "yes")
+it "delete reports the archive path"
+assert_contains "$out" "archived to $DOIT_DATA_DIR/deleted/proj-"
+it "the list file moves to deleted/ with its items"
+assert_eq "no 2" "$([[ -f "$PROJ" ]] && echo yes || echo no) $(jq '.todos | length' "$DOIT_DATA_DIR"/deleted/proj-*.json)"
+it "the daily twin loses its link"
+assert_eq "null" "$(field "$DAILY" D1 '.twin')"
+it "the daily twin gains the notes that never synced, indentation kept"
+desc=$(field "$DAILY" D1 '.description' | jq -r .)
+assert_eq "yes" "$([[ "$desc" == *$'\n\nnotes from "proj":\ndo: merge\n  DONE half\n\nlist "proj" deleted '* ]] && echo yes)"
+it "the daily twin records the deletion and keeps a footer"
+assert_contains "$(field "$DAILY" D1 '.description' | jq -r .)" 'list "proj" deleted '
+assert_contains "$(field "$DAILY" D1 '.description' | jq -r .)" 'last modified: '
+it "a twin pointing at another list is untouched"
+assert_eq '{"list":"other","id":"O1"}' "$(field "$DAILY" D9 '.twin')"
+
 report

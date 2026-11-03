@@ -10,7 +10,7 @@ twin_ref() {
         | select(.list and .id) | "\(.list)\t\(.id)"' "$1" 2>/dev/null
 }
 
-# twin_apply <twin_ref> <op> [arg]; op: complete|revert|delete|restore|priority|due|relink
+# twin_apply <twin_ref> <op> [arg] [notes]; op: complete|revert|delete|restore|priority|due|relink|detach
 # prints one status line, nothing when there is no twin
 twin_apply() {
     local tlist tid op="$2" arg="${3:-}"
@@ -39,6 +39,18 @@ twin_apply() {
                               | if ((.description // "") | startswith($f)) then .description = "from: " + $arg + " #" + .description[($f | length):] else . end)
                         else . end
                       | .twin.list = $arg)' ;;
+        # mirrors mcp/server.js detachTwin: notes never sync between twins, so the deleted side's notes move over
+        detach)   filter='def strip: sub("\n*----------\nlast (updated|modified):[\\s\\S]*\\z"; "");
+                      def trimws: sub("\\A\\s+"; "") | sub("\\s+\\z"; "");
+                      ($notes | strip | trimws | if startswith($hdr) then .[($hdr | length):] | trimws else . end) as $n
+                      | (.todos[] | select(.id == $id)) |= (
+                          ((.description // "") | strip | sub("\\s+\\z"; "")) as $body
+                          | .description = ([$body,
+                                (if $n != "" and ($body | contains($n) | not) then "notes from \"\($arg)\":\n\($n)" else empty end),
+                                "list \"\($arg)\" deleted \(now | strflocaltime("%Y-%m-%d")); twin link dropped"]
+                              | map(select(. != "")) | join("\n\n"))
+                              + "\n\n\n----------\nlast modified: \(now | strflocaltime("%Y-%m-%d: %H:%M"))"
+                          | del(.twin))' ;;
         # no promoteChildren like the MCP: tmux's own delete doesn't promote and owed twins are top-level
         delete)   filter='(.todos[] | select(.id == $id)) as $d | .todos |= map(select(.id != $id))
                       | ._metadata.deleted_todos = ([$d] + (._metadata.deleted_todos // []))[0:10]' ;;
@@ -46,7 +58,17 @@ twin_apply() {
                       | .todos += [$r] | ._metadata.deleted_todos |= map(select(.id != $id))' ;;
         *) return 1 ;;
     esac
-    jq --arg id "$tid" --arg arg "$arg" "$filter | ._metadata.updated_at = (now | floor)" "$tpath" \
+    jq --arg id "$tid" --arg arg "$arg" --arg notes "${4:-}" --arg hdr "$tlist: $tid" \
+        "$filter | ._metadata.updated_at = (now | floor)" "$tpath" \
         > "$tpath.tmp" && mv "$tpath.tmp" "$tpath"
     echo "twin in \"$tlist\": $op"
+}
+
+# twin_detach_list <list_path> <list_name>: before a list goes, unlink every twin it holds on another list
+twin_detach_list() {
+    local id
+    for id in $(jq -r --arg l "$2" '.todos[] | select(.twin.list and .twin.id and .twin.list != $l) | .id' "$1" 2>/dev/null); do
+        twin_apply "$(twin_ref "$1" "$id")" detach "$2" \
+            "$(jq -r --arg id "$id" '.todos[] | select(.id == $id) | .description // ""' "$1")"
+    done
 }

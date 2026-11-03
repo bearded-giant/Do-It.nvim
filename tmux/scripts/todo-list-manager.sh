@@ -254,9 +254,11 @@ delete_list() {
     read -r CONFIRM
 
     if [[ "$CONFIRM" == "yes" ]]; then
-        rm -f "$LISTS_DIR/${list_name}.json"
+        local archive="$DOIT_DATA_DIR/deleted/${list_name}-$(date +%s).json"
+        twin_detach_list "$LISTS_DIR/${list_name}.json" "$list_name" > /dev/null
+        mkdir -p "${archive%/*}" && mv "$LISTS_DIR/${list_name}.json" "$archive"
         prune_links_for_list "$list_name"
-        echo "${COLOR_GREEN}Deleted: $list_name${COLOR_RESET}"
+        echo "${COLOR_GREEN}Deleted: $list_name (archived to $archive)${COLOR_RESET}"
     else
         echo "Cancelled"
     fi

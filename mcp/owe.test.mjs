@@ -174,6 +174,29 @@ assert.match(claudeTwin.text, /^\[gate\] \d+\. claude: deploy it$/);
 await callTool("rename_list", { old_name: "claude", new_name: "claude-code" });
 assert.match(byText("daily", "deploy it").text, /^\[gate\] \d+\. claude-code: deploy it$/);
 
+// deleting a list archives the file and keeps each owed item's daily copy, unlinked, carrying the notes that never synced
+await callTool("create_list", { name: "gone" });
+await callTool("add_todo", { list: "gone", text: "rotate creds", type: "gate", owe: true, description: "do: rotate" });
+await callTool("add_todo", { list: "gone", text: "same notes", type: "gate", owe: true, description: "do: same" });
+await callTool("add_note", { list: "gone", id: byText("gone", "rotate creds").id, note: "DONE half of it" });
+const goneOut = await callTool("delete_list", { name: "gone" });
+assert.match(goneOut, /archived to .*deleted\/gone-\d+\.json/);
+assert.match(goneOut, /Twin in "daily" detached/);
+assert.ok(!fs.existsSync(path.join(listsDir, "gone.json")));
+const archives = fs.readdirSync(path.join(dataDir, "deleted")).filter(f => f.startsWith("gone-"));
+assert.equal(archives.length, 1);
+assert.equal(JSON.parse(fs.readFileSync(path.join(dataDir, "deleted", archives[0]), "utf-8")).todos.length, 2);
+const keptTwin = byText("daily", "gone: rotate creds");
+assert.equal(keptTwin.twin, undefined);
+assert.match(keptTwin.description, /^from: gone #1/);
+assert.match(keptTwin.description, /notes from "gone":\n[\s\S]*DONE half of it/);
+assert.match(keptTwin.description, /list "gone" deleted \d{4}-\d{2}-\d{2}; twin link dropped/);
+assert.match(keptTwin.description, /last modified: /);
+const sameTwin = byText("daily", "gone: same notes");
+assert.equal(sameTwin.twin, undefined);
+assert.doesNotMatch(sameTwin.description, /notes from/);
+assert.match(sameTwin.description, /list "gone" deleted/);
+
 // tmux links and the global pointer are the user's view state; an omitted list goes to daily
 fs.writeFileSync(path.join(dataDir, "session.json"), JSON.stringify({ active_list: "proj", sessions: { work: "proj" } }));
 assert.match(await callTool("add_todo", { text: "no list given" }), /Added to "daily"/);

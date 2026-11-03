@@ -1,5 +1,7 @@
 -- Owed items live twice (a project list and daily), cross-linked by `twin`.
 -- Mirrors mcp/server.js syncTwin so an nvim edit to one copy reaches the other.
+local footer = require("doit.core.utils.footer")
+
 local M = {}
 
 local MAX_DELETED = 10
@@ -67,7 +69,27 @@ local function relabel(twin, old_list, new_list)
     end
 end
 
-local function mutate(twin, op, value, source_id)
+-- mirrors mcp/server.js detachTwin: notes never sync between twins, so the deleted side's notes move over
+local function detach(twin, deleted_list, source)
+    local header = source.twin.list .. ": " .. source.twin.id
+    local notes = vim.trim(footer.strip(source.description))
+    if notes:sub(1, #header) == header then
+        notes = vim.trim(notes:sub(#header + 1))
+    end
+    local body = footer.strip(twin.description):gsub("%s+$", "")
+    local parts = {}
+    if body ~= "" then
+        table.insert(parts, body)
+    end
+    if notes ~= "" and not body:find(notes, 1, true) then
+        table.insert(parts, string.format('notes from "%s":\n%s', deleted_list, notes))
+    end
+    table.insert(parts, string.format('list "%s" deleted %s; twin link dropped', deleted_list, os.date("%Y-%m-%d")))
+    twin.description = footer.stamp(table.concat(parts, "\n\n"))
+    twin.twin = nil
+end
+
+local function mutate(twin, op, value, source)
     if op == "complete" then
         twin.done = true
         twin.in_progress = false
@@ -82,11 +104,13 @@ local function mutate(twin, op, value, source_id)
         twin.due_date = value
     elseif op == "relink" then
         relabel(twin, type(twin.twin) == "table" and twin.twin.list or nil, value)
-        twin.twin = { list = value, id = source_id }
+        twin.twin = { list = value, id = source.id }
+    elseif op == "detach" then
+        detach(twin, value, source)
     end
 end
 
--- op: complete|revert|priority|due|relink|delete|restore; value is the stamp/priority/date/list name
+-- op: complete|revert|priority|due|relink|detach|delete|restore; value is the stamp/priority/date/list name
 function M.sync(todo, op, value)
     local ref = type(todo) == "table" and todo.twin
     if type(ref) ~= "table" or not ref.list or not ref.id or not state or not state.get_list_path then
@@ -132,7 +156,7 @@ function M.sync(todo, op, value)
         table.remove(deleted, idx)
         table.insert(data.todos, twin)
     else
-        mutate(twin, op, value, todo.id)
+        mutate(twin, op, value, todo)
     end
 
     if loaded then
@@ -149,6 +173,18 @@ function M.relink_list(list_name)
     local data = read_list(state.get_list_path(list_name))
     for _, todo in ipairs(data and data.todos or {}) do
         M.sync(todo, "relink", list_name)
+    end
+end
+
+function M.detach_list(list_name)
+    if not state or not state.get_list_path then
+        return
+    end
+    local data = read_list(state.get_list_path(list_name))
+    for _, todo in ipairs(data and data.todos or {}) do
+        if type(todo.twin) == "table" and todo.twin.list ~= list_name then
+            M.sync(todo, "detach", list_name)
+        end
     end
 end
 

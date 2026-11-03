@@ -509,8 +509,10 @@ function storage.setup(M)
             return false, "List does not exist"
         end
         
-        -- Delete file
-        local success, err = os.remove(list_path)
+        require("doit.modules.todos.state.twin").detach_list(list_name)
+        local archive_dir = vim.fn.fnamemodify(list_path, ":h:h") .. "/deleted"
+        vim.fn.mkdir(archive_dir, "p")
+        local success, err = os.rename(list_path, string.format("%s/%s-%d.json", archive_dir, list_name, os.time()))
         if not success then
             return false, "Failed to delete list: " .. (err or "unknown error")
         end
