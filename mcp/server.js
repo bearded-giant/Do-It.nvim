@@ -27,7 +27,10 @@ const LISTS_DIR = path.join(DATA_DIR, "lists");
 const SESSION_FILE = path.join(DATA_DIR, "session.json");
 // the tmux chip shows list names whole, so length is capped here instead of cut there
 const MAX_LIST_NAME = 24;
-const listNameSchema = z.string().max(MAX_LIST_NAME, `List names are capped at ${MAX_LIST_NAME} chars; shorten it (drop repeated or trailing words), do not cut mid-word.`);
+const listNameSchema = z.string()
+    .max(MAX_LIST_NAME, `List names are capped at ${MAX_LIST_NAME} chars; shorten it (drop repeated or trailing words), do not cut mid-word.`)
+    // the name is the filename; same charset as tmux sanitize_list_name, so no path can escape lists/
+    .regex(/^(?!\.\.?$)[\w.-]+$/, "List names use letters, digits, '.', '_' and '-' only.");
 
 const PRIORITY_LABELS = { critical: "!!!", urgent: "!!", important: "!" };
 

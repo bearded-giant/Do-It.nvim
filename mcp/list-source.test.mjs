@@ -108,6 +108,17 @@ assert.match(r.text, /^proj /m);
 r = await call("add_todo", { list: "proj", text: "claude can still write here", type: "chore" });
 assert.ok(!r.isError, "any session can use a list whatever its source");
 
+// a list name becomes a filename, so path characters are refused
+for (const bad of ["../escape", "a/b", "..", "has space"]) {
+    r = await call("create_list", { name: bad });
+    assert.ok(r.isError, `create_list refuses "${bad}"`);
+}
+assert.ok(!fs.existsSync(path.join(dataDir, "escape.json")), "nothing written outside lists/");
+r = await call("rename_list", { old_name: "proj", new_name: "../escape" });
+assert.ok(r.isError, "rename_list refuses a path as the new name");
+r = await call("create_list", { name: "ok_name-1.x" });
+assert.ok(!r.isError, "word chars, dots and dashes pass");
+
 server.kill();
 fs.rmSync(dataDir, { recursive: true, force: true });
 console.log("list-source: ok");
