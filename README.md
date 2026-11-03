@@ -21,6 +21,7 @@ Do-It.nvim began as a way to track tasks and keep simple markdown notes per proj
 - **Import/Export** - Backup or share your tasks, or export pending items to markdown with `E`
 - **Lualine Integration** - Show active tasks in your statusline
 - **Tmux Add-on** - Optional tmux integration with shared data (see below)
+- **Command Line** - A `doit` command to browse, add, and edit items from any shell (see [Command Line](#command-line))
 - **Window-Linked Lists** - Each tmux window holds its own active list; `daily` stays one popup away
 
 ## Quick Start
@@ -637,6 +638,40 @@ Duplicate detection strips that whole wrapper before comparing, so an item you t
 | `DOIT_ACTIVE_LIST` | (unset) | Override active list name. Wins over window links and per-project derivation. The MCP server reads only this, then `daily` |
 
 The MCP server reads and writes the same JSON files used by the Neovim plugin and tmux add-on. Changes sync automatically.
+
+## Command Line
+
+`mcp/cli.js` is a `doit` command for working your lists from any shell. Run it with no arguments and it walks you through it: pick a list, pick an item, pick what to do with it. Arrow keys and Enter drive every prompt, typing filters whatever is on screen, and Esc backs out a level. It writes through the same handlers as the MCP server, so owed twins, timestamps, and validation behave the same. Items you add are yours (`source: "user"`, no rank prefix), same as typing them in Neovim or tmux.
+
+```bash
+cd mcp && npm install
+ln -s "$PWD/cli.js" ~/.local/bin/doit    # or anywhere else on your PATH
+```
+
+| Command | What it does |
+|---------|--------------|
+| `doit` | Pick a list, then browse and edit its items |
+| `doit open [list]` | Browse one list |
+| `doit find <text>` | Search item text and notes on every list, then open a match |
+| `doit lists [filter]` | Print every list with open counts and what's in progress. `--mine` or `--claude` narrows it |
+| `doit list add <name>` | Create a list |
+| `doit list rename <old> <new>` | Rename a list |
+| `doit list rm <name>` | Delete a list. It moves to `deleted/` in the data dir |
+| `doit list use <name>` | Make it the current list. Inside tmux that links the window |
+| `doit ls [list]` | Print a list's items, in progress and priorities first. `-a` includes done ones |
+| `doit add [text]` | Add an item to the current list. With no text it asks for the list, title, and priority. Takes `-l`, `-t` (type), `-p` (priority), `--due`, `-d` (details), `--parent`, `--start` |
+| `doit show <item>` | Print an item with its notes |
+| `doit edit <item>` | Open the item's menu, or change it right away with `--title`, `-p`, `--due`, `-t`, `-d` |
+| `doit note <item> [text]` | Append a note. With no text it opens `$EDITOR`, or reads stdin when piped |
+| `doit start <item>` | Start an item. `done` and `reopen` work the same way |
+| `doit mv <item> [list]` | Move an item to another list |
+| `doit rm <item>` | Delete an item. It asks first; `-y` skips that |
+
+An `<item>` is an id (the one the tmux and nvim item views copy), a `#rank` on the current list, or a few words from its text. Words matching more than one item get you a picker, or an error listing the ids when nothing can prompt. Leave `<item>` off and you pick one from the current list. The current list is whatever your tmux window shows, resolved by the same script the tmux views use. Outside tmux it's the global pointer (`doit list use` sets it), then `daily`. Pass `-l <list>` to aim anywhere else.
+
+Inside a list, typing filters its items, and when nothing matches, Enter adds what you typed as a new item. The list also has its list notes, a done-items toggle, and list actions (make current, rename, clear done, delete). An item's menu covers start, complete, reopen, add note, edit details (your `$EDITOR` on the description), title, priority, due date, type, add subtask, move, and delete.
+
+Nothing prompts when stdin or stdout isn't a terminal, so scripts are safe: a missing argument is an error, and deletes need `-y`.
 
 ## Obsidian Vault Export
 

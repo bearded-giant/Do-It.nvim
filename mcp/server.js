@@ -208,6 +208,12 @@ function generateId() {
 // The cross-project inbox for actions the user owes; owe twins land here.
 const OWED_LIST = "daily";
 
+// cli.js runs these handlers in-process; items typed there are the user's, written like nvim/tmux ones (no rank)
+let itemSource = "mcp";
+function setItemSource(source) {
+    itemSource = source;
+}
+
 // Twins live in two files, so a change made here has to be written there too.
 // tmux (tmux/scripts/lib-twin.sh) and nvim (lua/doit/modules/todos/state/twin.lua) mirror this.
 function syncTwin(todo, mutate) {
@@ -770,7 +776,7 @@ server.tool(
         const rank = nextRank(data.todos || []);
         const composed = twinned
             ? composeTodoText(`owed in ${OWED_LIST} #${owedRank}: ${parsed.body.trim()}`, { type: type || parsed.type, deps, rank })
-            : composeTodoText(text, { type, deps, rank });
+            : composeTodoText(text, { type, deps, rank: itemSource === "mcp" ? rank : null });
         const newTodo = {
             id,
             text: composed,
@@ -778,7 +784,7 @@ server.tool(
             in_progress: start || false,
             order_index: getMaxOrder(data.todos || []) + 1,
             created_at: Math.floor(Date.now() / 1000),
-            source: "mcp",
+            source: itemSource,
         };
         newTodo.description = stampDescription(description || "");
         if (priority) newTodo.priorities = priority;
@@ -1754,5 +1760,12 @@ server.tool(
     }
 );
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+export {
+    LISTS_DIR, PRIORITY_LABELS, findListByTodoId, isMineList, loadList, parseDue, readJSON, readVersion,
+    renderDue, server, setItemSource, stripFooter, structureAware,
+};
+
+// cli.js imports this module for its tools and must not take over stdio
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    await server.connect(new StdioServerTransport());
+}

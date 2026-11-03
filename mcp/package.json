@@ -4,10 +4,14 @@
   "description": "MCP server for do-it.nvim todo management",
   "type": "module",
   "main": "server.js",
+  "bin": {
+    "doit": "cli.js"
+  },
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.7.4",
     "@modelcontextprotocol/sdk": "^1.12.1"
   }
 }
