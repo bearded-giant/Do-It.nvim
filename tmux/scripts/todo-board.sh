@@ -47,7 +47,7 @@ def glyph:
    elif .st == "busy" then (if secs > 600 then [["33", "?"]] else [["33", "●"]] end)
    elif .focus then [["32", "●"]]
    else [["32", "✓"]] end)
-  + ((.ctx | tonumber? // 100) as $c | if $c < 30 then [[(if $c < 20 then "31" else "38;5;208" end), "◔\(.ctx)"]] else [] end);
+  + ((.ctx | tonumber? // 100) as $c | if $c < 36 then [[(if $c < 21 then "31" else "38;5;208" end), "◔\(.ctx)"]] else [] end);
 def slice($off; $w):
   reduce .[] as $s ({pos: 0, out: []};
     ($s[1] | length) as $n
