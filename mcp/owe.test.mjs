@@ -127,12 +127,14 @@ assert.match(await callTool("move_todo", { id: p.id, to_list: "other" }), /relin
 d = byText("daily", "confirm callback");
 assert.deepEqual(d.twin, { list: "other", id: p.id });
 assert.equal(d.text, "[gate] 2. other: confirm callback on stage");
-assert.ok(d.description.startsWith(`from: other #2 (id ${p.id})\n\ndo:`));
+// "other" was empty, so the moved item takes rank 1 there and its dep into proj drops out
+assert.ok(d.description.startsWith(`from: other #1 (id ${p.id})\n\ndo:`));
+assert.match(byText("other", "owed in daily").text, /^\[gate\] 1\. owed in daily #2: confirm callback on stage$/);
 await callTool("rename_list", { old_name: "other", new_name: "renamed" });
 d = byText("daily", "confirm callback");
 assert.deepEqual(d.twin, { list: "renamed", id: p.id });
 assert.equal(d.text, "[gate] 2. renamed: confirm callback on stage");
-assert.ok(d.description.startsWith(`from: renamed #2 (id ${p.id})`));
+assert.ok(d.description.startsWith(`from: renamed #1 (id ${p.id})`));
 
 // delete takes the twin with it, undo-able on both sides
 assert.match(await callTool("delete_todo", { id: p.id }), /Twin in "daily" deleted/);

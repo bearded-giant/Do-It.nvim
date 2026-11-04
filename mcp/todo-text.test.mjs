@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseTodoText, nextRank, composeTodoText, normalizeTodoText, relabelTwin } from "./todo-text.js";
+import { parseTodoText, nextRank, composeTodoText, normalizeTodoText, relabelTwin, renumberText } from "./todo-text.js";
 
 // parse
 assert.deepEqual(parseTodoText("[gate] 30. pre-store check"), {
@@ -101,9 +101,9 @@ assert.equal(
 assert.notEqual(normalizeTodoText("buy milk"), normalizeTodoText("buy bread"));
 
 // relabelTwin renames the list label after the marker/type/rank prefix, and the from: line
-const relabel = (text, description, oldList, newList) => {
+const relabel = (text, description, oldList, newList, rankMap) => {
     const t = { text, description };
-    relabelTwin(t, oldList, newList);
+    relabelTwin(t, oldList, newList, rankMap);
     return [t.text, t.description];
 };
 assert.deepEqual(relabel("[gate] 4. proj: ship it", "from: proj #4 (id x)\n\nwhy", "proj", "proj2"),
@@ -112,5 +112,24 @@ assert.deepEqual(relabel("claude: [chore] 2. proj: x", undefined, "proj", "p"), 
 assert.deepEqual(relabel("[gate] 4. projects: x", "from: projects #4", "proj", "p"), ["[gate] 4. projects: x", "from: projects #4"]);
 assert.deepEqual(relabel("[gate] 4. other text proj: x", "note from: proj #4", "proj", "p"), ["[gate] 4. other text proj: x", "note from: proj #4"]);
 assert.deepEqual(relabel("[gate] 4. proj: x", "from: proj #4", "proj", "proj"), ["[gate] 4. proj: x", "from: proj #4"]);
+
+// a moved item takes the target's rank; deps follow the map or drop out with the old list
+const map = new Map([[3, 12], [4, 13]]);
+assert.deepEqual(renumberText("claude: [build] 3. wire rows (dep on #4, #9)", map), {
+    text: "claude: [build] 12. wire rows (dep on #13)",
+    dropped: ["#9"],
+});
+assert.deepEqual(renumberText("[gate] 3b. sub step", map), { text: "[gate] 12b. sub step", dropped: [] });
+assert.deepEqual(renumberText("[gate] 4. only foreign (dep on #9)", map), { text: "[gate] 13. only foreign", dropped: ["#9"] });
+assert.deepEqual(renumberText("water plants", map), { text: "water plants", dropped: [] });
+assert.deepEqual(renumberText("[x] 7. unmapped rank", map), { text: "[x] 7. unmapped rank", dropped: [] });
+assert.deepEqual(
+    relabel("[gate] 2. old: x", "from: old #3 (id a)", "old", "new", map),
+    ["[gate] 2. new: x", "from: new #12 (id a)"],
+);
+assert.deepEqual(
+    relabel("[gate] 2. same: x", "from: same #4 (id a)", "same", "same", map),
+    ["[gate] 2. same: x", "from: same #13 (id a)"],
+);
 
 console.log("todo-text: all checks passed");

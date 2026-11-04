@@ -552,20 +552,20 @@ Todo items:
 
 | Tool | Description |
 |------|-------------|
-| `list_todos` | List items from a list, filtered by status, priority, #tag and/or due date |
+| `list_todos` | List items from a list, filtered by status, priority, #tag, due date, `worktree` and/or `feature` |
 | `get_todo` | Fetch one item by id from whichever list holds it, no list name needed, with the list notes linked to it |
 | `search_todos` | Search every list for items matching a text pattern |
 | `list_tags` | List the inline #tags on a list, with usage counts |
-| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item), `sequence`, and `owe` (also write a linked twin into `daily`) |
-| `update_todo` | Edit text, description, status, priority, due date, order, `sequence`, or `parent`. Needs an id |
+| `add_todo` | Create a todo, composing the text from `type`, `deps`, and an auto-assigned rank. Takes `due`, `parent` (nest under another item), `sequence`, `worktree` and `feature` (which checkout and feature the item belongs to), and `owe` (also write a linked twin into `daily`) |
+| `update_todo` | Edit text, description, status, priority, due date, order, `sequence`, `parent`, `worktree`, or `feature`. Needs an id |
 | `sequence_todos` | Set a list's whole run order in one call from ranks or ids. Everything not named loses its sequence |
-| `start_todo` | Mark an item in progress. Fuzzy text query; only one item runs at a time |
+| `start_todo` | Mark an item in progress. Fuzzy text query; one item runs at a time per worktree |
 | `complete_todo` | Mark an item done. Fuzzy text query; with no args it looks at in-progress items |
 | `revert_todo` | Send an item back to pending |
 | `delete_todo` | Delete an item, keeping it in `_metadata.deleted_todos` for undo |
 | `clear_done` | Delete every completed item in a list, keeping the last 10 for undo |
 | `dedupe_todos` | Remove items whose text matches after normalization. Dry run by default |
-| `move_todo` | Move an item to another list |
+| `move_todo` | Move an item to another list. It takes that list's next rank; deps that pointed into the old list drop off and get recorded in its description |
 
 Ids are global. Copy one from the tmux item view (`i`) or the nvim item view
 (`y`), paste it at the model, and `get_todo`, `start_todo`, `complete_todo`,
@@ -612,6 +612,7 @@ Lists:
 | `switch_list` | Change the active list. Inside tmux it links the current window and updates the global pointer; `scope` narrows the write to `window` (or its older name `session`) or `global` |
 | `create_list` | Create a new empty list. It links nothing; `switch_list` does that |
 | `rename_list` | Rename a list. Switch away from it first |
+| `merge_list` | Move every item and list note from one list into another, for folding an old feature list into its repo list. Moved items get fresh ranks with their deps remapped, owed twins and tmux window links follow, and `worktree` / `feature` get stamped on items that have none. The source is left empty for you to delete |
 | `delete_list` | Delete a list. Switch away from it first. The file moves to `deleted/<list>-<epoch>.json` in the data dir, and owed twins on other lists stay, unlinked |
 
 ### Item Text Convention
@@ -622,7 +623,9 @@ Items the MCP server creates get a scannable title instead of a bare sentence:
 claude: [gate] 41. pre-store gate check (dep on #40)
 ```
 
-You pass `type` (a short free-form tag like `gate`, `decision`, `bug`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list and never changes, so deps and `#N` references stay valid. It's a handle, not the work order. When items need to run in a set order, give them a sequence (`sequence_todos`, or `S` in nvim and tmux). Sequenced pending items get their own Sequence section above the priority groups and run in that order no matter their priority, and `/burn`-style workers see them first in `list_todos`. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. The `claude:` burn-down marker carries over too, so pass `claude: false` to drop it once an item is no longer model work. Composing is idempotent, so prefixes never stack.
+You pass `type` (a short free-form tag like `gate`, `decision`, `bug`) and `deps` (the rank numbers of blocking items) as params — the server composes the final text. The rank number is assigned automatically from the highest one already in the list and never changes while the item stays on that list, so deps and `#N` references stay valid. It's a handle, not the work order. When items need to run in a set order, give them a sequence (`sequence_todos`, or `S` in nvim and tmux). Sequenced pending items get their own Sequence section above the priority groups and run in that order no matter their priority, and `/burn`-style workers see them first in `list_todos`. `update_todo` keeps an item's rank when you rewrite its text, and takes `type` / `deps` to retype or re-point it later. The `claude:` burn-down marker carries over too, so pass `claude: false` to drop it once an item is no longer model work. Composing is idempotent, so prefixes never stack.
+
+One repo list can serve several checkouts at once. Pass `worktree` (the git worktree's directory name) and `feature` on `add_todo` and they're stored as fields, not text, and every tool's output shows them as `[wt:...] [feat:...]`. `start_todo` only stops the running item in the same worktree, so two sessions in two worktrees each keep their own, and `list_todos` filters on either field. An owed item's `daily` twin carries both.
 
 Keep the body a short label, 40 characters or so, because it's what the tmux chip and the board show. Paths, commands, sub-steps, and the reasoning go in the item's description, and the tool docs ask models for exactly that.
 

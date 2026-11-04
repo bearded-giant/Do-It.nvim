@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { composeTodoText, nextRank, normalizeTodoText, parseTags, parseTodoText, relabelTwin } from "./todo-text.js";
+import { composeTodoText, nextRank, normalizeTodoText, parseTags, parseTodoText, relabelTwin, renumberText } from "./todo-text.js";
 import { isSequenced, setSequence } from "./sequence.js";
 
 // Root VERSION is the single source of truth, read at runtime exactly as the
@@ -45,6 +45,13 @@ const TYPE_HINT =
 const DEPS_HINT =
     " Rank numbers this item depends on, e.g. [12, 28] renders '(dep on #12, #28)'." +
     " Reference the leading N. of the blocking item, not its id. Pass [] to clear.";
+
+const SCOPE_HINT = {
+    worktree:
+        "Worktree this item belongs to (the git worktree's directory name, e.g. 'golden-runs-tooling')." +
+        " One repo list serves every worktree; set it on every item a session creates. Shown as [wt:...].",
+    feature: "Feature this item belongs to, when the work is for one. Shown as [feat:...].",
+};
 
 const SEQUENCE_HINT =
     "Run-queue position (1 = first). Pending items with a sequence run in this order" +
@@ -413,11 +420,31 @@ function fuzzyMatch(todos, query) {
     });
 }
 
+function scopeLabel(t) {
+    return `${t.worktree ? ` [wt:${t.worktree}]` : ""}${t.feature ? ` [feat:${t.feature}]` : ""}`;
+}
+
+// "" clears a field; keep leaves a field the item already has
+function applyScope(todo, { worktree, feature }, { keep = false } = {}) {
+    for (const [key, val] of Object.entries({ worktree, feature })) {
+        if (val === undefined || (keep && todo[key])) continue;
+        if (val === "") delete todo[key];
+        else todo[key] = val;
+    }
+}
+
+// sessions in different worktrees share one repo list, so each worktree keeps its own active item
+function stopActive(todos, todo) {
+    for (const t of todos || []) {
+        if (t !== todo && t.in_progress && (t.worktree || "") === (todo.worktree || "")) t.in_progress = false;
+    }
+}
+
 function formatTodoLine(t) {
     const status = t.done ? "[x]" : t.in_progress ? "[~]" : "[ ]";
     const prio = t.priorities ? ` ${PRIORITY_LABELS[t.priorities] || t.priorities}` : "";
     const hasNote = t.description ? " (has notes)" : "";
-    return `${status}${prio} ${t.text}${hasNote}  [id:${t.id}]`;
+    return `${status}${prio} ${t.text}${hasNote}${scopeLabel(t)}  [id:${t.id}]`;
 }
 
 function presentChoices(matches, context, actionHint) {
@@ -570,8 +597,10 @@ server.tool(
         priority: z.enum(["critical", "urgent", "important"]).optional().describe("Filter by priority level. Items without a priority are 'default'."),
         tag: z.string().optional().describe("Filter by inline #tag, without the '#'. Exact match: 'labels' does not match 'labels-web'."),
         due: z.enum(["overdue", "today", "week"]).optional().describe("Filter by due date: overdue, due today, or due within 7 days (which includes overdue and today)."),
+        worktree: z.string().optional().describe("Only items stamped with this worktree (exact match)."),
+        feature: z.string().optional().describe("Only items stamped with this feature (exact match)."),
     },
-    async ({ list, filter = "all", priority, tag, due }) => {
+    async ({ list, filter = "all", priority, tag, due, worktree, feature }) => {
         const { name, data } = loadList(list);
         let todos = data.todos || [];
 
@@ -587,6 +616,9 @@ server.tool(
             const wanted = tag.replace(/^#/, "");
             todos = todos.filter(t => hasTag(t.text, wanted));
         }
+
+        if (worktree !== undefined) todos = todos.filter(t => t.worktree === worktree);
+        if (feature !== undefined) todos = todos.filter(t => t.feature === feature);
 
         if (due) {
             todos = todos.filter(t => {
@@ -604,7 +636,7 @@ server.tool(
             const dueLabel = t.due_date ? ` [${renderDue(t.due_date)}]` : "";
             const seqLabel = isSequenced(t) ? ` [seq ${t.sequence}]` : "";
             const indent = "  ".repeat(depth);
-            let line = `${indent}${status}${prio} ${t.text}${dueLabel}${seqLabel}  [id:${t.id}]`;
+            let line = `${indent}${status}${prio} ${t.text}${dueLabel}${seqLabel}${scopeLabel(t)}  [id:${t.id}]`;
             if (t.description) {
                 const notePreview = t.description.split("\n").map(l => `    ${l}`).join("\n");
                 line += `\n    notes:\n${notePreview}`;
@@ -726,6 +758,8 @@ server.tool(
             `Priority: ${todo.priorities || "none"}`,
         ];
         if (todo.sequence) lines.push(`Sequence: ${todo.sequence}`);
+        if (todo.worktree) lines.push(`Worktree: ${todo.worktree}`);
+        if (todo.feature) lines.push(`Feature: ${todo.feature}`);
         if (todo.due_date) lines.push(`Due: ${todo.due_date} (${renderDue(todo.due_date)})`);
         if (tags.length) lines.push(`Tags: ${tags.map(t => `#${t}`).join(" ")}`);
         if (parent) lines.push(`Parent: ${formatTodoLine(parent)}`);
@@ -761,9 +795,11 @@ server.tool(
         parent: z.union([z.number(), z.string()]).optional().describe("Nest under this item: its rank number (the leading N.) or its id. Ranks stay flat and unique across the whole list."),
         start: z.boolean().optional().describe("Immediately set as in_progress (default: false)"),
         sequence: z.number().int().positive().optional().describe(SEQUENCE_HINT),
+        worktree: z.string().optional().describe(SCOPE_HINT.worktree),
+        feature: z.string().optional().describe(SCOPE_HINT.feature),
         owe: z.boolean().optional().describe(`The USER owes this action and nothing else can do it: credentials, a console (vault, DNS, IdP, GCP, beta admin), outward comms, or a human call the code can't settle, actionable now, with work or a security/prod risk waiting on it. Never for resuming a session, merging/reviewing an MR, tagging/deploying after a merge, watching for a future event, or anything the model can run. Writes this item AND a twin in "${OWED_LIST}", cross-linked by id, so the user tracks everything they owe across projects in one list. Completing, reverting, deleting or re-prioritizing either twin through these tools applies to both. Put why / do / links / resume sections in 'description'; both twins get it. Not for 'claude:' items.`),
     },
-    async ({ text, list, type, deps, description, priority, due, parent, start, sequence, owe }) => {
+    async ({ text, list, type, deps, description, priority, due, parent, start, sequence, owe, worktree, feature }) => {
         const { name, filepath, data } = loadList(list);
         const id = generateId();
         const parsed = parseTodoText(text);
@@ -787,6 +823,7 @@ server.tool(
             source: itemSource,
         };
         newTodo.description = stampDescription(description || "");
+        applyScope(newTodo, { worktree, feature });
         if (priority) newTodo.priorities = priority;
         if (due) {
             if (!parseDue(due)) throw new Error(`Invalid due date "${due}". Use YYYY-MM-DD.`);
@@ -817,6 +854,7 @@ server.tool(
             };
             if (newTodo.priorities) owedTodo.priorities = newTodo.priorities;
             if (newTodo.due_date) owedTodo.due_date = newTodo.due_date;
+            applyScope(owedTodo, newTodo);
             newTodo.description = stampDescription(`${OWED_LIST}: ${owedId}${extra}`);
             newTodo.twin = { list: OWED_LIST, id: owedId };
             owed.data.todos = owed.data.todos || [];
@@ -826,7 +864,7 @@ server.tool(
         }
 
         data.todos = data.todos || [];
-        if (start) for (const t of data.todos) t.in_progress = false;
+        if (start) stopActive(data.todos, newTodo);
         data.todos.push(newTodo);
         if (sequence) setSequence(data.todos, newTodo, sequence);
         saveList(filepath, data);
@@ -835,7 +873,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Added to "${name}": ${composed}${status} [id:${id}]${twinLine}`,
+                text: `Added to "${name}": ${composed}${status}${scopeLabel(newTodo)} [id:${id}]${twinLine}`,
             }],
         };
     }
@@ -861,8 +899,10 @@ server.tool(
         sequence: z.number().int().min(0).optional().describe(SEQUENCE_HINT + " 0 clears it."),
         due: z.string().optional().describe("Set due date as YYYY-MM-DD. Use an empty string to clear it."),
         parent: z.union([z.number(), z.string()]).optional().describe("Re-nest under this item (rank number or id). Use an empty string to move it back to the top level."),
+        worktree: z.string().optional().describe(SCOPE_HINT.worktree + " Empty string clears it."),
+        feature: z.string().optional().describe(SCOPE_HINT.feature + " Empty string clears it."),
     },
-    async ({ id, list, text, type, deps, claude, description, priority, done, in_progress, order_index, sequence, due, parent }) => {
+    async ({ id, list, text, type, deps, claude, description, priority, done, in_progress, order_index, sequence, due, parent, worktree, feature }) => {
         const { name, filepath, data } = loadListForTodo(list, id);
         const todo = (data.todos || []).find(t => t.id === id);
         if (!todo) throw new Error(`Todo "${id}" not found in list "${name}"`);
@@ -876,6 +916,7 @@ server.tool(
             });
         }
         if (description !== undefined) todo.description = stampDescription(description);
+        applyScope(todo, { worktree, feature });
         if (priority !== undefined) {
             if (priority === "none") delete todo.priorities;
             else todo.priorities = priority;
@@ -938,7 +979,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Updated in "${name}": ${todo.text} [done:${todo.done}, in_progress:${todo.in_progress}${todo.sequence ? `, sequence:${todo.sequence}` : ""}]${twinNote}`,
+                text: `Updated in "${name}": ${todo.text}${scopeLabel(todo)} [done:${todo.done}, in_progress:${todo.in_progress}${todo.sequence ? `, sequence:${todo.sequence}` : ""}]${twinNote}`,
             }],
         };
     }
@@ -975,7 +1016,7 @@ server.tool(
 
 server.tool(
     "start_todo",
-    "Start a todo item (set in_progress=true): the list's active item, shown in the user's tmux chip and nvim statusline. Supports fuzzy text query. Only one item can be in_progress at a time — starting a new one stops the current one. Call it before working an item, and leave the next item started when you stop.",
+    "Start a todo item (set in_progress=true): the active item for its worktree, shown in the user's tmux chip and nvim statusline. Supports fuzzy text query. One item per worktree is in_progress: starting one stops the current one with the same worktree (items with no worktree share one slot), so parallel sessions on one repo list each keep their own. Call it before working an item, and leave the next item started when you stop.",
     {
         id: z.string().optional().describe("Todo ID."),
         query: z.string().optional().describe("Fuzzy text match (all words must appear)."),
@@ -995,10 +1036,7 @@ server.tool(
             return presentChoices(result.matches, `Multiple items match on "${name}"`, "Ask the user which to start, then call start_todo with the chosen ID.");
         }
 
-        // stop any currently in_progress items
-        for (const t of data.todos || []) {
-            if (t.in_progress) t.in_progress = false;
-        }
+        stopActive(data.todos, result.todo);
         result.todo.in_progress = true;
         result.todo.done = false;
         saveList(filepath, data);
@@ -1006,7 +1044,7 @@ server.tool(
         return {
             content: [{
                 type: "text",
-                text: `Started in "${name}": ${result.todo.text}`,
+                text: `Started in "${name}": ${result.todo.text}${scopeLabel(result.todo)}`,
             }],
         };
     }
@@ -1482,15 +1520,28 @@ server.tool(
         moved.depth = 0;
 
         // add to target
-        moved.order_index = getMaxOrder(targetData.todos || []) + 1;
-        delete moved.sequence;
         targetData.todos = targetData.todos || [];
+        moved.order_index = getMaxOrder(targetData.todos) + 1;
+        delete moved.sequence;
+        const { rank } = parseTodoText(moved.text);
+        const rankMap = rank === null ? null : new Map([[rank, nextRank(targetData.todos)]]);
+        if (rankMap) {
+            const { text, dropped } = renumberText(moved.text, rankMap);
+            moved.text = text;
+            if (dropped.length) {
+                const kept = stripFooter(moved.description).trimEnd();
+                moved.description = stampDescription(
+                    `${kept ? `${kept}\n\n` : ""}moved from ${source.name} #${rank}; its deps there: ${dropped.join(", ")}`,
+                );
+            }
+        }
+        if (moved.in_progress) stopActive(targetData.todos, moved);
         targetData.todos.push(moved);
 
         saveList(source.filepath, source.data);
         saveList(targetPath, targetData);
         const twinNote = syncTwin(moved, (_, t) => {
-            relabelTwin(t, t.twin.list, to_list);
+            relabelTwin(t, t.twin.list, to_list, rankMap);
             t.twin.list = to_list;
             return "relinked";
         });
@@ -1499,6 +1550,93 @@ server.tool(
             content: [{
                 type: "text",
                 text: `Moved from "${source.name}" to "${to_list}": ${moved.text}${twinNote}`,
+            }],
+        };
+    }
+);
+
+server.tool(
+    "merge_list",
+    `Move every item and list note from one do-it list into another, e.g. folding an old feature or worktree list into its repo list. Moved items take fresh ranks after the target's highest, their (dep on #N) refs follow, owed twins and tmux window links follow to the target, and worktree/feature are stamped on moved items that have none. The source list is left empty, not deleted: delete_list it once the user confirms. Never from or to "${OWED_LIST}".`,
+    {
+        from: z.string().describe("List to empty"),
+        to: listNameSchema.describe("List to merge into; created when missing"),
+        worktree: z.string().optional().describe("Stamp this worktree on moved items that have none"),
+        feature: z.string().optional().describe("Stamp this feature on moved items that have none"),
+    },
+    async ({ from, to, worktree, feature }) => {
+        if (from === to) throw new Error("from and to are the same list.");
+        if (from === OWED_LIST || to === OWED_LIST) {
+            throw new Error(`"${OWED_LIST}" holds the owed twins; merge project lists only.`);
+        }
+        const source = loadList(from);
+        const targetPath = getListPath(to);
+        const now = Math.floor(Date.now() / 1000);
+        const target = fs.existsSync(targetPath)
+            ? readJSON(targetPath)
+            : { todos: [], _metadata: { created_at: now, updated_at: now } };
+        target.todos = target.todos || [];
+        const moved = source.data.todos || [];
+        const notes = source.data.notes || [];
+
+        let next = nextRank(target.todos);
+        const rankMap = new Map();
+        const ranks = new Set(moved.map(t => parseTodoText(t.text).rank).filter(n => n !== null));
+        for (const rank of [...ranks].sort((a, b) => a - b)) rankMap.set(rank, next++);
+
+        const orderBase = getMaxOrder(target.todos);
+        const seqBase = Math.max(0, ...target.todos.filter(isSequenced).map(t => t.sequence));
+        const active = new Set(target.todos.filter(t => t.in_progress && !t.done).map(t => t.worktree || ""));
+        for (const t of moved) {
+            t.text = renumberText(t.text, rankMap).text;
+            t.order_index = orderBase + (t.order_index || 0);
+            if (typeof t.sequence === "number") t.sequence += seqBase;
+            applyScope(t, { worktree, feature }, { keep: true });
+            if (t.in_progress && !t.done) {
+                const slot = t.worktree || "";
+                if (active.has(slot)) t.in_progress = false;
+                else active.add(slot);
+            }
+        }
+        // a twin pair inside the two lists is rewritten here; syncTwin would read the stale files
+        for (const t of [...moved, ...target.todos]) {
+            if (t.twin && t.twin.list === from) {
+                relabelTwin(t, from, to, rankMap);
+                t.twin.list = to;
+            }
+        }
+        target.todos.push(...moved);
+        if (notes.length) target.notes = [...(target.notes || []), ...notes];
+
+        // target first: a crash between the writes duplicates items instead of losing them
+        saveList(targetPath, target);
+        source.data.todos = [];
+        source.data.notes = [];
+        saveList(source.filepath, source.data);
+
+        let relinked = 0;
+        for (const t of moved) {
+            if (!t.twin || t.twin.list === to) continue;
+            syncTwin(t, (_, twin) => {
+                relabelTwin(twin, twin.twin.list, to, rankMap);
+                twin.twin.list = to;
+                relinked++;
+                return "relinked";
+            });
+        }
+        updateSession(session => {
+            for (const [sess, list] of Object.entries(session.sessions || {})) {
+                if (list === from) session.sessions[sess] = to;
+            }
+        });
+        retagLiveWindows(from, to);
+
+        const pending = moved.filter(t => !t.done).length;
+        const span = rankMap.size ? `; ranks #${[...rankMap.values()][0]}-#${next - 1}` : "";
+        return {
+            content: [{
+                type: "text",
+                text: `Merged ${moved.length} item(s) (${pending} pending) and ${notes.length} note(s) from "${from}" into "${to}"${span}; ${relinked} twin(s) relinked. "${from}" is empty; delete_list it once the user confirms.`,
             }],
         };
     }

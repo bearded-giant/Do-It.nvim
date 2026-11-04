@@ -55,16 +55,47 @@ export function parseTodoText(text) {
 const LABEL_PREFIX = /^(?:claude:\s*)?(?:\[[^\][]+\]\s*)?(?:\d+[a-z]*\.\s+)?/i;
 
 // an owed twin names its project list ("[gate] 4. proj: body", "from: proj #4"), so a relink renames that label
-export function relabelTwin(todo, oldList, newList) {
-    if (!oldList || oldList === newList) return;
+export function relabelTwin(todo, oldList, newList, rankMap) {
+    if (!oldList || (oldList === newList && !rankMap)) return;
     const text = todo.text || "";
     const prefix = LABEL_PREFIX.exec(text)[0];
     const rest = text.slice(prefix.length);
     if (rest.startsWith(`${oldList}: `)) todo.text = `${prefix}${newList}: ${rest.slice(oldList.length + 2)}`;
     const from = `from: ${oldList} #`;
     if ((todo.description || "").startsWith(from)) {
-        todo.description = `from: ${newList} #${todo.description.slice(from.length)}`;
+        let tail = todo.description.slice(from.length);
+        const n = /^\d+/.exec(tail);
+        if (rankMap && n && rankMap.has(Number(n[0]))) tail = `${rankMap.get(Number(n[0]))}${tail.slice(n[0].length)}`;
+        todo.description = `from: ${newList} #${tail}`;
     }
+}
+
+// ranks are unique per list, so an item landing in another list takes a new rank and
+// its deps follow through the same old->new map; deps the map lacks pointed into the old list
+export function renumberText(text, rankMap) {
+    const { groups } = TEXT_SHAPE.exec(text || "");
+    const remap = (n, suffix) => (rankMap.has(Number(n)) ? `${rankMap.get(Number(n))}${suffix || ""}` : null);
+    const dropped = [];
+    let body = groups.body || "";
+    const deps = DEP_SUFFIX.exec(body);
+    if (deps) {
+        const kept = [...deps[0].matchAll(/#(\d+)([a-z]*)/gi)]
+            .map(([ref, n, suffix]) => {
+                const next = remap(n, suffix);
+                if (next === null) dropped.push(ref);
+                return next;
+            })
+            .filter(Boolean);
+        body = body.slice(0, deps.index).trimEnd();
+        if (kept.length) body = `${body} (dep on ${kept.map(r => `#${r}`).join(", ")})`;
+    }
+    const rank = groups.rank ? remap(groups.rank, groups.suffix) || `${groups.rank}${groups.suffix || ""}` : null;
+    return {
+        text: [groups.claude ? "claude:" : null, groups.type ? `[${groups.type}]` : null, rank ? `${rank}.` : null, body]
+            .filter(Boolean)
+            .join(" "),
+        dropped,
+    };
 }
 
 export function nextRank(todos) {
